@@ -4,18 +4,20 @@
  * holds as a file under `.agents/` inside the unit's worktree and the brief lists the paths, short
  * ones inline. The story's documents go to its spec folder, `.agents/specs/<story>/` (`spec.md`,
  * `handoffs/<unit>.md`), the layout a repo keeping specs in `.agents` uses; every other input goes to
- * `.agents/inputs/`. Each folder norn writes holds a `.gitignore` of `*`, so nothing the agent reads is
- * ever committed, whether or not the repo commits the rest of `.agents/`.
+ * the run folder's `in/` (`.agents/run/in/`, `$NORN_IN`), and the run writes its reports to its
+ * `out/` (`$NORN_OUT`), which every launch empties. Each folder norn writes holds a `.gitignore` of
+ * `*`, so nothing the agent reads or reports is ever committed, whether or not the repo commits the
+ * rest of `.agents/`.
  *
  * The spec, the handoff, the slice files (`slices/<nn>-<slug>.md`) and the files the workflow's steps
  * produce (`produces:`, such as `pr.md`) are documents the agent edits there: what it changed is read
  * back into the story's documents when it reports (and before the next materialization), so the next
  * step reads it, a slice in its own worktree included.
- * A copy of what norn last wrote sits in `.agents/inputs/.base/`, and only a file that differs from it
+ * A copy of what norn last wrote sits in `.agents/run/.base/`, and only a file that differs from it
  * is read back, so a worktree that kept a stale, untouched copy never overwrites a newer document.
  */
 import { type BriefInputs, type BriefInputView, type BriefStory, type KernelReceipt, producedFiles, type UnitJournal, type WorkflowStepDoc } from "@norn/kernel";
-import { ok, type PluginResult, parseStoryKey, parseUnitId, type TrackerItem } from "@norn/plugin-api";
+import { type HostFiles, ok, type PluginResult, parseStoryKey, parseUnitId, RUN_DIRS_ENV, type TrackerItem } from "@norn/plugin-api";
 import type { CriterionVerdict, Finding } from "@norn/schema";
 import { baseRefOf, cutFrom } from "./branches.ts";
 import type { RuntimeEnv } from "./env.ts";
@@ -27,15 +29,53 @@ import { HANDOFFS_DIR, handoffArtifact, listStoryDocs, readStoryDoc, writeStoryD
 const AGENTS_DIR = ".agents";
 /** the folder of each story's documents in a worktree: `.agents/specs/<story>/` */
 export const SPECS_DIR = `${AGENTS_DIR}/specs`;
+/** the folder of what belongs to one run: its inputs, its reports and norn's copies of the documents */
+export const RUN_DIR = `${AGENTS_DIR}/run`;
 /** the folder of the inputs rewritten for every run */
-export const INPUTS_DIR = `${AGENTS_DIR}/inputs`;
-const BASE_DIR = `${INPUTS_DIR}/.base`;
+export const INPUTS_DIR = `${RUN_DIR}/in`;
+/** the folder a run writes its reports to, emptied at every launch */
+export const OUT_DIR = `${RUN_DIR}/out`;
+const BASE_DIR = `${RUN_DIR}/.base`;
+/** where a worktree made before the run folder keeps its copies; read so its untouched documents still read as untouched */
+const LEGACY_BASE_DIR = `${AGENTS_DIR}/inputs/.base`;
 const IGNORE_ALL = "*\n";
 const IGNORE_FILE = ".gitignore";
 /** Text up to this long is shown in the brief itself as well as written to its file. */
 const INLINE_MAX = 1500;
 
-export const INPUTS_NOTE = `norn's files in this worktree are under \`${AGENTS_DIR}/\` and ignored by git: the story's spec and this unit's handoff in \`${SPECS_DIR}/<story>/\`, the other inputs in \`${INPUTS_DIR}/\`. Edit the handoff, and add your sections to the spec below its item block; norn reads both back when you report, and the slice files in its \`slices/\` folder too. The other inputs are rewritten for every run.`;
+export const INPUTS_NOTE = `norn's files in this worktree are under \`${AGENTS_DIR}/\` and ignored by git: the story's spec and this unit's handoff in \`${SPECS_DIR}/<story>/\`, the other inputs in \`${INPUTS_DIR}/\` (\`$${RUN_DIRS_ENV.in}\`). Edit the handoff, and add your sections to the spec below its item block; norn reads both back when you report, and the slice files in its \`slices/\` folder too. The other inputs are rewritten for every run.`;
+
+/** The run folder's `in/` and `out/` in a worktree, as every launch sets them in the agent's env. */
+export function runDirsEnv(worktree: string): Record<string, string> {
+  return { [RUN_DIRS_ENV.in]: `${worktree}/${INPUTS_DIR}`, [RUN_DIRS_ENV.out]: `${worktree}/${OUT_DIR}` };
+}
+
+/**
+ * Empty the run folder's `out/` before a launch: a report belongs to the run that wrote it, and one an
+ * earlier run left (it died before it reported) would otherwise be collected as this run's.
+ */
+export async function clearOut(files: HostFiles, worktree: string): Promise<void> {
+  await emptyFolder(files, `${worktree}/${OUT_DIR}`);
+}
+
+async function emptyFolder(files: HostFiles, dir: string): Promise<void> {
+  for (const name of await files.list(dir)) {
+    const path = `${dir}/${name}`;
+    let inner: string[];
+    try {
+      inner = await files.list(path);
+    } catch {
+      // listing a file fails: it has nothing inside
+      inner = [];
+    }
+    if (inner.length > 0) await emptyFolder(files, path);
+    try {
+      await files.remove(path);
+    } catch {
+      // a folder is not removed as a file; left empty, it holds no report
+    }
+  }
+}
 
 /** The worktree a unit's agent works in: its own with a vcs that makes worktrees, else the repo's checkout. */
 export function worktreeOf(env: RuntimeEnv, unit: string): string {
@@ -51,6 +91,7 @@ interface Doc {
   file: string;
   /** what norn last wrote there, relative to the worktree */
   base: string;
+  legacyBase: string;
 }
 
 /** The story's spec folder in a worktree; `unit` may be a slice, whose story's folder it shares. */
@@ -62,7 +103,8 @@ export function specFolder(unit: string): string {
 
 function doc(name: string, unit: string, artifact: string): Doc {
   const file = `${specFolder(unit)}/${artifact}`;
-  return { name, artifact, file, base: `${BASE_DIR}/${file.slice(AGENTS_DIR.length + 1)}` };
+  const rel = file.slice(AGENTS_DIR.length + 1);
+  return { name, artifact, file, base: `${BASE_DIR}/${rel}`, legacyBase: `${LEGACY_BASE_DIR}/${rel}` };
 }
 const docsOf = (unit: string): Doc[] => [doc("spec", unit, SPEC_ARTIFACT), doc("handoff", unit, handoffArtifact(unit))];
 
@@ -138,7 +180,7 @@ export async function readBackDocs(env: RuntimeEnv, unit: string, worktree = wor
   for (const d of [...own, ...made]) {
     const text = await readFile(env, `${worktree}/${d.file}`);
     if (text === null) continue;
-    const base = await readFile(env, `${worktree}/${d.base}`);
+    const base = (await readFile(env, `${worktree}/${d.base}`)) ?? (await readFile(env, `${worktree}/${d.legacyBase}`));
     if (text === base) continue;
     const wrote = await writeStoryDoc(env, unit, d.artifact, text);
     if (!wrote.ok) continue;
@@ -296,7 +338,7 @@ export interface MaterializedInputs {
 export async function materializeInputs(env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, worktree = worktreeOf(env, record.unit)): Promise<PluginResult<MaterializedInputs>> {
   const unit = record.unit;
   try {
-    await env.ctx.files.write(`${worktree}/${INPUTS_DIR}/${IGNORE_FILE}`, IGNORE_ALL);
+    await env.ctx.files.write(`${worktree}/${RUN_DIR}/${IGNORE_FILE}`, IGNORE_ALL);
     await env.ctx.files.write(`${worktree}/${specFolder(unit)}/${IGNORE_FILE}`, IGNORE_ALL);
     await readBackDocs(env, unit, worktree, producedOf(record));
     const item = await storyItem(env, unit);

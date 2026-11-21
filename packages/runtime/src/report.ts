@@ -17,7 +17,7 @@ import { branchOf, baseRefOf, cutFrom } from "./branches.ts";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
 import { baseConflictOf } from "./input-history.ts";
-import { INPUTS_DIR, producedOf, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
+import { producedOf, readBackDocs, RUN_DIR, specFolder, worktreeOf } from "./inputs.ts";
 import { handoffArtifact } from "./story-docs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
@@ -400,7 +400,7 @@ const DIRTY_SHOWN = 10;
  * Why a `done` cannot be recorded while the unit's checkout holds work not committed, or null when
  * it can: the steps after it (a branch update, a push, a pull request) carry commits only, so what
  * is left in the worktree would be lost or make them fail. norn's own files there never count: the
- * inputs and the story's spec folder, which it reads back itself (though a repo that commits its
+ * run folder (inputs, reports) and the story's spec folder, which it reads back itself (though a repo that commits its
  * specs tracks them), and what it installed for the run's executor, which a repo's own `.gitignore`
  * can leave showing and which committing would carry norn's hooks into the branch. An ask or stuck
  * is never held back: the work is not handed on.
@@ -411,7 +411,7 @@ async function uncommittedRefusal(env: RuntimeEnv, unit: string, executor: strin
   const worktree = worktreeOf(env, unit);
   const r = await vcs.uncommitted(worktree);
   if (!r.ok) return refuse(`cannot tell whether ${worktree} holds uncommitted work: ${r.failure.message}`, "report again with the same command", r.failure.code);
-  const owned = [`${INPUTS_DIR}/`, `${specFolder(unit)}/`];
+  const owned = [`${RUN_DIR}/`, `${specFolder(unit)}/`];
   const harness = env.slots.executors[executor];
   const installed = new Set([...(harness?.localFiles ?? []), ...skillLinks(harness?.skillsDir, env.slots.pack.skills)]);
   const left = r.value.filter((p) => !installed.has(p) && !owned.some((o) => p.startsWith(o)));

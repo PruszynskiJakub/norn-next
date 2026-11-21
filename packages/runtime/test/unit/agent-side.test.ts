@@ -507,9 +507,9 @@ describe("reporting", () => {
     expect(await reportRun(h.env, UNIT, runId, { verb: "ask", question: "keep src/a.ts?" }, "r2")).toMatchObject({ ok: true });
   });
 
-  test("norn's own files in the worktree (its inputs and the story's spec folder) never count as uncommitted work", async () => {
+  test("norn's own files in the worktree (the run folder and the story's spec folder) never count as uncommitted work", async () => {
     const { h, runId } = await running();
-    h.dirty[WORKTREE] = [".agents/inputs/last_check.md", `.agents/specs/${UNIT}/spec.md`, `.agents/specs/${UNIT}/handoffs/${UNIT}.md`];
+    h.dirty[WORKTREE] = [".agents/run/in/last_check.md", ".agents/run/out/notes.txt", ".agents/run/.base/specs/lt-1/spec.md", `.agents/specs/${UNIT}/spec.md`, `.agents/specs/${UNIT}/handoffs/${UNIT}.md`];
     expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
   });
 

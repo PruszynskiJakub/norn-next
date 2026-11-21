@@ -90,15 +90,15 @@ describe("renderBrief", () => {
         story: { key: "gh-12", title: "Sign in with a passkey", url: "https://forge.example/12" },
         inputs: [
           { name: "spec", label: "the story's spec", path: ".agents/specs/gh-1/spec.md" },
-          { name: "last_check", label: "the last check's result", path: ".agents/inputs/last_check.md", text: "Check `test` exited 1.\n\n```\nFAIL a.test.ts\n```" },
+          { name: "last_check", label: "the last check's result", path: ".agents/run/in/last_check.md", text: "Check `test` exited 1.\n\n```\nFAIL a.test.ts\n```" },
           { name: "diff", note: "run `git diff main...HEAD`" },
         ],
-        inputsNote: "`.agents/inputs/` is ignored by git.",
+        inputsNote: "`.agents/run/in/` is ignored by git.",
       }),
     );
     expect(md).toContain("## Story\n\n`gh-12`: Sign in with a passkey (https://forge.example/12)\n\n## Your work");
-    expect(md).toContain("- `spec` — the story's spec: `.agents/specs/gh-1/spec.md`\n- `last_check` — the last check's result: `.agents/inputs/last_check.md`\n  ````\n  Check `test` exited 1.\n\n  ```\n  FAIL a.test.ts\n  ```\n  ````\n- `diff` — run `git diff main...HEAD`");
-    expect(md).toContain("`.agents/inputs/` is ignored by git.");
+    expect(md).toContain("- `spec` — the story's spec: `.agents/specs/gh-1/spec.md`\n- `last_check` — the last check's result: `.agents/run/in/last_check.md`\n  ````\n  Check `test` exited 1.\n\n  ```\n  FAIL a.test.ts\n  ```\n  ````\n- `diff` — run `git diff main...HEAD`");
+    expect(md).toContain("`.agents/run/in/` is ignored by git.");
     expect(md).not.toContain("- `handoff`\n");
   });
 

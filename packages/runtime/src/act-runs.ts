@@ -11,6 +11,7 @@ import { ensureWorktree } from "./branches.ts";
 import { stopDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
 import { appendEvents } from "./events/log.ts";
+import { clearOut } from "./inputs.ts";
 import { nudgePromptId } from "./launcher.ts";
 import { unitInFacts } from "./record.ts";
 import { readStepRun } from "./step-runs.ts";
@@ -76,6 +77,7 @@ async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"r
   const acted = await t.env.journal.act(unit, {
     intent: d.intent,
     perform: async () => {
+      await clearOut(t.env.ctx.files, worktree.value);
       const started = await t.env.launcher.start(request);
       if (!started.ok) await endUnlaunched(t, unit, d.run_id, started.failure.message);
       return started;

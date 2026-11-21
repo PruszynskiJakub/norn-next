@@ -30,6 +30,7 @@ import { DEFAULT_KERNEL_CONFIG, reduceSession } from "@norn/kernel";
 import type { Harness, HostContext, NornPromptSource, PluginResult, Runner, RunnerSplitRequest } from "@norn/plugin-api";
 import { fail, markPrompt, ok, RUN_ENV } from "@norn/plugin-api";
 import { WRITES_ENV } from "./live-run.ts";
+import { runDirsEnv } from "./inputs.ts";
 import { agentBinEnv, cliOfHookCommand } from "./agent-bin.ts";
 import { dialogInputId } from "./dialog.ts";
 import { readEvents } from "./events/log.ts";
@@ -195,7 +196,7 @@ export class HarnessLauncher implements AgentLauncher {
     const model = run.brief.model ?? e.model;
     const agentEnv = await this.agentEnv();
     if (!agentEnv.ok) return agentEnv;
-    const env = { ...agentEnv.value, [RUN_ENV.unit]: run.unit, [RUN_ENV.run]: run.run_id, [WRITES_ENV]: run.writes ?? "worktree" };
+    const env = { ...agentEnv.value, [RUN_ENV.unit]: run.unit, [RUN_ENV.run]: run.run_id, [WRITES_ENV]: run.writes ?? "worktree", ...runDirsEnv(run.worktree) };
     let spec: ReturnType<Harness["launch"]>;
     try {
       spec = e.harness.launch({

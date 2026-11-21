@@ -105,7 +105,7 @@ describe("the slice files as inputs", () => {
     await sliceStarted(h, "lt-1/01");
     // a fresh checkout of the story: only the documents carry the files there
     await h.files.remove(`${WORKTREE}/${SLICES}/01-parse.md`);
-    await h.files.remove(`${WORKTREE}/.agents/inputs/.base/specs/lt-1/slices/01-parse.md`);
+    await h.files.remove(`${WORKTREE}/.agents/run/.base/specs/lt-1/slices/01-parse.md`);
     const v = await only(h, await record(h, UNIT), "slices");
     expect(v.path).toBe(`${SLICES}/`);
     expect(v.text).toBe("The slice files, each with where its slice stands:\n\n- `01-parse.md`: at `build` #1\n- `02-export.md`: not started");
@@ -154,8 +154,8 @@ describe("the base side of a conflict", () => {
   test("after a conflict it names the base commit to merge and, per path, what the base changed there", async () => {
     const h = await started();
     const v = await only(h, withReceipts(await record(h, UNIT), conflict), "base_side");
-    expect(v.path).toBe(".agents/inputs/base_side.md");
-    const text = (await h.files.read(`${WORKTREE}/.agents/inputs/base_side.md`)) ?? "";
+    expect(v.path).toBe(".agents/run/in/base_side.md");
+    const text = (await h.files.read(`${WORKTREE}/.agents/run/in/base_side.md`)) ?? "";
     expect(text).toContain(`could not merge \`main\` at \`${BASE_SHA}\` into the story branch \`norn/lt-1\`: it conflicts in 2 paths.`);
     expect(text).toContain(`\`git merge ${BASE_SHA}\``);
     expect(text).toContain(`- \`src/a.ts\`: the commits \`git log --format='%h %an %s' $(git merge-base HEAD ${BASE_SHA})..${BASE_SHA} -- 'src/a.ts'\`, the change \`git diff $(git merge-base HEAD ${BASE_SHA}) ${BASE_SHA} -- 'src/a.ts'\``);
@@ -166,7 +166,7 @@ describe("the base side of a conflict", () => {
     const h = await started();
     h.env.slots.vcs.mergeBase = async () => ({ ok: true, value: ANCHOR });
     await only(h, withReceipts(await record(h, UNIT), conflict), "base_side");
-    expect(await h.files.read(`${WORKTREE}/.agents/inputs/base_side.md`)).toContain(`git diff ${ANCHOR} ${BASE_SHA} -- 'src/a.ts'`);
+    expect(await h.files.read(`${WORKTREE}/.agents/run/in/base_side.md`)).toContain(`git diff ${ANCHOR} ${BASE_SHA} -- 'src/a.ts'`);
   });
 
   test("a slice whose integrate conflicted is given the story branch's commit to merge and, per path, what the story branch changed there", async () => {
@@ -174,8 +174,8 @@ describe("the base side of a conflict", () => {
     await sliced(h);
     const slice = withReceipts(await sliceStarted(h, "lt-1/01"), integrateConflict);
     const v = await only(h, slice, "base_side");
-    expect(v.path).toBe(".agents/inputs/base_side.md");
-    const text = (await h.files.read(`${SLICE_WORKTREE}/.agents/inputs/base_side.md`)) ?? "";
+    expect(v.path).toBe(".agents/run/in/base_side.md");
+    const text = (await h.files.read(`${SLICE_WORKTREE}/.agents/run/in/base_side.md`)) ?? "";
     expect(text).toContain(`Integrating this slice into the story branch \`norn/lt-1\` at \`integrate\` conflicted with it at \`${STORY_SHA}\`: 2 paths.`);
     expect(text).toContain(`\`git merge ${STORY_SHA}\``);
     expect(text).toContain(`- \`src/a.ts\`: the commits \`git log --format='%h %an %s' $(git merge-base HEAD ${STORY_SHA})..${STORY_SHA} -- 'src/a.ts'\``);
@@ -212,10 +212,10 @@ describe("each step sent to merge the base, as its workflow file lists its input
       const made = await materializeInputs(h.env, journal, briefWith(inputs));
       if (!made.ok) throw new Error(made.failure.message);
       const view = made.value.inputs.find((i) => i.name === "base_side");
-      expect({ where, path: view?.path }).toEqual({ where, path: ".agents/inputs/base_side.md" });
-      const text = (await h.files.read(`${WORKTREE}/.agents/inputs/base_side.md`)) ?? "";
+      expect({ where, path: view?.path }).toEqual({ where, path: ".agents/run/in/base_side.md" });
+      const text = (await h.files.read(`${WORKTREE}/.agents/run/in/base_side.md`)) ?? "";
       expect({ where, sha: text.includes(`\`git merge ${BASE_SHA}\``), a: text.includes("`src/a.ts`"), b: text.includes("`docs/it's.md`") }).toEqual({ where, sha: true, a: true, b: true });
-      await h.files.remove(`${WORKTREE}/.agents/inputs/base_side.md`);
+      await h.files.remove(`${WORKTREE}/.agents/run/in/base_side.md`);
     }
   });
 
@@ -231,10 +231,10 @@ describe("each step sent to merge the base, as its workflow file lists its input
       const inputs = listedInputs(text, "merge");
       const made = await materializeInputs(h.env, slice, briefWith(inputs));
       if (!made.ok) throw new Error(made.failure.message);
-      expect({ where, path: made.value.inputs.find((i) => i.name === "base_side")?.path }).toEqual({ where, path: ".agents/inputs/base_side.md" });
-      const file = (await h.files.read(`${SLICE_WORKTREE}/.agents/inputs/base_side.md`)) ?? "";
+      expect({ where, path: made.value.inputs.find((i) => i.name === "base_side")?.path }).toEqual({ where, path: ".agents/run/in/base_side.md" });
+      const file = (await h.files.read(`${SLICE_WORKTREE}/.agents/run/in/base_side.md`)) ?? "";
       expect({ where, sha: file.includes(`\`git merge ${STORY_SHA}\``), a: file.includes("`src/a.ts`"), b: file.includes("`src/b.ts`") }).toEqual({ where, sha: true, a: true, b: true });
-      await h.files.remove(`${SLICE_WORKTREE}/.agents/inputs/base_side.md`);
+      await h.files.remove(`${SLICE_WORKTREE}/.agents/run/in/base_side.md`);
     }
   });
 });
@@ -249,7 +249,7 @@ describe("the resolution to review", () => {
   test("after a resolved update it gives the remerge-diffs since the anchor and the conflicts this round recorded", async () => {
     const h = await started();
     const v = await only(h, withReceipts(await record(h, UNIT), conflict, resolved), "resolution");
-    expect(v.path).toBe(".agents/inputs/resolution.md");
+    expect(v.path).toBe(".agents/run/in/resolution.md");
     expect(v.text).toContain(`git log --first-parent --merges --remerge-diff --format='%H %s' ${ANCHOR}..${HEAD}`);
     expect(v.text).toContain(`- \`update\` could not merge \`main\` at \`${BASE_SHA.slice(0, 12)}\` (2026-11-17T10:00:00.000Z): \`src/a.ts\`, \`docs/it's.md\``);
   });
@@ -264,7 +264,7 @@ describe("the last findings", () => {
     const brief = { ...briefWith(["last_findings"]), ...(reworkFrom !== undefined && { rework_from: reworkFrom }) };
     const made = await materializeInputs(h.env, journal, brief);
     if (!made.ok) throw new Error(made.failure.message);
-    const text = await h.files.read(`${WORKTREE}/.agents/inputs/last_findings.md`);
+    const text = await h.files.read(`${WORKTREE}/.agents/run/in/last_findings.md`);
     return { view: made.value.inputs[0], text };
   }
 
@@ -272,7 +272,7 @@ describe("the last findings", () => {
     const h = await started();
     const journal = withReceipts(await record(h, UNIT), reject);
     const { view, text } = await lastFindings(h, journal, journal.receipts.at(-1)?.seq);
-    expect(view?.path).toBe(".agents/inputs/last_findings.md");
+    expect(view?.path).toBe(".agents/run/in/last_findings.md");
     expect(text).toContain("Rename the flag.");
   });
 
@@ -356,8 +356,8 @@ describe("the story's record", () => {
     await append(UNIT, "hq-1", { kind: "gate.decided", step: "human-qa", attempt: 1, outcome: "approve", by: "jo", reason: "Looks right." });
     await sliceStarted(h, "lt-1/01");
     const v = await only(h, await record(h, UNIT), "record");
-    expect(v.path).toBe(".agents/inputs/record.md");
-    const text = (await h.files.read(`${WORKTREE}/.agents/inputs/record.md`)) ?? "";
+    expect(v.path).toBe(".agents/run/in/record.md");
+    const text = (await h.files.read(`${WORKTREE}/.agents/run/in/record.md`)) ?? "";
     expect(text).toContain("## `lt-1` (the story): at `build` #1");
     expect(text).toContain("- `qa #1` reported `done partial`: All but the look checked. (criteria report below)");
     expect(text).toContain("- `human-qa #1` decided `approve` by jo: Looks right.");
@@ -388,15 +388,15 @@ describe("the brief", () => {
     const story = withReceipts(await record(h, UNIT), conflict, resolved);
     const md = renderBrief({ brief: briefWith(inputs), unit: UNIT, outcomes: ["done"], inputs: await views(h, story, inputs) });
     expect(md).toContain(`- \`slices\` — every slice file of the story: scope, dependencies, acceptance criteria: \`${SLICES}/\``);
-    expect(md).toContain("- `record` — the story's record: every unit's outcomes, gate rulings and criteria reports with their evidence: `.agents/inputs/record.md`");
-    expect(md).toContain("- `resolution` — the resolution to review: each merge's remerge-diff and the conflicts this round recorded: `.agents/inputs/resolution.md`");
+    expect(md).toContain("- `record` — the story's record: every unit's outcomes, gate rulings and criteria reports with their evidence: `.agents/run/in/record.md`");
+    expect(md).toContain("- `resolution` — the resolution to review: each merge's remerge-diff and the conflicts this round recorded: `.agents/run/in/resolution.md`");
     expect(md).toContain("- `base_side` — the base side of the conflict: the base commit to merge and what it changed in each conflicting path. no base conflict sent this unit here");
     const conflicted = withReceipts(await record(h, UNIT), conflict);
     const slice = await sliceStarted(h, "lt-1/01");
     const sliceMd = renderBrief({ brief: briefWith(["slice"]), unit: "lt-1/01", outcomes: ["done"], inputs: await views(h, slice, ["slice"]) });
     expect(sliceMd).toContain(`- \`slice\` — this slice's file: its scope, dependencies and acceptance criteria, each with its verifier: \`${SLICES}/01-parse.md\``);
     const baseMd = renderBrief({ brief: briefWith(["base_side"]), unit: UNIT, outcomes: ["done"], inputs: await views(h, conflicted, ["base_side"]) });
-    expect(baseMd).toContain("- `base_side` — the base side of the conflict: the base commit to merge and what it changed in each conflicting path: `.agents/inputs/base_side.md`");
+    expect(baseMd).toContain("- `base_side` — the base side of the conflict: the base commit to merge and what it changed in each conflicting path: `.agents/run/in/base_side.md`");
   });
 });
 

@@ -159,9 +159,9 @@ describe("a signal's detail", () => {
     const got = await materializeInputs(h.env, await record(h, "lt-1"), run.brief, run.worktree);
     if (!got.ok) throw new Error(got.failure.message);
     const input = got.value.inputs.find((i) => i.name === "signal");
-    expect(input?.path).toBe(".agents/inputs/signal.md");
+    expect(input?.path).toBe(".agents/run/in/signal.md");
     expect(input?.text).toContain("`ready` was moved by the signal `ticked`, reported by ticker for occurrence `t1`.");
-    expect(h.files.snapshot()[`${run.worktree}/.agents/inputs/signal.md`]).toContain('"lint"');
+    expect(h.files.snapshot()[`${run.worktree}/.agents/run/in/signal.md`]).toContain('"lint"');
     // back at the gate, the same occurrence is still reported: it fired this round, so the gate waits for a person
     const reported = await reportRun(h.env, "lt-1", run.run_id, { verb: "done", outcome: "done" }, "r1");
     expect(reported.ok).toBe(true);

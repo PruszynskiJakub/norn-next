@@ -169,7 +169,7 @@ describe("harness launcher start", () => {
     const launch = s.paneHarness.launches[0] as LaunchRequest;
     expect(readPromptMark(launch.prompt)).toEqual({ source: "brief", id: "01JRUN0000000000000000000A" });
     expect(launch.prompt.startsWith("# Brief for gh-12/03")).toBe(true);
-    expect(launch.env).toEqual({ NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A", NORN_WRITES: "worktree" });
+    expect(launch.env).toEqual({ NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A", NORN_WRITES: "worktree", NORN_IN: "/wt/gh-12-03/.agents/run/in", NORN_OUT: "/wt/gh-12-03/.agents/run/out" });
     expect(launch.headless).toBeUndefined();
     expect(s.pane.starts[0]).toMatchObject({
       key: "01JRUN0000000000000000000A",
@@ -177,7 +177,7 @@ describe("harness launcher start", () => {
       title: "gh-12/03 build",
       workspace: "gh-12",
       logPath: "/m/runtime/sessions/01JRUN0000000000000000000A.log",
-      env: { AGENT_MODE: "x", NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A", NORN_WRITES: "worktree" },
+      env: { AGENT_MODE: "x", NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A", NORN_WRITES: "worktree", NORN_IN: "/wt/gh-12-03/.agents/run/in", NORN_OUT: "/wt/gh-12-03/.agents/run/out" },
     });
     expect(Object.keys(s.pane.starts[0]?.env ?? {})).not.toContain("NORN_PROMPT_SOURCE");
     expect(await readSentPrompt(s.ctx, "gh-12/03", "01JRUN0000000000000000000A", "01JRUN0000000000000000000A")).toMatchObject({ source: "brief" });
@@ -260,6 +260,8 @@ describe("harness launcher start of a docs-only step", () => {
     s.bg.live.clear();
     expect(await s.launcher.answer(started.value.handle, "q1", "go left")).toEqual(ok(undefined));
     expect([s.bgHarness.launches[1]?.env[WRITES_ENV], s.bg.starts[1]?.env[WRITES_ENV]]).toEqual(["docs", "docs"]);
+    // a resumed session reports from the same folders the first launch named
+    expect([s.bgHarness.launches[1]?.env.NORN_IN, s.bg.starts[1]?.env.NORN_OUT]).toEqual(["/wt/gh-12-03/.agents/run/in", "/wt/gh-12-03/.agents/run/out"]);
   });
 
   test("a step that writes its worktree is launched with that rule, never one inherited from the launching process", async () => {
@@ -284,7 +286,7 @@ describe("the norn a launched agent runs", () => {
     const s = setup();
     expect((await withShim(s).start(run())).ok).toBe(true);
     const launch = s.paneHarness.launches[0] as LaunchRequest;
-    expect(launch.env).toEqual({ PATH: "/m/runtime/bin:/usr/local/bin:/usr/bin", NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A", NORN_WRITES: "worktree" });
+    expect(launch.env).toEqual({ PATH: "/m/runtime/bin:/usr/local/bin:/usr/bin", NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A", NORN_WRITES: "worktree", NORN_IN: "/wt/gh-12-03/.agents/run/in", NORN_OUT: "/wt/gh-12-03/.agents/run/out" });
     expect(s.pane.starts[0]?.env).toMatchObject({ PATH: "/m/runtime/bin:/usr/local/bin:/usr/bin", AGENT_MODE: "x" });
     expect(s.files.executable("/m/runtime/bin/norn")).toBe(true);
     expect(await s.files.read("/m/runtime/bin/norn")).toBe(shimScript(CLI));

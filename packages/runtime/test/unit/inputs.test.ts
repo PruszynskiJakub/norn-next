@@ -76,7 +76,7 @@ describe("the story's spec", () => {
 });
 
 describe("readable inputs", () => {
-  test("the brief names the story and each input under .agents/: the spec and handoff in its spec folder, the rest in .agents/inputs/, all ignored by git", async () => {
+  test("the brief names the story and each input under .agents/: the spec and handoff in its spec folder, the rest in .agents/run/in/, all ignored by git", async () => {
     const { h } = await started();
     const md = await brief(h);
     expect(md).toContain("## Story");
@@ -86,7 +86,7 @@ describe("readable inputs", () => {
     expect(md).toContain("- `last_check` — the last check's result. no check has run for this unit yet");
     expect(md).toContain("`.agents/specs/lt-1/handoffs/lt-1.md` is this unit's current state");
     expect(md).toContain("ignored by git");
-    expect(await h.files.read(`${WORKTREE}/.agents/inputs/.gitignore`)).toBe("*\n");
+    expect(await h.files.read(`${WORKTREE}/.agents/run/.gitignore`)).toBe("*\n");
     expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/.gitignore`)).toBe("*\n");
     expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/spec.md`)).toContain(ITEM.body);
     expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`)).toContain("# Handoff: lt-1");
@@ -102,7 +102,7 @@ describe("readable inputs", () => {
     await tickUntil(h, async () => (await record(h, UNIT)).state?.run?.step === "review");
     // the next step may run in another checkout: only the story's documents carry the handoff there
     await h.files.remove(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`);
-    await h.files.remove(`${WORKTREE}/.agents/inputs/.base/specs/lt-1/handoffs/lt-1.md`);
+    await h.files.remove(`${WORKTREE}/.agents/run/.base/specs/lt-1/handoffs/lt-1.md`);
     h.items[0] = trackerItem(1, { ...ITEM, body: "The help text says `teh` twice." });
     const md = await brief(h);
     expect(md).toContain("# norn brief — lt-1 · review #1");
@@ -120,6 +120,19 @@ describe("readable inputs", () => {
     expect(write?.ok).toBe(true);
     await brief(h);
     expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`)).toContain("newer, from elsewhere");
+  });
+});
+
+describe("the run folder", () => {
+  test("a launch empties .agents/run/out/, so a report reads only what its own run wrote there", async () => {
+    const h = harness({ workflow: "handed" });
+    h.items.push(trackerItem(1, ITEM));
+    // left by an earlier run of the unit that died before it reported
+    await h.files.write(`${WORKTREE}/.agents/run/out/findings.json`, "[]");
+    await h.files.write(`${WORKTREE}/.agents/run/out/evidence/shot.txt`, "old");
+    await tickUntil(h, has("agent.start"));
+    const left = Object.keys(h.files.snapshot()).filter((p) => p.startsWith(`${WORKTREE}/.agents/run/out/`));
+    expect(left).toEqual([]);
   });
 });
 

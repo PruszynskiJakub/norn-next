@@ -109,7 +109,7 @@ describe("the agent verbs act for the run in the launch env", () => {
     const env = await envOf(configured());
     const worktree = env.slots.vcs.worktree.path(UNIT);
     const list = `worktree ${ROOT}\nHEAD ${"a".repeat(40)}\nbranch refs/heads/main\n\nworktree ${worktree}\nHEAD ${"a".repeat(40)}\nbranch refs/heads/lt-1-x\n\n`;
-    const norns = [" M .agents/specs/lt-1/spec.md", "?? .agents/inputs/last_check.md"];
+    const norns = [" M .agents/specs/lt-1/spec.md", "?? .agents/run/in/last_check.md"];
     let status = [...norns, " M src/app.ts", "?? notes.txt", ""].join("\0");
     const m = configured({
       env: runEnv(),

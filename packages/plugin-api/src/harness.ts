@@ -40,6 +40,13 @@ export interface HarnessCapabilities {
  */
 export const RUN_ENV = Object.freeze({ unit: "NORN_UNIT", run: "NORN_RUN_ID" } as const);
 
+/**
+ * Set by the host on every launch beside `RUN_ENV` (plugin API 1.22): the absolute folders in the
+ * worktree where the run reads the inputs norn rewrote for it (`in`) and writes the reports `norn
+ * done` collects (`out`), so a skill names a report's place without knowing the layout.
+ */
+export const RUN_DIRS_ENV = Object.freeze({ in: "NORN_IN", out: "NORN_OUT" } as const);
+
 /** The kernel's ruling on a tool call about to run. */
 export type GuardAnswer = { kind: "allow" } | { kind: "deny"; reason: string };
 /** The kernel's ruling on the agent ending its turn. */
