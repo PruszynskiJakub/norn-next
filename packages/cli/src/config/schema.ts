@@ -100,8 +100,8 @@ const StepRef = Type.String({ pattern: "^[a-z0-9][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$
 const StepRefs = Type.Array(StepRef, { uniqueItems: true });
 
 /**
- * What the person lets stand in for them: the attended steps whose presence a supervisor may take
- * (`attended`) and the gates a supervisor may decide (`gates`). Granted in the user's own file only: a
+ * What the person lets stand in for them: the `attended: agent` steps whose questions a supervisor may
+ * answer (`attended`) and the gates a supervisor may decide (`gates`). Granted in the user's own file only: a
  * repo file, which an agent in its step can change, may narrow a list and never widen it.
  */
 export const Policy = Type.Object(

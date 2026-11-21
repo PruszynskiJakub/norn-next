@@ -59,7 +59,7 @@ export interface RuntimeConfig {
   checks?: Record<string, string>;
   /**
    * What the person's policy lets stand in for them, each a step as `<workflow>.<step>`: the gates a
-   * supervisor may decide and the attended steps whose presence it may take. A granted gate is no
+   * supervisor may decide and the `attended: agent` steps whose questions it may answer. A granted gate is no
    * person's step to the floor a workflow is checked against. Absent: nothing is granted.
    */
   standIn?: StandIn;

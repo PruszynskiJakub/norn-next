@@ -148,7 +148,7 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   "kernel.claim_renew_before": durationText(d.claimRenewBeforeMs),
   "kernel.lock_stale": durationText(DEFAULT_LOCK_STALE_MS),
   "trace.retain": durationText(DEFAULT_TRACE_RETAIN_MS),
-  "policy.stand_in.attended": { derived: "none: no step's presence is taken by a stand-in" },
+  "policy.stand_in.attended": { derived: "none: a supervisor answers no step's questions" },
   "policy.stand_in.gates": { derived: "none: every gate is the person's" },
   "policy.allow": { derived: "none: every capability a role names may be granted" },
   "checks.<name>": { derived: `\`checks.test\` is ${JSON.stringify(DEFAULT_CHECKS.test)}, which the shipped workflows' test steps run; init detects the repo's own` },

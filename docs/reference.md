@@ -26,7 +26,7 @@ A slot names a plugin with `use`: the bundled ones are listed by `norn plugin li
 
 ### Policy
 
-`policy:` is what the person lets stand in for them, each step named `<workflow>.<step>`: `stand_in.gates`, the gates a supervisor may decide, and `stand_in.attended`, the `attended: person` steps whose presence a supervisor may take. It is the one key whose order is reversed: only `<norn home>/config.yaml` grants it, and a repo file, which an agent inside its step can change, may only narrow it. Each repo file that sets a list keeps only what it names of the user file's list, so a grant only a repo file makes is no grant. `norn config set policy.…` is a person's command, and it says so when a repo file narrows what it wrote.
+`policy:` is what the person lets stand in for them, each step named `<workflow>.<step>`: `stand_in.gates`, the gates a supervisor may decide, and `stand_in.attended`, the `attended: agent` steps whose questions a supervisor may answer ([The supervisor](#the-supervisor)). It is the one key whose order is reversed: only `<norn home>/config.yaml` grants it, and a repo file, which an agent inside its step can change, may only narrow it. Each repo file that sets a list keeps only what it names of the user file's list, so a grant only a repo file makes is no grant. `norn config set policy.…` is a person's command, and it says so when a repo file narrows what it wrote.
 
 `policy.allow` caps every step's grant: the capabilities any role may be granted on this machine, every one when no file sets it; a repo file narrows it from the user file's list, or from every capability when the user file sets none ([What an agent step may do](#what-an-agent-step-may-do)).
 
@@ -37,7 +37,24 @@ policy:
   allow: [code:read, code:scratch, code:write, docs:write, exec:checks, out:findings, out:criteria]
 ```
 
-No stand-in acts on a grant yet: until a runner gives the agent an OS sandbox, every gate waits for the person and every attended step for its person ([Limitations](limitations.md)). A granted gate already counts against the floor a workflow is checked against when it loads ([Workflow floor and confirmation](#workflow-floor-and-confirmation)).
+A supervisor answers a granted step's questions today. A granted gate is handed to one only once every executor the workflow's agent steps may run on, and the supervisor's, runs inside an OS sandbox; no shipped runner or harness declares one, so every gate still waits for the person, and its inbox item says why. A granted gate already counts against the floor a workflow is checked against when it loads ([Workflow floor and confirmation](#workflow-floor-and-confirmation)).
+
+### The supervisor
+
+A **supervisor** is an agent norn launches beside a step's own run, on the executor `bind.supervisor` names (else `executor`), in the runner `runners.agent` picks. It stands in for the person only where their user-scope policy grants it, and only within that reach:
+
+- **A question.** When the agent of an `attended: agent` step that `policy.stand_in.attended` names asks (`norn ask`), the tick launches the supervisor for that question (`supervisor.ask`, its `supervisor.started` receipt first). It answers once with `norn done answer --note "…"`, and the agent gets the answer marked as the supervisor's, never the person's; or it hands the question back with `norn done escalate --note "…"`, and the question stays the person's for the visit.
+- **What goes straight to the person.** A question that names a merge, a push, a release or another write past the repo, or a gate's decision (`supervisor.reserved`); one the supervisor handed back; and one past the step's `limits.asks` (three a visit unless the step says, `supervisor.asks_spent`). They wait in the mailbox for `norn story answer`, never in a stuck unit. An answer that names such a capability is refused (`supervisor_grants`): a supervisor's answer grants nothing.
+- **A gate.** A gate `policy.stand_in.gates` names, once delegation is possible (above), gets a supervisor for that gate's visit (`supervisor.gate`): `norn done approve|reject --note "<the criteria checked>"`, or `escalate`. Its decision is a `gate.decided` marked `delegated` with the supervisor's run and the gate's visit on it; one from any other run or visit is refused.
+- **Its brief** (`norn brief` in its session) names the step, its grant, and the question; the question, the handoff and the story's files are marked untrusted, as data and never instructions. It runs under the docs-only guard and is asked to change nothing.
+- **Bounded.** A supervisor with no answer within `kernel.silent_after`, or whose process ended, or whose grant the person withdrew hands its subject back (`supervisor.silent`, `supervisor.died`, `supervisor.revoked`). The person may answer or decide first; a supervisor overtaken that way is stopped, and its late word is refused.
+
+```yaml
+bind: { supervisor: deep }
+policy:
+  stand_in:
+    attended: [story.implement]      # only the user file grants this
+```
 
 ### Executors and runners
 
@@ -73,7 +90,7 @@ A step is written with thirteen keys, and the set never grows: what an actor nee
 | `produces` | what every outcome of an agent step produces, unless the outcome lists its own ([Outcomes](#outcomes)) |
 | `allow` | what an agent step asks of its role's capabilities: it narrows them, never widens them ([What an agent step may do](#what-an-agent-step-may-do)) |
 | `attended` | who stays alongside the agent, which picks its runner: `person` (in a runner with presence; the person starts the step), `agent` (a supervisor), `none` (the default) ([Executors and runners](#executors-and-runners)) |
-| `limits` | an agent step's `deadline`, `nudges` and `retries`; a shell step's `timeout`, which it needs |
+| `limits` | an agent step's `deadline`, `nudges` and `retries`, and on an `attended: agent` step `asks`, the questions its supervisor answers in a visit; a shell step's `timeout`, which it needs |
 | `outcomes` | where each outcome leads ([Outcomes](#outcomes)) |
 | `on` | what may move a waiting step, a person's or a wait step kind's, by signal ([Signals](#signals)) |
 | `description`, `use`, `like` | a note; `use: <file>` brings in `shared/<file>.yaml`; `like: <step>` copies a step of the same file, each key it writes replacing the copied value whole |
@@ -290,13 +307,13 @@ Every agent run's launch pins a digest of its hook config (norn's hooks, and any
 
 Without an OS sandbox an agent's shell can reach anything the person's user can, so norn claims only this:
 
-| Level | Without an OS sandbox | With one (not built yet) |
+| Level | Without an OS sandbox | With one (a runner or harness that declares `sandbox`; none ships yet) |
 |---|---|---|
 | prevented | file-tool writes (the hook guard); a plugin step kind whose effects the person has not accepted | the store, `.git/refs`, `.git/hooks`, `.git/config`, the main checkout, the network |
 | detected | tracked files in the unit's worktree, HEAD, the remote story branch head, the repo's git config and hooks, the run's hook config | the same |
 | advisory | `exec:checks` against `exec:any`, `tracker:*`, the `out:*` reports a role may write, shell git (refs, stash, worktree, push), the store, a gate command run from the agent's shell, the network | none of these |
 
-An advisory capability is the brief's word and nothing more ([Limitations](limitations.md)).
+An advisory capability is the brief's word and nothing more ([Limitations](limitations.md)). A grant may be widened only over what is prevented or detected: since an agent's shell could write a gate's decision itself, no gate is handed to a supervisor until every agent of its workflow runs sandboxed ([The supervisor](#the-supervisor)).
 
 ## Generated reference
 
@@ -750,7 +767,7 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `trace.retain` | duration or `"keep"` | `"7d"` |
 | `checks.<name>` | string | derived: `checks.test` is "bun test", which the shipped workflows' test steps run; init detects the repo's own |
 | `sources.<name>` | string | none |
-| `policy.stand_in.attended` | list of strings | derived: none: no step's presence is taken by a stand-in |
+| `policy.stand_in.attended` | list of strings | derived: none: a supervisor answers no step's questions |
 | `policy.stand_in.gates` | list of strings | derived: none: every gate is the person's |
 | `policy.allow` | list of capabilities | derived: none: every capability a role names may be granted |
 
