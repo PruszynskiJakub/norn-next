@@ -123,8 +123,9 @@ function agent(name: string, step: Obj, role: string, baseline: readonly string[
     });
     // pinned as written: the grant is decided each tick from the role, this list and the policy
     out.allow = step.allow;
-    // asking for no code write narrows the agent to the story's documents, as the hook guard holds it
-    if (!step.allow.includes("code:write")) out.writes = "docs";
+    // asking for no code level above read narrows the agent to the story's documents, as the hook guard
+    // holds it; scratch edits are checked and reset after the run instead, so they are never guarded
+    if (!step.allow.includes("code:write") && !step.allow.includes("code:scratch")) out.writes = "docs";
   }
   // person keeps the older form's pin, and none is the pin's default
   if (step.attended === "person") out.attended = true;

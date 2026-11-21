@@ -126,11 +126,13 @@ describe("a step names its actor with by:", () => {
     );
   });
 
-  test("allow: is pinned as written, and one without code:write narrows the agent to its documents", () => {
+  test("allow: is pinned as written, and one with neither code:write nor code:scratch narrows the agent to its documents", () => {
     const step = (allow: string[]) => loaded(loadWorkflow(wf({ a: { by: "builder", do: "Do it.", allow, outcomes: { done: "$done" } } }), opts())).pinned.doc.steps.a;
     expect(step(["code:write"])).toEqual({ agent: "Do it.", role: "builder", allow: ["code:write"], outcomes: { done: "$done" } });
     expect(step(["code:write", "docs:write"])).toEqual({ agent: "Do it.", role: "builder", allow: ["code:write", "docs:write"], outcomes: { done: "$done" } });
     expect(step(["docs:write", "exec:any"])).toEqual({ agent: "Do it.", role: "builder", allow: ["docs:write", "exec:any"], writes: "docs", outcomes: { done: "$done" } });
+    // scratch is checked and reset after the run, never held by the docs-only guard
+    expect(step(["code:scratch", "exec:any"])).toEqual({ agent: "Do it.", role: "builder", allow: ["code:scratch", "exec:any"], outcomes: { done: "$done" } });
     expect(loaded(loadWorkflow(wf({ a: { by: "builder", do: "Do it.", allow: ["exec:any"], outcomes: { done: "$done" } } }), opts())).graph.steps.a?.agent?.allow).toEqual(["exec:any"]);
   });
 
