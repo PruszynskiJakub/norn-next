@@ -18,6 +18,7 @@ import {
   readSentPrompt,
   shellQuote,
   shimScript,
+  WRITES_ENV,
 } from "../../src/index.ts";
 
 const START = "2026-11-17T09:00:00.000Z";
@@ -168,7 +169,7 @@ describe("harness launcher start", () => {
     const launch = s.paneHarness.launches[0] as LaunchRequest;
     expect(readPromptMark(launch.prompt)).toEqual({ source: "brief", id: "01JRUN0000000000000000000A" });
     expect(launch.prompt.startsWith("# Brief for gh-12/03")).toBe(true);
-    expect(launch.env).toEqual({ NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A" });
+    expect(launch.env).toEqual({ NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A", NORN_WRITES: "worktree" });
     expect(launch.headless).toBeUndefined();
     expect(s.pane.starts[0]).toMatchObject({
       key: "01JRUN0000000000000000000A",
@@ -176,7 +177,7 @@ describe("harness launcher start", () => {
       title: "gh-12/03 build",
       workspace: "gh-12",
       logPath: "/m/runtime/sessions/01JRUN0000000000000000000A.log",
-      env: { AGENT_MODE: "x", NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A" },
+      env: { AGENT_MODE: "x", NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A", NORN_WRITES: "worktree" },
     });
     expect(Object.keys(s.pane.starts[0]?.env ?? {})).not.toContain("NORN_PROMPT_SOURCE");
     expect(await readSentPrompt(s.ctx, "gh-12/03", "01JRUN0000000000000000000A", "01JRUN0000000000000000000A")).toMatchObject({ source: "brief" });
@@ -239,6 +240,41 @@ describe("harness launcher start", () => {
   });
 });
 
+describe("harness launcher start of a docs-only step", () => {
+  test("is refused on a harness that cannot deny a tool, before anything is installed or launched", async () => {
+    const s = setup({ bgHarness: { denyTool: false } });
+    const refused = await s.launcher.start(run({ executor: "bg", attended: false, writes: "docs" }));
+    expect(refused).toMatchObject({ ok: false, failure: { code: "invalid", retryable: false } });
+    expect(!refused.ok && refused.failure.message).toContain("writes: docs");
+    expect(!refused.ok && refused.failure.message).toContain("run it on an executor whose harness can (by:)");
+    expect([s.bgHarness.installs, s.bgHarness.launches, s.bg.starts]).toEqual([[], [], []]);
+  });
+
+  test("its launch, and a resume of it, carry the step's writes in the env, so the hook guard holds it with the record unreadable", async () => {
+    const s = setup({ bgHarness: { resume: true } });
+    const runId = "01JRUN0000000000000000000B";
+    const started = await s.launcher.start(run({ executor: "bg", attended: false, run_id: runId, writes: "docs" }));
+    if (!started.ok) throw new Error("start failed");
+    expect([s.bgHarness.launches[0]?.env[WRITES_ENV], s.bg.starts[0]?.env[WRITES_ENV]]).toEqual(["docs", "docs"]);
+    await appendEvents(s.ctx, "gh-12/03", runId, [{ type: "session.started", run_id: runId, seq: 0, at: START, harness_session: "sess-1" }]);
+    s.bg.live.clear();
+    expect(await s.launcher.answer(started.value.handle, "q1", "go left")).toEqual(ok(undefined));
+    expect([s.bgHarness.launches[1]?.env[WRITES_ENV], s.bg.starts[1]?.env[WRITES_ENV]]).toEqual(["docs", "docs"]);
+  });
+
+  test("a step that writes its worktree is launched with that rule, never one inherited from the launching process", async () => {
+    const s = setup();
+    await new HarnessLauncher({ ...s.launcher.opts, agentEnv: { [WRITES_ENV]: "docs" } }).start(run());
+    expect([s.paneHarness.launches[0]?.env[WRITES_ENV], s.pane.starts[0]?.env[WRITES_ENV]]).toEqual(["worktree", "worktree"]);
+  });
+
+  test("starts on a harness that denies a tool, and a step that writes its worktree starts on either", async () => {
+    const s = setup({ bgHarness: { denyTool: false } });
+    expect((await s.launcher.start(run({ writes: "docs" }))).ok).toBe(true);
+    expect((await s.launcher.start(run({ executor: "bg", attended: false, run_id: "01JRUN0000000000000000000B" }))).ok).toBe(true);
+  });
+});
+
 describe("the norn a launched agent runs", () => {
   const CLI = ["/opt/my tools/bun", "/src/cli/main.ts"];
   const withShim = (s: ReturnType<typeof setup>, over: Partial<HarnessLauncher["opts"]> = {}) =>
@@ -248,7 +284,7 @@ describe("the norn a launched agent runs", () => {
     const s = setup();
     expect((await withShim(s).start(run())).ok).toBe(true);
     const launch = s.paneHarness.launches[0] as LaunchRequest;
-    expect(launch.env).toEqual({ PATH: "/m/runtime/bin:/usr/local/bin:/usr/bin", NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A" });
+    expect(launch.env).toEqual({ PATH: "/m/runtime/bin:/usr/local/bin:/usr/bin", NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A", NORN_WRITES: "worktree" });
     expect(s.pane.starts[0]?.env).toMatchObject({ PATH: "/m/runtime/bin:/usr/local/bin:/usr/bin", AGENT_MODE: "x" });
     expect(s.files.executable("/m/runtime/bin/norn")).toBe(true);
     expect(await s.files.read("/m/runtime/bin/norn")).toBe(shimScript(CLI));

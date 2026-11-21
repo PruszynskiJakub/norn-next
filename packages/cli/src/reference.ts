@@ -46,7 +46,8 @@ function renderCommand(c: Command): string[] {
       .filter((k) => !named.has(k))
       .map((k) => `- \`--${k}\``),
   ];
-  return [`##### \`norn ${c.name}\``, "", c.summary, "", "```sh", c.usage, "```", "", ...(options.length ? [...options, ""] : [])];
+  const personOnly = c.personOnly ? ["A person's command: refused in an agent's session (`person_only`).", ""] : [];
+  return [`##### \`norn ${c.name}\``, "", c.summary, "", ...personOnly, "```sh", c.usage, "```", "", ...(options.length ? [...options, ""] : [])];
 }
 
 type Schema = Record<string, unknown>;

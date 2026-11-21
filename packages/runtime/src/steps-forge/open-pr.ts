@@ -1,6 +1,9 @@
 /**
  * `open-pr`: open the story's draft change from its `pr.md`, or update the one already open, and set
  * its body. Written over the Forge and Vcs slots, never a provider, so every forge gets the same step.
+ * It reads `pr_body`, the file a describe step declares under `produces:`, with a fallback: a
+ * workflow's light path (a base update when only the base moved) reaches open-pr again without
+ * describe, on a change an earlier pass already described, whose body file the worktree still holds.
  * The branch is pushed first (when the vcs pushes at all), after taking in what a person pushed to it,
  * so the change shows the head this step saw.
  */
@@ -10,7 +13,7 @@ import { type Static, Type } from "@sinclair/typebox";
 
 export const OpenPrConfig = Type.Object(
   {
-    /** the body's file, relative to the worktree; absent: `pr.md` in the story's spec folder */
+    /** the body's file, relative to the worktree; absent: the file `pr_body` is produced as, else `pr.md` in the story's spec folder */
     body_file: Type.Optional(Type.String({ minLength: 1, pattern: "^[^/]" })),
   },
   { additionalProperties: false },
@@ -37,11 +40,14 @@ async function readText(ctx: HostContext, path: string): Promise<string | null> 
   }
 }
 
+/** The name of the PR body a describe step produces. */
+const PR_BODY_READ = "pr_body";
+
 /** The agent's body file as written, trimmed; "" when there is none. */
 async function bodyText(ctx: HostContext, input: StepKindInput<OpenPrConfig>): Promise<string> {
   const wt = input.worktree;
   if (wt === undefined) return "";
-  const file = input.config.body_file ?? `${SPECS_DIR}/${input.story}/${PR_BODY_FILE}`;
+  const file = input.config.body_file ?? input.reads?.[PR_BODY_READ] ?? `${SPECS_DIR}/${input.story}/${PR_BODY_FILE}`;
   return ((await readText(ctx, `${wt}/${file}`)) ?? "").trim();
 }
 
@@ -135,5 +141,6 @@ export const openPr: StepKindDefinition<typeof OpenPrConfig> = {
   configSchema: OpenPrConfig,
   outcomes: ["done"],
   mode: "effect",
+  reads: [{ name: PR_BODY_READ, fallback: `the ${PR_BODY_FILE} in the story's spec folder an earlier pass left, else a body of norn's footer alone (the story's link)` }],
   run,
 };

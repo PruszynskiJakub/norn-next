@@ -7,7 +7,6 @@
  * While another machine holds the story, the receipt goes to it through the mailbox (decision-route).
  */
 import type { GateOutcome, UnitJournal } from "@norn/kernel";
-import { RUN_ENV } from "@norn/plugin-api";
 import type { RuntimeEnv } from "@norn/runtime";
 import { type ParsedArgs, opt } from "../command.ts";
 import type { CliContext } from "../context.ts";
@@ -40,9 +39,6 @@ export async function roundOf(env: RuntimeEnv, u: UnitJournal): Promise<number> 
 export async function decideGate(ctx: CliContext, args: ParsedArgs, outcome: GateOutcome) {
   const key = args.positionals[0] as string;
   const verb = `story ${outcome}`;
-  // the kernel refuses a gate decided through a run; saying so here spares the agent a receipt that moves nothing
-  if (ctx.env[RUN_ENV.run])
-    throw refuse(`a step agent may not ${outcome} a gate (run ${ctx.env[RUN_ENV.run]})`, "a person or their delegate decides it, outside any norn run", "agent_gate");
   const reason = opt.str(args, "reason")?.trim();
   if (outcome === "reject" && !reason) throw refuse("a reject needs the reason the next attempt gets", `norn story reject ${key} --reason "<what to change>"`, "reason");
   const want = opt.str(args, "gate");

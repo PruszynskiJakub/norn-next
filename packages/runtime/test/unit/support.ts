@@ -220,8 +220,9 @@ export type StepAnswer = string | StepKindOutcome;
 
 /** Step kinds that answer from a queue per kind (the last answer repeats), recording each input. */
 export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: StepCall[]): Record<string, StepKindDefinition> {
-  const kind = (name: string, mode: "effect" | "wait", outcomes: string[]): StepKindDefinition => ({
+  const kind = (name: string, mode: "effect" | "wait", outcomes: string[], reads?: StepKindDefinition["reads"]): StepKindDefinition => ({
     name,
+    ...(reads && { reads }),
     configSchema: Type.Object({ note: Type.Optional(Type.String()) }, { additionalProperties: false }),
     outcomes,
     mode,
@@ -234,7 +235,7 @@ export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: Step
     },
   });
   return {
-    probe: kind("probe", "effect", ["done", "conflict"]),
+    probe: kind("probe", "effect", ["done", "conflict"], [{ name: "notes", fallback: "probes without notes" }]),
     "await-thing": kind("await-thing", "wait", ["ready"]),
     // named as the vcs plugin's kind, so the inputs that read the base update's receipts find it
     "update-branch": kind("update-branch", "effect", ["done", "conflict", "resolved"]),
@@ -258,6 +259,16 @@ export const WORKFLOWS: Record<string, string> = {
     "    means: { done: the thing is built }",
     "",
   ].join("\n"),
+  "reviewed.yaml": [
+    "name: reviewed",
+    "start: review",
+    "steps:",
+    "  review:",
+    "    agent: Review the thing.",
+    "    writes: docs",
+    "    outcomes: { approve: $done }",
+    "",
+  ].join("\n"),
   "handed.yaml": [
     "name: handed",
     "start: build",
@@ -268,8 +279,25 @@ export const WORKFLOWS: Record<string, string> = {
     "    outcomes: { done: review }",
     "  review:",
     "    agent: Review the thing.",
-    "    inputs: [spec, handoff, last_findings, diff, mystery]",
+    "    inputs: [spec, handoff, last_findings, diff]",
     "    outcomes: { done: $done }",
+    "",
+  ].join("\n"),
+  "produced.yaml": [
+    "name: produced",
+    "start: write",
+    "steps:",
+    "  write:",
+    "    agent: Write the notes.",
+    "    produces: { notes: { file: notes/out.md, on: [done] } }",
+    "    outcomes: { done: read, skip: $done }",
+    "  read:",
+    "    agent: Read the notes.",
+    "    inputs: [spec, notes]",
+    "    outcomes: { done: poke }",
+    "  poke:",
+    "    probe: null",
+    "    outcomes: { done: $done, conflict: $stuck }",
     "",
   ].join("\n"),
   "stepped.yaml": [

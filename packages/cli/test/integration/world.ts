@@ -8,6 +8,8 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { nodeExec } from "@norn/host-node";
+import { RUN_ENV } from "@norn/plugin-api";
+import { WRITES_ENV } from "@norn/runtime";
 
 export const MAIN = join(import.meta.dir, "..", "..", "src", "main.ts");
 export const TEST_PLUGIN = join(import.meta.dir, "fixtures", "test-harness");
@@ -48,8 +50,9 @@ export type AgentPlan = "work" | "ask" | "ask-then-stuck" | "hang" | "protocol" 
 
 /**
  * A fresh clone of an empty bare remote with one commit on main, and a norn home beside it. The
- * env empties HERDR_ENV, so a person's running herdr is never probed, and names a git identity, so
- * the agent's commits and the person's merge need no global config.
+ * env empties HERDR_ENV, so a person's running herdr is never probed, and the launch env (RUN_ENV,
+ * WRITES_ENV), so a run from inside an agent's session is not one: its person-only commands would be
+ * refused. It names a git identity, so the agent's commits and the person's merge need no global config.
  */
 export async function world(plan: AgentPlan = "work"): Promise<World> {
   // realpath: macOS hands out /var under /private, and git names the canonical path
@@ -71,6 +74,9 @@ export async function world(plan: AgentPlan = "work"): Promise<World> {
   const env: Record<string, string> = {
     NORN_HOME_DIR: home,
     HERDR_ENV: "",
+    [RUN_ENV.unit]: "",
+    [RUN_ENV.run]: "",
+    [WRITES_ENV]: "",
     TEST_AGENT_NOTES: notes,
     TEST_AGENT_PLAN: plan,
     TEST_AGENT_PLANS: plans,

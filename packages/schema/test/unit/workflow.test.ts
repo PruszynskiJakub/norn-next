@@ -185,6 +185,12 @@ describe("workflow-source and workflow-shared schemas", () => {
     expect(validate("workflow", wf).ok).toBe(false);
     expect(validate("workflow-source", { ...wf, steps: { ...wf.steps, base: { use: "base-update", skills: ["x"] } } }).ok).toBe(false);
   });
+  test("an agent step's produces: and writes: validate as a file writes them, closed", () => {
+    const wf = (review: Record<string, unknown>) => ({ name: "t", start: "review", steps: { review: { agent: "Review it.", outcomes: { done: "$done" }, ...review } } });
+    expect(validate("workflow-source", wf({ writes: "docs", produces: { notes: { file: "notes.md" }, pr_body: { file: "pr.md", on: ["done"] } } })).ok).toBe(true);
+    for (const bad of [{ produces: {} }, { produces: { notes: { file: "" } } }, { produces: { notes: { file: "n.md", extra: 1 } } }, { produces: { notes: { file: "n.md", on: [] } } }, { writes: "all" }])
+      expect({ bad, ok: validate("workflow-source", wf(bad)).ok }).toEqual({ bad, ok: false });
+  });
   test("a shared file holds start, steps and a description, and its routes may leave through an exit", () => {
     const shared = { description: "d", start: "test", steps: { test: { check: "bun test", timeout: "5m", outcomes: { pass: { exit: "tested" }, fail: "$stuck" } } } };
     expect(validate("workflow-shared", shared).ok).toBe(true);

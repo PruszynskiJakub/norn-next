@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { claudeHarness } from "@norn/harness-claude";
 import { markPrompt, ok, RUN_ENV, type VcsConflictMarker } from "@norn/plugin-api";
 import {
+  type AgentRunRequest,
   batchesDir,
   batchName,
   briefOf,
@@ -15,6 +16,7 @@ import {
   recordSentPrompt,
   reportRun,
   writeStoryDoc,
+  WRITES_ENV,
 } from "../../src/index.ts";
 import { has, harness, type Harnessed, record, type Report, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
 
@@ -22,8 +24,8 @@ const UNIT = "lt-1";
 const WORKTREE = "/machine/repo/worktrees/lt-1";
 
 /** A story at its agent step with the run started and on the record. */
-async function running(formerHolders?: string[]): Promise<{ h: Harnessed; runId: string }> {
-  const h = harness({ workflow: "agented", ...(formerHolders && { formerHolders }) });
+async function running(formerHolders?: string[], workflow = "agented"): Promise<{ h: Harnessed; runId: string }> {
+  const h = harness({ workflow, ...(formerHolders && { formerHolders }) });
   h.items.push(trackerItem(1));
   await tickUntil(h, has("agent.start"));
   await tickUntil(h, has("receipts.apply"));
@@ -188,6 +190,74 @@ describe("guard hook", () => {
     const { h, runId } = await running();
     const r = await hook(h, runId, "PreToolUse", { tool_use_id: "b1", tool_name: "Bash", tool_input: { command: "echo hi > /etc/x" } });
     expect(r.reply.stdout).toBe("");
+  });
+});
+
+describe("guard hook on a docs-only step", () => {
+  const docsOnly = () => running(undefined, "reviewed");
+  const reasonOf = (r: { reply: { stdout: string } }) => (r.reply.stdout === "" ? null : JSON.parse(r.reply.stdout).hookSpecificOutput);
+
+  test("its run is launched as docs-only, so a launcher can refuse an executor that cannot guard it", async () => {
+    const { h } = await docsOnly();
+    const start = h.launcher.calls.find((c) => c.op === "start")?.args[0] as AgentRunRequest | undefined;
+    expect(start?.writes).toBe("docs");
+  });
+
+  test("a write to the story's documents, relative or absolute, or under a writable root, is allowed", async () => {
+    const { h, runId } = await docsOnly();
+    for (const p of [".agents/specs/lt-1/handoffs/story.md", `${WORKTREE}/.agents/specs/lt-1/spec.md`, ".agents/specs/lt-1/slices/01-a.md", "/tmp/findings.json"])
+      expect({ p, out: reasonOf(await hook(h, runId, "PreToolUse", preWrite(p))) }).toEqual({ p, out: null });
+  });
+
+  test("a write to code in the worktree is denied: the step is docs-only, and the reason says to hand back findings instead", async () => {
+    const { h, runId } = await docsOnly();
+    for (const p of ["src/x.ts", `${WORKTREE}/README.md`, ".agents/specs/lt-2/spec.md", ".agents/specs/lt-1/../../../src/x.ts"]) {
+      const out = reasonOf(await hook(h, runId, "PreToolUse", preWrite(p)));
+      expect({ p, decision: out?.permissionDecision }).toEqual({ p, decision: "deny" });
+      expect(out.permissionDecisionReason).toContain("writes: docs");
+      expect(out.permissionDecisionReason).toContain("norn done");
+      expect(out.permissionDecisionReason).toContain("--findings");
+    }
+  });
+
+  test("a link in the spec folder that carries a write into the code is denied", async () => {
+    const { h, runId } = await docsOnly();
+    await h.files.symlink("../../../src", `${WORKTREE}/.agents/specs/lt-1/code`);
+    const out = reasonOf(await hook(h, runId, "PreToolUse", preWrite(".agents/specs/lt-1/code/x.ts")));
+    expect(out?.permissionDecision).toBe("deny");
+    expect(out.permissionDecisionReason).toContain("writes: docs");
+  });
+
+  test("outside the worktree and in run state, the rules of every step still hold", async () => {
+    const { h, runId } = await docsOnly();
+    expect(reasonOf(await hook(h, runId, "PreToolUse", preWrite("/repo/src/x.ts")))?.permissionDecisionReason).toContain("outside this unit's worktree");
+    expect(reasonOf(await hook(h, runId, "PreToolUse", preWrite("/machine/repo/store/units/lt-1/state.json")))?.permissionDecisionReason).toContain("run state");
+  });
+
+  test("with the record unreadable or corrupt, the guard holds the step's writes from the launch env: a write to code is still denied", async () => {
+    const { h, runId } = await docsOnly();
+    const unreadable = { ...h.env.journal, readUnit: async () => ({ ok: false, failure: { code: "unavailable", message: "store down", retryable: true } }) } as unknown as IngestDeps["journal"];
+    const corrupt = {
+      ...h.env.journal,
+      readUnit: async (u: string) => {
+        const r = await h.env.journal.readUnit(u);
+        return r.ok ? { ok: true, value: { ...r.value, corrupt: "state.json fails its schema" } } : r;
+      },
+    } as unknown as IngestDeps["journal"];
+    for (const journal of [unreadable, corrupt]) {
+      const r = await ingestHook(deps(h, { journal }), { harness: "claude", hook: "PreToolUse", payload: { hook_event_name: "PreToolUse", session_id: "s1", ...preWrite("src/x.ts") }, env: { ...env(runId), [WRITES_ENV]: "docs" } });
+      await r.delivered();
+      expect(reasonOf(r)?.permissionDecision).toBe("deny");
+      expect(reasonOf(r).permissionDecisionReason).toContain("writes: docs");
+      const doc = await ingestHook(deps(h, { journal }), { harness: "claude", hook: "PreToolUse", payload: { hook_event_name: "PreToolUse", session_id: "s1", ...preWrite(".agents/specs/lt-1/spec.md") }, env: { ...env(runId), [WRITES_ENV]: "docs" } });
+      await doc.delivered();
+      expect(reasonOf(doc)).toBeNull();
+    }
+  });
+
+  test("a shell call is not judged, as on every step", async () => {
+    const { h, runId } = await docsOnly();
+    expect((await hook(h, runId, "PreToolUse", { tool_use_id: "b1", tool_name: "Bash", tool_input: { command: "echo hi > src/x.ts" } })).reply.stdout).toBe("");
   });
 });
 

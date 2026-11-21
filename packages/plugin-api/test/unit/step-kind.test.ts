@@ -49,6 +49,29 @@ describe("defineNornPlugin: step kinds", () => {
     expect(stepKindProblems("open-pr", { ...kind(), configSchema: undefined })).toEqual(["needs a configSchema"]);
     expect(stepKindProblems("open-pr", null)).toEqual(["is not an object"]);
   });
+
+  test("`produces` and `writes` are step keys (plugin API 1.20), so no step kind takes either as its name or a config key", () => {
+    for (const key of ["produces", "writes"]) {
+      expect(stepKindProblems("open-pr", kind({ configSchema: Type.Object({ [key]: Type.String() }) }))).toEqual([`config keys ${key} clash with step keys`]);
+      expect(stepKindProblems(key, kind({ name: key }))).toEqual(["is a name the kernel keeps for itself"]);
+    }
+  });
+});
+
+describe("step kind reads (plugin API 1.20)", () => {
+  test("a kind may declare what it reads: a name an earlier step must produce, or one with the fallback it takes without it", () => {
+    expect(stepKindProblems("open-pr", kind({ reads: ["pr_body", { name: "notes", fallback: "opens the change with no notes" }] }))).toEqual([]);
+    expect(stepKindProblems("open-pr", kind({ reads: [] }))).toEqual([]);
+    const plugin = defineNornPlugin({ name: "p", api: "^1.20", provides: { stepKinds: { "open-pr": kind({ reads: ["pr_body"] }) } } });
+    expect(plugin.provides.stepKinds?.["open-pr"]?.reads).toEqual(["pr_body"]);
+  });
+
+  test("a read is an input name, named once, and an optional one says what the kind does without it", () => {
+    expect(stepKindProblems("open-pr", kind({ reads: "pr_body" as never }))).toEqual(["reads must be a list"]);
+    expect(stepKindProblems("open-pr", kind({ reads: ["PR body", { name: "x y", fallback: "f" }] }))).toEqual(['reads "PR body", "x y" are not input names']);
+    expect(stepKindProblems("open-pr", kind({ reads: ["pr_body", { name: "pr_body", fallback: "f" }] }))).toEqual(["reads repeat"]);
+    expect(stepKindProblems("open-pr", kind({ reads: [{ name: "pr_body", fallback: " " }, 7 as never] }))).toEqual(["a read is a name, or {name, fallback} with the fallback it takes without it"]);
+  });
 });
 
 describe("stepKindAnswerProblem", () => {

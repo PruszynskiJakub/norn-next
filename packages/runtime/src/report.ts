@@ -9,7 +9,7 @@
  * records once. It is refused, never guessed at, when the run is not the unit's live one or `done`
  * names an outcome the step does not route.
  */
-import { type BriefInputs, checkCriteriaReport, HANDOFF_MAX_BYTES, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
+import { type BriefInputs, checkCriteriaReport, HANDOFF_MAX_BYTES, producedOn, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
 import type { HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
 import { parseUnitId, STORE_ID_PATTERN } from "@norn/plugin-api";
 import type { CriterionVerdict, Finding, Note, Verdict } from "@norn/schema";
@@ -17,7 +17,7 @@ import { branchOf, baseRefOf, cutFrom } from "./branches.ts";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
 import { baseConflictOf } from "./input-history.ts";
-import { INPUTS_DIR, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
+import { INPUTS_DIR, producedOf, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
 import { handoffArtifact } from "./story-docs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
@@ -151,6 +151,8 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   if (req.verb === "done") {
     const handBack = handBackRefusal(live, req);
     if (handBack) return handBack;
+    const missing = await producedRefusal(env, record, live, req.outcome);
+    if (missing) return missing;
     const long = await handoffSizeRefusal(env, unit);
     if (long) return long;
     const stopped = await unfinishedRefusal(env, unit);
@@ -165,7 +167,7 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   const text = textOf(req);
   const outcome = req.verb === "done" ? req.outcome : undefined;
   // before the receipt: once it is applied the next step may launch, and it must read what this run wrote
-  await readBackDocs(env, unit);
+  await readBackDocs(env, unit, undefined, producedOf(record));
   let criteria: { report: CriterionVerdict[]; summary: CriteriaSummary } | undefined;
   if (req.verb === "done") {
     const checked = await checkCriteria(env, unit, live, req);
@@ -252,6 +254,33 @@ function handBackRefusal(live: LiveStep, req: Extract<ReportRequest, { verb: "do
     `write ${FINDINGS_SHAPE}, then run: norn done ${req.outcome}${criteria} --findings <file>`,
     "hand_back_required",
   );
+}
+
+/**
+ * Why a `done` cannot be recorded while a file the step produces for that outcome is missing or empty
+ * in the unit's worktree, or null when every one is there: a later step (or a step kind such as
+ * open-pr) reads it, and would otherwise run on nothing. Read where read-back reads it, before it.
+ */
+async function producedRefusal(env: RuntimeEnv, record: UnitJournal, live: LiveStep, outcome: string): Promise<Refusable<never> | null> {
+  const step = record.state?.workflow.doc.steps[live.step];
+  if (!step) return null;
+  const worktree = worktreeOf(env, record.unit);
+  for (const p of producedOn(step, outcome)) {
+    const file = `${specFolder(record.unit)}/${p.file}`;
+    let text: string | null;
+    try {
+      text = await env.ctx.files.read(`${worktree}/${file}`);
+    } catch {
+      text = null;
+    }
+    if (text !== null && text.trim() !== "") continue;
+    return refuse(
+      `step ${live.step} produces \`${p.name}\` with outcome ${outcome}, and ${file} is ${text === null ? "missing" : "empty"}`,
+      `write ${file} (\`${p.name}\`, which later steps read) in the worktree, then report again`,
+      "produced_missing",
+    );
+  }
+  return null;
 }
 
 /** The notes for a person a criteria report's verdicts carry, each naming its criterion. */

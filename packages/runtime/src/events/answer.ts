@@ -4,7 +4,8 @@
  * `turn.ended` for a stop ruling, a `session.started`, `turn.started` or `context.compacted` for
  * context. Nothing to say is null, which a harness renders as allow.
  *
- * - guard: deny a write outside the run's worktree, or to norn's run state, as the old hook did;
+ * - guard: deny a write outside the run's worktree, or to norn's run state, as the old hook did; on
+ *   a `writes: docs` step, also a write in the worktree outside the story's spec folder;
  * - stop: block while the run has not reported and its step needs a report, the reason telling the
  *   agent how to report once, at most MAX_STOP_BLOCKS times a run: past that the turn ends, and the
  *   step's bounded nudges and retries take over from a block that would otherwise never end;
@@ -34,10 +35,16 @@ export interface AnswerContext {
    */
   writableRoots?: readonly string[];
   /**
-   * The same paths with their symlinks followed: `writes` maps each write's folded path to its real
-   * one. A write whose real path lands in run state is denied though its folded path is in the worktree.
+   * Set when the run's step is `writes: docs`: inside the worktree a write may land only in `dir`, the
+   * story's spec folder; `done` is how the report command is spelled, for the reason a denial gives.
    */
-  real?: { worktree: string; protectedPaths: readonly string[]; writes: Readonly<Record<string, string>> };
+  docs?: { step?: string; dir: string; done: string };
+  /**
+   * The same paths with their symlinks followed: `writes` maps each write's folded path to its real
+   * one. A write whose real path lands in run state is denied though its folded path is in the worktree,
+   * and on a docs-only step one whose real path leaves the spec folder (`docs`) for the rest of the worktree.
+   */
+  real?: { worktree: string; protectedPaths: readonly string[]; writes: Readonly<Record<string, string>>; docs?: string };
   /**
    * What to restate when a session starts again having lost its brief (a resume, a compaction);
    * absent on the first start, where the brief itself is about to be read.
@@ -86,8 +93,21 @@ function guard(events: readonly HarnessEvent[], ctx: AnswerContext): HarnessAnsw
         kind: "deny",
         reason: `norn: \`${path}\` is outside this unit's worktree \`${worktree}\`. Work only in this worktree: another one is another unit's live work.`,
       };
+    if (ctx.docs && under(worktree, path)) {
+      const dir = resolvePath(worktree, ctx.docs.dir);
+      // a link in the spec folder can carry a write into the code: where it really lands is judged too
+      const escaped = real?.docs !== undefined && landed !== undefined && under(real.worktree, landed) && !under(real.docs, landed);
+      if (!under(dir, path) || escaped) return { kind: "deny", reason: docsOnlyReason(ctx.docs, dir, path) };
+    }
   }
   return null;
+}
+
+function docsOnlyReason(docs: NonNullable<AnswerContext["docs"]>, dir: string, path: string): string {
+  return (
+    `norn: ${docs.step !== undefined ? `step \`${docs.step}\`` : "this step"} is docs-only (\`writes: docs\`): it writes only the story's documents in \`${dir}\` and files outside the repo, never \`${path}\`. ` +
+    `Do not edit code in this step: report what needs changing as findings, \`${docs.done} <outcome> --findings <file>\` with the file outside the repo (under $TMPDIR).`
+  );
 }
 
 /** Turn ends refused per run for want of a report, before the turn may end and classification takes over. */

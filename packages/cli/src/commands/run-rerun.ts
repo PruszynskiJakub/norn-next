@@ -6,7 +6,7 @@
  * carries the round, the visit and what the move asks, so a retried rerun records once.
  */
 import type { UnitJournal } from "@norn/kernel";
-import { parseUnitId, RUN_ENV } from "@norn/plugin-api";
+import { parseUnitId } from "@norn/plugin-api";
 import { loadPinned } from "@norn/runtime";
 import { defineCommand, opt } from "../command.ts";
 import { corruptError, failure, refuse, rendered } from "../output.ts";
@@ -18,6 +18,7 @@ const USAGE = "norn run rerun <unit> [--step <step>] [--reset <counter>]... [--r
 export const runRerunCommand = defineCommand({
   name: "run rerun",
   acts: true,
+  personOnly: true,
   summary: "Run a unit's step again, or move it to another step, counters reset",
   usage: USAGE,
   options: {
@@ -35,8 +36,6 @@ export const runRerunCommand = defineCommand({
     const unit = args.positionals[0] as string;
     const reset = [...new Set(opt.list(args, "reset"))];
     const reason = opt.str(args, "reason")?.trim() || undefined;
-    // a step agent moving units would take where the work goes next away from the person
-    if (ctx.env[RUN_ENV.run]) throw refuse(`a step agent may not rerun a step (run ${ctx.env[RUN_ENV.run]})`, "a person reruns it, outside any norn run", "agent_rerun");
     const ref = parseUnitId(unit);
     if (!ref) throw refuse(`${unit} is not a unit id`, "norn story list", "unknown_unit");
     const env = await ctx.runtimeEnv();

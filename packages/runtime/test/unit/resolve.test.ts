@@ -6,7 +6,7 @@ import { defineNornPlugin, type NornPlugin } from "@norn/plugin-api";
 import { localStorePlugin } from "@norn/store-local";
 import { localTrackerPlugin } from "@norn/tracker-local";
 import { vcsGitPlugin } from "@norn/vcs-git";
-import { collectStepKinds, createRuntime, loadPackWorkflows, type RuntimeConfig, resolveSlots, stepsForgePlugin } from "../../src/index.ts";
+import { collectStepKinds, createRuntime, HOST_INPUTS, loadPackWorkflows, type RuntimeConfig, resolveSlots, SPEC_FOLDER_FILES, stepsForgePlugin } from "../../src/index.ts";
 
 const pack = defineNornPlugin({
   name: "norn-pack-tiny",
@@ -68,6 +68,24 @@ describe("loadPackWorkflows and createRuntime", () => {
   test("a pack's workflows load by name through the kernel loader", () => {
     const r = loadPackWorkflows(pack.provides.packs?.tiny as never, {});
     expect(r.ok && r.value.tiny?.ok).toBe(true);
+  });
+
+  test("a workflow file naming an input the host does not provide is refused at its path, naming the inputs it does", () => {
+    const file = (inputs: string) => `name: typo\nstart: build\nsteps:\n  build:\n    agent: Build it.\n    inputs: ${inputs}\n    outcomes: { done: $done }\n`;
+    const r = loadPackWorkflows({ workflows: { "typo.yaml": file("[spec, last_finding]"), "fine.yaml": file(`[${HOST_INPUTS.join(", ")}, { file: docs/x.md }]`) }, shared: {}, skills: {} }, {});
+    if (!r.ok) throw new Error(r.failure.message);
+    expect(r.value.typo).toEqual({ ok: false, errors: [{ path: "/steps/build/inputs/1", message: `\`last_finding\` is not an input norn provides: name one of ${HOST_INPUTS.join(", ")}, or a file as {file: <path>}` }] });
+    expect(r.value.fine?.ok).toBe(true);
+    expect([...HOST_INPUTS].sort()).toEqual(["base_side", "diff", "handoff", "last_check", "last_findings", "record", "resolution", "signal", "slice", "slices", "spec"]);
+  });
+
+  test("a workflow file producing a file norn writes in the spec folder itself is refused, naming the ones it keeps", () => {
+    const file = (produced: string) => `name: own\nstart: build\nsteps:\n  build:\n    agent: Build it.\n    produces: { notes: { file: ${produced} } }\n    outcomes: { done: $done }\n`;
+    const r = loadPackWorkflows({ workflows: { "own.yaml": file("handoffs/x.md"), "fine.yaml": file("notes.md") }, shared: {}, skills: {} }, {});
+    if (!r.ok) throw new Error(r.failure.message);
+    expect(r.value.own).toEqual({ ok: false, errors: [{ path: "/steps/build/produces/notes/file", message: `\`handoffs/x.md\` is a file norn writes in the spec folder itself: name another (norn keeps ${SPEC_FOLDER_FILES.join(", ")})` }] });
+    expect(r.value.fine?.ok).toBe(true);
+    expect([...SPEC_FOLDER_FILES].sort()).toEqual([".gitignore", "handoffs/", "slices/", "spec.md"]);
   });
 
   test("createRuntime builds a runtime from resolvable config and refuses an unresolvable one", () => {

@@ -67,12 +67,20 @@ function briefOf(v: UnitView, spec: AgentStepSpec) {
   };
 }
 
+/** A docs-only step is held by the write guard alone: on a harness that cannot deny a tool it would run unguarded, so no agent starts, fresh or retried. */
+function unguarded(v: UnitView, spec: AgentStepSpec, executor: string, caps: ExecutorCapabilities): Decision | null {
+  if (spec.writes !== "docs" || caps.denyTool) return null;
+  return parkDecision(v, "agent.unguarded", "stuck", { text: `step '${v.state.step}' is writes: docs, but executor '${executor}' cannot deny a tool, so its writes would go unguarded; run it on an executor whose harness can (by:)` });
+}
+
 function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
   // an attended step waits for the person who works beside it to start it (`run.requested`), in either mode
   if (spec.attended && v.state.requested === undefined) return parkDecision(v, "agent.ready.attended", "attended", { text: spec.instructions });
   const executor = executorOf(v, spec);
   const caps = capsOf(v, executor);
   if (!caps) return parkDecision(v, "agent.no_executor", "stuck", { text: `executor '${executor}' is not configured` });
+  const guardless = unguarded(v, spec, executor, caps);
+  if (guardless) return guardless;
   // a person's `run.requested` starts this visit's agent once; manual mode still holds the next step
   if (personDrives(v)) return parkDecision(v, "agent.ready.manual", "manual", { text: spec.instructions });
   // a run a person started may open where they watch it (a pane); one nobody started must run headless
@@ -252,7 +260,10 @@ function quiet(v: UnitView, spec: AgentStepSpec, run: RunInfo, base: string): De
 
 /** A fresh session for the step in place of `run`. */
 function retry(v: UnitView, spec: AgentStepSpec, run: RunInfo, rule: string): Decision {
-  if (!capsOf(v, run.executor)?.headless) return parkDecision(v, "agent.retry.no_headless", "stuck", { text: `run ${run.id} needs a fresh session; executor '${run.executor}' cannot run headless` });
+  const caps = capsOf(v, run.executor);
+  if (!caps?.headless) return parkDecision(v, "agent.retry.no_headless", "stuck", { text: `run ${run.id} needs a fresh session; executor '${run.executor}' cannot run headless` });
+  const guardless = unguarded(v, spec, run.executor, caps);
+  if (guardless) return guardless;
   const run_id = v.ctx.nextId();
   return {
     kind: "retry_run",

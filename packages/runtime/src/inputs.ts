@@ -7,13 +7,14 @@
  * `.agents/inputs/`. Each folder norn writes holds a `.gitignore` of `*`, so nothing the agent reads is
  * ever committed, whether or not the repo commits the rest of `.agents/`.
  *
- * The spec, the handoff and the slice files (`slices/<nn>-<slug>.md`) are documents the agent edits
- * there: what it changed is read back into the story's documents when it reports (and before the next
- * materialization), so the next step reads it, a slice in its own worktree included.
+ * The spec, the handoff, the slice files (`slices/<nn>-<slug>.md`) and the files the workflow's steps
+ * produce (`produces:`, such as `pr.md`) are documents the agent edits there: what it changed is read
+ * back into the story's documents when it reports (and before the next materialization), so the next
+ * step reads it, a slice in its own worktree included.
  * A copy of what norn last wrote sits in `.agents/inputs/.base/`, and only a file that differs from it
  * is read back, so a worktree that kept a stale, untouched copy never overwrites a newer document.
  */
-import type { BriefInputs, BriefInputView, BriefStory, KernelReceipt, UnitJournal } from "@norn/kernel";
+import { type BriefInputs, type BriefInputView, type BriefStory, type KernelReceipt, producedFiles, type UnitJournal, type WorkflowStepDoc } from "@norn/kernel";
 import { ok, type PluginResult, parseStoryKey, parseUnitId, type TrackerItem } from "@norn/plugin-api";
 import type { CriterionVerdict, Finding } from "@norn/schema";
 import { baseRefOf, cutFrom } from "./branches.ts";
@@ -21,7 +22,7 @@ import type { RuntimeEnv } from "./env.ts";
 import { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 import { readStepRun } from "./step-runs.ts";
 import { baseSideOf, recordOf, type Resolved, resolutionOf, roundOf, standing, storyUnits } from "./input-history.ts";
-import { handoffArtifact, listStoryDocs, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
+import { HANDOFFS_DIR, handoffArtifact, listStoryDocs, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
 
 const AGENTS_DIR = ".agents";
 /** the folder of each story's documents in a worktree: `.agents/specs/<story>/` */
@@ -30,6 +31,7 @@ export const SPECS_DIR = `${AGENTS_DIR}/specs`;
 export const INPUTS_DIR = `${AGENTS_DIR}/inputs`;
 const BASE_DIR = `${INPUTS_DIR}/.base`;
 const IGNORE_ALL = "*\n";
+const IGNORE_FILE = ".gitignore";
 /** Text up to this long is shown in the brief itself as well as written to its file. */
 const INLINE_MAX = 1500;
 
@@ -66,6 +68,12 @@ const docsOf = (unit: string): Doc[] => [doc("spec", unit, SPEC_ARTIFACT), doc("
 
 /** The story's slice files are documents too: the slice step writes them here, and each slice reads its own. */
 const SLICES = "slices";
+
+/**
+ * What norn writes in a story's spec folder itself, a folder ending in `/`: the loader refuses a
+ * `produces:` file among them, as norn would overwrite it, or read it back as its own document.
+ */
+export const SPEC_FOLDER_FILES = [IGNORE_FILE, SPEC_ARTIFACT, `${HANDOFFS_DIR}/`, `${SLICES}/`] as const;
 const sliceDoc = (unit: string, artifact: string): Doc => doc(artifact, unit, artifact);
 
 /** The slice files in the worktree's spec folder, as documents to read back. */
@@ -114,14 +122,20 @@ export async function mirrorSpec(env: RuntimeEnv, unit: string, item: TrackerIte
   return ok(next);
 }
 
+/** Every file the steps of a unit's pinned workflow produce, relative to the story's spec folder. */
+export const producedOf = (record: UnitJournal): string[] => producedFiles(record.state?.workflow.doc.steps ?? {});
+
 /**
  * Read the unit's edited documents in its worktree back into the story's documents: each one that
- * differs from what norn last wrote there. Answers the names read back; a document that cannot be
- * read back is left as it is, never half written.
+ * differs from what norn last wrote there, the `produced` files (relative to the spec folder) among
+ * them. Answers the names read back; a document that cannot be read back is left as it is, never half
+ * written.
  */
-export async function readBackDocs(env: RuntimeEnv, unit: string, worktree = worktreeOf(env, unit)): Promise<string[]> {
+export async function readBackDocs(env: RuntimeEnv, unit: string, worktree = worktreeOf(env, unit), produced: readonly string[] = []): Promise<string[]> {
   const back: string[] = [];
-  for (const d of [...docsOf(unit), ...(await sliceDocsIn(env, unit, worktree))]) {
+  const own = [...docsOf(unit), ...(await sliceDocsIn(env, unit, worktree))];
+  const made = produced.filter((f) => !own.some((d) => d.artifact === f)).map((f) => doc(f, unit, f));
+  for (const d of [...own, ...made]) {
     const text = await readFile(env, `${worktree}/${d.file}`);
     if (text === null) continue;
     const base = await readFile(env, `${worktree}/${d.base}`);
@@ -282,9 +296,9 @@ export interface MaterializedInputs {
 export async function materializeInputs(env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, worktree = worktreeOf(env, record.unit)): Promise<PluginResult<MaterializedInputs>> {
   const unit = record.unit;
   try {
-    await env.ctx.files.write(`${worktree}/${INPUTS_DIR}/.gitignore`, IGNORE_ALL);
-    await env.ctx.files.write(`${worktree}/${specFolder(unit)}/.gitignore`, IGNORE_ALL);
-    await readBackDocs(env, unit, worktree);
+    await env.ctx.files.write(`${worktree}/${INPUTS_DIR}/${IGNORE_FILE}`, IGNORE_ALL);
+    await env.ctx.files.write(`${worktree}/${specFolder(unit)}/${IGNORE_FILE}`, IGNORE_ALL);
+    await readBackDocs(env, unit, worktree, producedOf(record));
     const item = await storyItem(env, unit);
     const out: MaterializedInputs = { inputs: [] };
     if (item) out.story = { key: item.key, title: item.title, ...(item.url !== undefined && { url: item.url }) };
@@ -313,9 +327,26 @@ async function materializeDoc(env: RuntimeEnv, worktree: string, d: Doc, text: s
   await env.ctx.files.write(`${worktree}/${d.base}`, text);
 }
 
+/**
+ * Every input name a step may list, each served by its case in `materializeOne`: the workflow loader
+ * refuses a file naming any other, so a misspelt name fails at load instead of reaching the agent as
+ * an empty input. Adding an input means adding its name here and its case below; the switch is
+ * checked against this list.
+ */
+export const HOST_INPUTS = ["spec", "handoff", "last_check", "last_findings", SIGNAL_INPUT, "diff", "slice", "slices", "record", "resolution", "base_side"] as const;
+type HostInput = (typeof HOST_INPUTS)[number];
+const isHostInput = (name: string): name is HostInput => (HOST_INPUTS as readonly string[]).includes(name);
+
 async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, worktree: string, name: string, item: TrackerItem | null, out: MaterializedInputs): Promise<BriefInputView> {
   const unit = record.unit;
   const [spec, handoff] = docsOf(unit) as [Doc, Doc];
+  if (!isHostInput(name)) {
+    const steps = record.state?.workflow.doc.steps ?? {};
+    const producer = Object.entries(steps).find(([, s]) => s.produces?.[name] !== undefined);
+    if (producer) return materializeProduced(env, worktree, unit, name, producer[0], producer[1]);
+    // a pinned revision is loaded without the input check, so it may still name one: noted, never failed
+    return { name, note: "norn provides no input of this name" };
+  }
   switch (name) {
     case "spec": {
       const mirrored = item ? await mirrorSpec(env, unit, item) : await readStoryDoc(env, unit, SPEC_ARTIFACT);
@@ -366,13 +397,17 @@ async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: Brief
       return resolvedInput(env, worktree, name, "the resolution to review: each merge's remerge-diff and the conflicts this round recorded", resolutionOf(record));
     case "base_side":
       return resolvedInput(env, worktree, name, "the base side of the conflict: the base commit to merge and what it changed in each conflicting path", await baseSideOf(env, record));
-    default: {
-      // a kind the host has no rule for: a story document of that name, when one was kept
-      const kept = await readStoryDoc(env, unit, `${name}.md`);
-      if (kept.ok && kept.value !== null) return written(env, worktree, name, `${name}.md`, `the story's ${name}`, kept.value);
-      return { name, note: "norn holds nothing for this input yet" };
-    }
   }
+}
+
+/** A file an earlier step produced, from the story's documents, so a step in another worktree reads it too. */
+async function materializeProduced(env: RuntimeEnv, worktree: string, unit: string, name: string, step: string, producer: WorkflowStepDoc): Promise<BriefInputView> {
+  const label = `produced by step ${step}`;
+  const d = doc(name, unit, producer.produces?.[name]?.file as string);
+  const kept = await readStoryDoc(env, unit, d.artifact);
+  if (!kept.ok || kept.value === null) return { name, label, note: `norn holds no \`${d.artifact}\` for this story yet: step ${step} has not produced it` };
+  await materializeDoc(env, worktree, d, kept.value);
+  return { name, label, path: d.file };
 }
 
 async function resolvedInput(env: RuntimeEnv, worktree: string, name: string, label: string, got: Resolved): Promise<BriefInputView> {

@@ -54,6 +54,30 @@ A **step** is one node of a workflow. Its head key says what happens there:
 
 A step written `use:` brings in a shared file's steps, and `like:` copies another step. An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). A step's `outcomes:` maps each outcome to the next step, `$done` or `$stuck`. Every route back (a failed test sends the story back to `implement`) carries a **counter** with a max, derived from the kind of edge and named `<step>.<outcome>`: a check's `fail` 5, a gate's `reject` 2, a `conflict` 2, `stale` 10, an agent sending work back 3. `max:` on an edge changes its bound, and the `kernel.counters` config keys change the defaults.
 
+### What steps hand each other
+
+A step hands a file to the steps after it by declaring it. An agent step's `produces:` names each file it writes in the story's spec folder (`describe` produces `pr_body`, written to `pr.md`); a later agent step lists the name under `inputs:`, and a step kind declares what it reads (`open-pr` reads `pr_body`). Two rules hold:
+
+- **Inputs.** A step reads only what the host provides or what an earlier step on every path to it produces. A file breaking it is refused when it loads, with the step and one path that lacks a producer. A route back is fine: what counts is that a producer comes first on every path.
+- **Outputs.** A report is accepted only with everything its outcome produces. `norn done` is refused while a declared file is missing or empty in the worktree, and says which file to write. It checks only that the file is there and not empty, not that this run wrote it: a file an earlier pass left passes the check, so a step that must rewrite it says so in its text.
+
+A step kind may read a name with a fallback instead: it runs without the file, and says what it does then. `open-pr` reads `pr_body` that way, because the light path of a base update (only the base moved) reaches it again without `describe`, on a change an earlier pass already described.
+
+### What an agent step may write
+
+An agent step writes in its unit's worktree. `writes: docs` narrows that to the story's documents: the files in its spec folder, `.agents/specs/<story>/` (the spec, the handoffs, the slice files, `pr.md`), and files outside the repo, such as a findings file under `$TMPDIR`. The pack's review steps say it, so a review reports what needs changing as findings and never edits the code; QA and the build steps write their worktree.
+
+```yaml
+review:
+  agent: "Review this slice's diff against its acceptance criteria and the spec."
+  skills: [norn-review]
+  writes: docs
+  hand_back: { changes_requested: findings }
+  outcomes: { approve: integrate, changes_requested: implement }
+```
+
+The worktree hooks hold it (below), so a `writes: docs` step runs only on an executor whose harness can refuse a tool call: on any other, the unit parks `stuck` (`agent.unguarded`) before an agent starts, naming the step and the executor. `by:` on the step, or another default executor, lets it run. `writes: worktree` is the default and can be left out.
+
 ### Signals
 
 A **signal** is a fact about the world outside a waiting step, which a tick reads: the base moved under the story (`stale`), the story branch holds commits its change lacks (`unpushed`), the step has waited too long (`timeout`). `outcomes:` says how a step ends by itself; a step's `on:` block says what may move it along while it waits, with the same route shape:
@@ -87,6 +111,8 @@ A signal may carry a small `detail` (a failed check, a review's comments); the n
 
 Checks and the git and forge steps always run on their own. Gates, attended steps and a waiting merge always wait for a person, in either mode.
 
+Some commands are a person's alone: deciding a gate (`norn story approve`, `reject`), answering a question (`norn story answer`), starting a round (`norn story round`), taking a story to this machine (`norn story take`), updating a finished story's branch (`norn story update-branch`), closing a story (`norn story close`), starting, stopping or rerunning a run (`norn run start`, `stop`, `rerun`) and `norn tidy`. norn refuses each of them inside an agent's session, the process tree every launch marks with `NORN_UNIT` and `NORN_RUN_ID`, whatever the harness or runner (`person_only`, exit 3). The agent asks instead (`norn ask "…"`). A person working in an attended step's pane types into that same session, so they run these from a shell of their own. No flag lifts the refusal.
+
 ## What needs you
 
 `norn status` shows every story and unit, the ones that wait for a person first: a gate to decide, a question to answer (`norn story answer <story> "…"`), a manual step to start, a stuck unit. A finished story (every unit ended done) is one line under Finished while its item is open and leaves the markdown once the item closed (`--json` still lists it), and its ticks decide nothing for it, but for one thing: when its change merges after it finished, the next tick takes the claim again to close its item. `norn story list` lists the stories and `norn story view <story>` shows one: the round it is in, its units with their worktrees, runs, gates and questions (a slice's key shows the story it belongs to). An agent that asks waits; a person's answer goes to the same session when it is still there, or to a fresh one with the answer in its brief.
@@ -113,8 +139,9 @@ Each unit works in its own git worktree, made by the vcs plugin in the machine d
 
 - **Skills.** The pack's skills go to `.agents/skills/<name>/`, linked from the harness's own folder (`.claude/skills/<name>`, `.pi/skills/<name>`), in every unit worktree before a launch and in the main checkout when `norn init` or `norn doctor` runs, so a person's own session finds the skills a person runs (`/norn-fsd`, `/norn-fsd-round`, `/norn-retro`, `/norn-triage`). They are ignored by git. A skill folder the repo commits, or a person keeps, under the same name is theirs and wins over the pack's.
 - **The spec and the handoff.** The story's spec is `.agents/specs/<story>/spec.md`, mirrored from the tracker item; each unit's **handoff** is `.agents/specs/<story>/handoffs/<unit>.md`, the unit's current state in prose (goal, proof, what is easy to miss, notes, the next action), rewritten by whoever works on it. The agent edits both in place; norn reads them back when it reports, and keeps them with the run data, never on the branch.
-- **Other inputs.** The last check's output, a rejection's findings and the like go to `.agents/inputs/`, rewritten for every run.
-- **Hooks.** The harness wires norn's hooks into the tool's local settings in that worktree (`.claude/settings.local.json` for Claude Code, an extension for pi). They feed norn the agent's events, keep it from ending a turn without a report, and refuse a file write outside the worktree or into norn's run state.
+- **Other inputs.** The last check's output, a rejection's findings and the like go to `.agents/inputs/`, rewritten for every run. A step lists the ones it reads under `inputs:`, by the names in [Reference › Inputs](reference.md#inputs).
+- **Produced files.** A file a step declares under `produces:` is written by its agent in the spec folder. norn reads it back with the spec and the handoff when the agent reports, and writes it into the worktree of a later step that lists its name, so a slice in its own worktree gets it too.
+- **Hooks.** The harness wires norn's hooks into the tool's local settings in that worktree (`.claude/settings.local.json` for Claude Code, an extension for pi). They feed norn the agent's events, keep it from ending a turn without a report, and refuse a file write outside the worktree or into norn's run state; on a `writes: docs` step, also one in the worktree outside the story's spec folder, with a reason telling the agent to hand back findings instead. The step's rule comes from the run's record; a docs-only run is also launched with `NORN_WRITES=docs`, which the hooks hold when the record cannot be read, so they never fall back to the worktree rule. They judge the agent tool's file writes (Claude Code's `Write`, `Edit`, `MultiEdit`, `NotebookEdit`; pi's `write`, `edit`), following a link to where a write really lands. A shell command is never judged, so `echo x > src/a.ts` or a formatter run from the shell gets through on any step: `writes: docs` keeps a review from editing code by mistake, not an agent set on it; the review skill asks the same of the agent in words.
 
 The branch, and the PR, hold only the code.
 

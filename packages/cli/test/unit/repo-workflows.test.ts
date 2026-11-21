@@ -104,4 +104,15 @@ describe("the repo's own workflows in .agents/workflows", () => {
     expect(body.code).toBe("repo_workflow_invalid");
     expect(body.error).toContain(".agents/workflows/shared/sync.yaml (workflow story)");
   });
+
+  test("a repo workflow naming an input norn does not provide: a tick refuses naming the file, the step's input and the inputs norn has, and doctor fails its workflows check", async () => {
+    const m = repoWith({ "tidy.yaml": TIDY.replace("    agent: Do the work.", "    agent: Do the work.\n    inputs: [spec, last_finding]") });
+    const tick = await runCli(["tick", "--json"], m.io);
+    expect(tick.exit).toBe(ExitCode.refused);
+    const body = json(tick.stdout);
+    expect(body.code).toBe("repo_workflow_invalid");
+    expect(body.error).toContain(".agents/workflows/tidy.yaml: /steps/work/inputs/1: `last_finding` is not an input norn provides: name one of spec, handoff, last_check, last_findings,");
+    const checks = json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; ok: boolean; code?: string; error?: string }>;
+    expect(checks.find((c) => c.name === "workflows")).toEqual(expect.objectContaining({ ok: false, code: "repo_workflow_invalid", error: expect.stringContaining("`last_finding`") }));
+  });
 });

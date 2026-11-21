@@ -53,7 +53,7 @@ describe("story approve and reject", () => {
   test("a step agent may not decide a gate, and a reject needs its reason", async () => {
     const m = configured();
     await seedUnit(m, { step: GATE_STEP, run: null });
-    expect(refusal(await runCli(["story", "approve", UNIT, "--json"], withEnv(m, runEnv()).io))).toEqual({ exit: ExitCode.refused, code: "agent_gate" });
+    expect(refusal(await runCli(["story", "approve", UNIT, "--json"], withEnv(m, runEnv()).io))).toEqual({ exit: ExitCode.refused, code: "person_only" });
     expect(refusal(await runCli(["story", "reject", UNIT, "--json"], m.io))).toEqual({ exit: ExitCode.refused, code: "reason" });
     expect((await runCli(["story", "reject", UNIT, "--reason", "split slice 2", "--json"], m.io)).exit).toBe(ExitCode.ok);
     expect((await receiptsOf(m)).map((r) => r.data)).toEqual([{ kind: "gate.decided", outcome: "reject", by: "me@box", step: GATE_STEP, attempt: 1, reason: "split slice 2" }]);
@@ -245,7 +245,7 @@ describe("run start", () => {
     expect(refusal(r)).toEqual({ exit: ExitCode.refused, code: "not_manual_parked" });
     expect((json(r.stdout) as { error: string }).error).toContain(`runs ${RUN} at ${AGENT_STEP}`);
     const agent = withEnv(m, runEnv());
-    expect(refusal(await runCli(["run", "start", UNIT, "--json"], agent.io))).toEqual({ exit: ExitCode.refused, code: "agent_start" });
+    expect(refusal(await runCli(["run", "start", UNIT, "--json"], agent.io))).toEqual({ exit: ExitCode.refused, code: "person_only" });
     expect(await receiptsOf(m)).toEqual([]);
   });
 
@@ -425,7 +425,7 @@ describe("story round", () => {
     const env = await envOf(m);
     const round = (args: string[] = [], t = m) => runCli(["story", "round", ...args, "--workflow", "triage", "--json"], t.io);
     expect(refusal(await round([`${UNIT}/01`]))).toEqual({ exit: ExitCode.refused, code: "not_a_story" });
-    expect(refusal(await round([UNIT], withEnv(m, runEnv())))).toEqual({ exit: ExitCode.refused, code: "agent_round" });
+    expect(refusal(await round([UNIT], withEnv(m, runEnv())))).toEqual({ exit: ExitCode.refused, code: "person_only" });
     const pending = await env.journal.record(UNIT, { id: "01JCCCCCCCCCCCCCCCCCCCCCCC", data: { kind: "mode.changed", mode: "auto", by: "me@box" } });
     if (!pending.ok) throw new Error(pending.failure.message);
     expect(refusal(await round([UNIT]))).toEqual({ exit: ExitCode.refused, code: "pending" });
@@ -506,7 +506,7 @@ describe("run rerun", () => {
     await seedUnit(m, { step: GATE_STEP, ...stuck });
     const env = await envOf(m);
     const rerun = (t = m) => runCli(["run", "rerun", UNIT, "--json"], t.io);
-    expect(refusal(await rerun(withEnv(m, runEnv())))).toEqual({ exit: ExitCode.refused, code: "agent_rerun" });
+    expect(refusal(await rerun(withEnv(m, runEnv())))).toEqual({ exit: ExitCode.refused, code: "person_only" });
     const held = await env.slots.store.claims.acquire(UNIT, "someone@else", 60_000);
     if (!held.ok) throw new Error(held.failure.message);
     expect(refusal(await rerun())).toEqual({ exit: ExitCode.refused, code: "claim_held" });
@@ -643,7 +643,7 @@ describe("story take", () => {
     expect(refusal(await take(m))).toEqual({ exit: ExitCode.refused, code: "unknown_story" });
     await seedUnit(m, { step: AGENT_STEP });
     expect(refusal(await runCli(["story", "take", `${UNIT}/01`, "--json"], m.io))).toEqual({ exit: ExitCode.refused, code: "not_a_story" });
-    expect(refusal(await take(withEnv(m, runEnv())))).toEqual({ exit: ExitCode.refused, code: "agent_take" });
+    expect(refusal(await take(withEnv(m, runEnv())))).toEqual({ exit: ExitCode.refused, code: "person_only" });
     expect(await receiptsOf(m)).toEqual([]);
     expect(await holderOf(m)).toBeNull();
   });

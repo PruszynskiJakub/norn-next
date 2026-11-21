@@ -10,9 +10,10 @@
  * be written, else in the result). The one exception is a write the guard never judged: allowed, it
  * could land in another unit's worktree or norn's run state, so it is denied with the reason.
  */
-import { type BriefCommands, type Journal, type ReportHintInput, reduceSession, renderReportHint, renderStepReminder } from "@norn/kernel";
+import { type BriefCommands, DEFAULT_BRIEF_COMMANDS, type Journal, type ReportHintInput, reduceSession, renderReportHint, renderStepReminder } from "@norn/kernel";
 import { type Harness, type HarnessAnswer, type HarnessEvent, type HostContext, type NativeReply, RUN_ENV } from "@norn/plugin-api";
-import { liveStepOf, reportOnRecord } from "../live-run.ts";
+import { specFolder } from "../inputs.ts";
+import { liveStepOf, reportOnRecord, runWrites, WRITES_ENV } from "../live-run.ts";
 import { type AnswerContext, answerFor, MAX_STOP_BLOCKS, owesReportBlock, resolvePath } from "./answer.ts";
 import { appendEvents, readEvents } from "./log.ts";
 import { realPath } from "./real-path.ts";
@@ -63,8 +64,8 @@ const SILENT: NativeReply = { stdout: "", exit_code: 0 };
 const nothing = async (): Promise<void> => {};
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-/** The worktree, the protected paths and each write's path with their links followed, for the guard's second look. */
-async function realPaths(ctx: HostContext, worktree: string, protectedPaths: readonly string[], events: readonly HarnessEvent[]): Promise<AnswerContext["real"]> {
+/** The worktree, the protected paths, the spec folder of a docs-only step and each write's path with their links followed, for the guard's second look. */
+async function realPaths(ctx: HostContext, worktree: string, protectedPaths: readonly string[], events: readonly HarnessEvent[], docsDir?: string): Promise<AnswerContext["real"]> {
   const folded = resolvePath("/", worktree);
   const writes: Record<string, string> = {};
   for (const e of events) if (e.type === "tool.requested" && e.kind === "write" && e.detail) writes[resolvePath(folded, e.detail)] = await realPath(ctx.files, folded, e.detail);
@@ -73,6 +74,7 @@ async function realPaths(ctx: HostContext, worktree: string, protectedPaths: rea
     worktree: await realPath(ctx.files, "/", folded),
     protectedPaths: await Promise.all(protectedPaths.map((p) => realPath(ctx.files, "/", p))),
     writes,
+    ...(docsDir !== undefined && { docs: await realPath(ctx.files, folded, docsDir) }),
   };
 }
 
@@ -209,11 +211,16 @@ export async function ingestHook(deps: IngestDeps, input: IngestInput): Promise<
     }
     const worktree = deps.worktreeOf(unit);
     const protectedPaths = deps.protectedPaths ?? [ctx.repo.dataDir];
-    const real = await realPaths(ctx, worktree, protectedPaths, fresh);
+    const own = record !== null ? runWrites(record, runId) : null;
+    // the record has the last word; without it the launch env's rule holds, so an unreadable record never opens the code to a docs-only run
+    const docsOnly = own !== null ? own.writes === "docs" : input.env[WRITES_ENV] === "docs";
+    const docs = docsOnly ? { ...(own && { step: own.step }), dir: specFolder(unit), done: (deps.commands ?? DEFAULT_BRIEF_COMMANDS).done } : undefined;
+    const real = await realPaths(ctx, worktree, protectedPaths, fresh, docs?.dir);
     const computed = answerFor(fresh, {
       worktree,
       protectedPaths,
       ...(real && { real }),
+      ...(docs && { docs }),
       ...(deps.writableRoots && { writableRoots: deps.writableRoots }),
       reported,
       needsReport,

@@ -41,6 +41,7 @@ steps:
   review:
     agent: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
     skills: [norn-review]
+    writes: docs
     inputs: [spec, diff, last_findings]
     hand_back: { changes_requested: findings }
     outcomes:
@@ -53,6 +54,9 @@ steps:
     agent: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
     skills: [norn-pr]
     inputs: [spec, diff, handoff]
+    # open-pr reads it; norn done refuses the report while pr.md is missing or empty
+    produces:
+      pr_body: { file: pr.md }
     outcomes:
       done: ship
     means:

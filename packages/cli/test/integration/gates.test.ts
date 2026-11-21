@@ -169,8 +169,8 @@ describe("a person's decision at a gate", () => {
     expect(String(noReason.body.do_instead)).toContain(`norn story reject ${KEY} --reason`);
   });
 
-  test("an approve under a run's env is refused as agent_gate", () => {
-    expect(refusal(asAgent)).toMatchObject({ code: 3, code_name: "agent_gate" });
+  test("an approve under a run's env is refused as person_only", () => {
+    expect(refusal(asAgent)).toMatchObject({ code: 3, code_name: "person_only" });
   });
 
   test("a reject with a reason sends the unit back to build, its counter bumped", () => {

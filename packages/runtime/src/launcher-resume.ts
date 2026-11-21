@@ -18,6 +18,7 @@ import { IsoTime, NonEmpty } from "@norn/schema";
 import { Type } from "@sinclair/typebox";
 import { appendEvents, readEvents } from "./events/log.ts";
 import { launchRecordPath, resumesDir } from "./events/paths.ts";
+import { WRITES_ENV } from "./live-run.ts";
 import type { LaunchHandle } from "./launcher-handle.ts";
 
 const LaunchRecord = Type.Object(
@@ -29,6 +30,8 @@ const LaunchRecord = Type.Object(
     logPath: NonEmpty,
     /** a resume asks for the model the run started on, as a harness may otherwise resume on its default */
     model: Type.Optional(NonEmpty),
+    /** a resume carries a docs-only step's rule in its env as the first launch did */
+    writes: Type.Optional(Type.Literal("docs")),
   },
   { additionalProperties: false, title: "LaunchRecord" },
 );
@@ -124,7 +127,7 @@ export async function resumeWith(input: ResumeInput): Promise<PluginResult<void>
     const prepared = await input.prepare(launch.value.cwd);
     if (!prepared.ok) return prepared;
   }
-  const env = { ...input.env, [RUN_ENV.unit]: h.unit, [RUN_ENV.run]: h.run_id };
+  const env = { ...input.env, [RUN_ENV.unit]: h.unit, [RUN_ENV.run]: h.run_id, [WRITES_ENV]: launch.value.writes ?? "worktree" };
   let spec: ReturnType<Harness["launch"]>;
   try {
     const model = launch.value.model;

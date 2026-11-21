@@ -10,7 +10,7 @@ import type { RunnerKey } from "./runner.ts";
 export interface HarnessCapabilities {
   /** a hook can keep the agent from ending its turn */
   blockStop: boolean;
-  /** a hook can refuse a tool call before it runs */
+  /** a hook can refuse a tool call before it runs; a `writes: docs` agent step runs only on a harness that can */
   denyTool: boolean;
   /** a hook can add text to the agent's context */
   injectContext: boolean;

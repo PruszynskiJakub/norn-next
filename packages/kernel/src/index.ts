@@ -15,7 +15,7 @@ export type {
   SessionView,
 } from "./session/view.ts";
 
-export { type AnsweredAsk, type BriefCommands, type BriefInputView, type BriefRenderInput, type BriefStory, DEFAULT_BRIEF_COMMANDS, HANDOFF_MAX_BYTES, type ReportHintInput, renderBrief, renderReportHint, renderStepReminder } from "./brief/render.ts";
+export { type AnsweredAsk, type BriefCommands, type BriefInputView, type BriefProduced, type BriefRenderInput, type BriefStory, DEFAULT_BRIEF_COMMANDS, HANDOFF_MAX_BYTES, type ReportHintInput, renderBrief, renderReportHint, renderStepReminder } from "./brief/render.ts";
 export * from "./model/actions.ts";
 export * from "./model/capabilities.ts";
 export * from "./model/config.ts";
@@ -27,6 +27,7 @@ export * from "./model/validate.ts";
 export * from "./workflow/document.ts";
 export * from "./workflow/graph.ts";
 export { type LoadWorkflowOptions, loadWorkflow, type StepKindInfo } from "./workflow/load.ts";
+export { type Produced, producedFiles, producedOn, producesOn } from "./workflow/produces.ts";
 export { type CountedStep, type DerivedCounters, deriveCounters, type ExitLeft } from "./workflow/counters.ts";
 export { type ApplyResult, applyReceipts, type NewRunStateInput, newRunState, type RouteTaken } from "./journal/apply.ts";
 export { type ActOutcome, type ActPlan, Journal, outcomeReceiptId, type UnitJournal } from "./journal/journal.ts";

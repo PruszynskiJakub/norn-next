@@ -4,21 +4,20 @@
  * look into), and close what their runs left open on this machine (a herdr pane per run). Whatever holds unique work is kept and listed with the reason. Under this machine's tick
  * lock, so no tick makes a worktree again while it goes.
  */
-import { RUN_ENV } from "@norn/plugin-api";
 import { acquireTickLock, newTickId, tidy } from "@norn/runtime";
 import { defineCommand, opt } from "../command.ts";
-import { busyError, failure, refuse, rendered } from "../output.ts";
+import { busyError, failure, rendered } from "../output.ts";
 import { syncStore } from "./person-support.ts";
 
 export const tidyCommand = defineCommand({
   name: "tidy",
   acts: true,
+  personOnly: true,
   summary: "Remove the worktrees and local branches of ended stories that no live claim holds, and close their runs' panes",
   usage: "norn tidy [--dry-run]",
   options: { "dry-run": { type: "boolean" } },
   optionHelp: { "--dry-run": "list what would be removed and change nothing" },
   async run(ctx, args) {
-    if (ctx.env[RUN_ENV.run]) throw refuse(`a step agent may not tidy the machine's worktrees (run ${ctx.env[RUN_ENV.run]})`, "a person runs it, outside any norn run", "agent_tidy");
     const dryRun = opt.bool(args, "dry-run");
     const env = await ctx.runtimeEnv();
     await syncStore(env, "the store", "norn tidy");

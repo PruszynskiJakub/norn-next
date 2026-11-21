@@ -6,7 +6,7 @@
  * The schema checks the keys it knows and lets the rest through; `loadWorkflow` decides which key is
  * the head and refuses a step whose head is unknown.
  */
-import { Duration, Mode, NonEmpty, OUTCOME_NAME_PATTERN, OutcomeName, PosInt, StepName, StoredCounterName, Target, Verdict } from "@norn/schema";
+import { Duration, Mode, NonEmpty, OUTCOME_NAME_PATTERN, OutcomeName, PosInt, StepName, StepWrites, StoredCounterName, Target, Verdict } from "@norn/schema";
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
 
 const closed = { additionalProperties: false } as const;
@@ -52,13 +52,28 @@ export type HandBack = Static<typeof HandBack>;
 
 /**
  * An input the brief gives the agent: a named kind (`spec`, `diff`, `last_findings`, ...) the host's
- * brief builder resolves, or a file. Decide passes them through and never opens them.
+ * brief builder resolves (the loader, given the host's names, refuses any other), or a file. Decide
+ * passes them through and never opens them.
  */
 export const StepInputDoc = Type.Union([
   Type.String({ pattern: OUTCOME_NAME_PATTERN }),
   Type.Object({ file: NonEmpty, label: Type.Optional(NonEmpty) }, closed),
 ]);
 export type StepInputDoc = Static<typeof StepInputDoc>;
+
+/**
+ * A file an agent step writes for the steps after it, relative to the story's spec folder, and the
+ * outcomes whose report needs it (default: every outcome the step reports but one that hands findings
+ * back). The loader keeps the path inside the folder; the host refuses a report without the file.
+ */
+export const ProducesDoc = Type.Object(
+  {
+    file: Type.String({ minLength: 1, pattern: "\\S", description: "The file, relative to the story's spec folder (`pr.md`)" }),
+    on: Type.Optional(Type.Array(OutcomeName, { minItems: 1, uniqueItems: true })),
+  },
+  closed,
+);
+export type ProducesDoc = Static<typeof ProducesDoc>;
 
 const EXIT_CODE_PATTERN = "^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
 const SharedName = Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "A shared file's name, without `.yaml`" });
@@ -81,11 +96,14 @@ function stepDoc<R extends TSchema, O extends TSchema>(route: R, onRoute: O) {
       verdict: Type.Optional(Type.Record(OutcomeName, Verdict, closed)),
       skills: Type.Optional(Type.Array(NonEmpty, { uniqueItems: true })),
       inputs: Type.Optional(Type.Array(StepInputDoc, { uniqueItems: true })),
+      /** what an agent step writes for later steps, by the name their `inputs:` (or a step kind's `reads`) use */
+      produces: Type.Optional(Type.Record(Type.String({ pattern: OUTCOME_NAME_PATTERN }), ProducesDoc, { ...closed, minProperties: 1 })),
       attended: Type.Optional(Type.Boolean({ description: "Worked with a person; always started by a person" })),
       by: Type.Optional(Type.String({ minLength: 1, description: "The executor that runs the agent; default the config's" })),
       model: Type.Optional(NonEmpty),
       criteria: Type.Optional(Type.Literal("required")),
       hand_back: Type.Optional(Type.Record(OutcomeName, HandBack, { ...closed, minProperties: 1 })),
+      writes: Type.Optional(StepWrites),
       deadline: Type.Optional(Duration),
       nudges: Type.Optional(Type.Integer({ minimum: 0 })),
       retries: Type.Optional(Type.Integer({ minimum: 0 })),

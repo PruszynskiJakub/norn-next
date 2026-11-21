@@ -1,12 +1,14 @@
 # Reference
 
-Every command and flag, every config key, the signals a workflow can route, the workflows the bundled pack ships and the exit codes. The lists between the two marker comments below are generated from the CLI itself (`bun run docs:emit`), so they match the release this file ships with. What the terms mean is in [Concepts](concepts.md).
+Every command and flag, every config key, the signals a workflow can route, the inputs an agent step can name, the workflows the bundled pack ships and the exit codes. The lists between the two marker comments below are generated from the CLI itself (`bun run docs:emit`), so they match the release this file ships with. What the terms mean is in [Concepts](concepts.md).
 
 ## Output and exit codes
 
 Commands a person or an agent reads print markdown. Every command prints one JSON value instead with `--json`; `norn hook` answers its harness in the harness's own format. Code should branch on the exit code and the `--json` data, never on the markdown.
 
 A refusal prints `{error, do_instead, code}` (as markdown without `--json`): what was refused, what to do instead and a stable code. The exit code says why: `refused` (3) when a rule says no, `usage` (2) for bad arguments, `corrupt` (4) when a file norn keeps fails validation, `busy` (5) when another process holds the lock or the claim, `config` (6) when a config file is wrong. The full list is under [Exit codes](#exit-codes).
+
+A command marked *a person's command* below is refused with `person_only` (exit 3) when it runs in an agent's session, that is when `NORN_UNIT` or `NORN_RUN_ID` is set, as every launch sets them for the agent and all it starts. Its `do_instead` tells the agent to ask the person (`norn ask "…"`); the person runs it from their own shell, not from the agent's pane.
 
 ## Config
 
@@ -33,6 +35,58 @@ A gate or a wait step kind (`await-merge`) routes signals under `on:`, beside it
 | `timeout` | clock | `after:` a duration (`30m`, `48h`, `7d`), required | the step has waited `after:`: a gate since it parked, a wait step since its run started | the step visit (`ready#3`) |
 
 A plugin declares more under `provides.signals`; `norn plugin list` names them, and a workflow that routes one loads only with that plugin configured. A signal fires once per occurrence id in a round, the first listed first, one per tick, and only for the story's own unit. `on:` on an agent, check, effect step or slices step is refused, and so is an undeclared signal or a name under both `outcomes:` and `on:`. A wait step kind that answers a signal's name as its own outcome (`await-merge` answers `unpushed`) takes the one route under `on:` for both. A waiting step written before `on:`, with `stale` or `unpushed` under `outcomes:`, still loads to the same graph; `norn doctor` warns about a repo file in that form.
+
+## Inputs
+
+An agent step's `inputs:` lists what its brief gives it. norn writes each one under `.agents/` in the unit's worktree, and the brief names its path; an input norn holds nothing for yet is listed with a note.
+
+| Input | What the agent gets |
+|---|---|
+| `spec` | the story's spec, `.agents/specs/<story>/spec.md`: its tracker item, mirrored, and the sections later steps added |
+| `handoff` | this unit's handoff, `.agents/specs/<story>/handoffs/<unit>.md`, which the agent keeps current |
+| `last_check` | the last check's exit, outcome and the end of its output |
+| `last_findings` | the findings that sent the work back: a rejected gate's reason, or the report of the step that handed findings back |
+| `signal` | the signal that moved the story from where it waited, with what its source reported; the agent step right after a signal gets it whether or not it lists it |
+| `diff` | the `git diff` command that shows the change so far |
+| `slice` | this slice's file, `slices/<nn>-<slug>.md` in the story's spec folder |
+| `slices` | every slice file of the story, with where each slice stands |
+| `record` | the story's record: every unit's outcomes, gate rulings and criteria reports with their evidence |
+| `resolution` | the resolution to review: each merge's remerge-diff and the conflicts this round recorded |
+| `base_side` | the base side of a conflict: the base commit to merge and what it changed in each conflicting path |
+
+An entry may also be a file in the repo, `{file: <path>, label: <text>}`, which the brief names as it is, or a name an earlier step produces (below). A workflow file naming any other input is refused when it loads, at the step and the entry (`/steps/review/inputs/2`), with the names above. A unit's pinned workflow loads without this check, so a pinned workflow that names one keeps running, and its brief notes that norn provides no input of that name.
+
+### Produced files
+
+An agent step declares the files it writes for later steps under `produces:`, each by a name of its own:
+
+```yaml
+describe:
+  agent: "Write the PR body to pr.md in the spec folder."
+  produces:
+    pr_body: { file: pr.md }            # on: [done] would name the outcomes it is due on
+  outcomes: { done: ship }
+```
+
+- `file` is relative to the story's spec folder, `.agents/specs/<story>/`; a path that may leave it (absolute, with `..`, a backslash or a drive letter) is refused, and so is a file norn writes there itself: `.gitignore`, `spec.md`, or one under `handoffs/` or `slices/`.
+- `on:` lists the outcomes whose report needs the file. Without it, every outcome the step reports needs it but one that hands findings back (`hand_back: findings`), which sends the work back rather than forward. An outcome the step does not report is refused.
+- A produced name may not be an input norn provides, and every step producing one name writes the same file.
+- `norn done <outcome>` is refused (`produced_missing`) while a file due on that outcome is missing or empty in the worktree; a file left by an earlier pass counts, as norn does not check that this run wrote it. The brief says which file each outcome needs.
+- A later step lists the name under `inputs:`, and its brief names the file. norn keeps the file with the story's documents, so a step in another worktree gets it too.
+- A step that lists a produced name, or a step kind that reads one, must have a producer before it on every path from `start`, the producer reporting an outcome the file is due on. A file where some path lacks one is refused when it loads, naming the step and that path (`plan.skip → review`). A route back is fine.
+
+The bundled `describe` steps produce `pr_body`, which `open-pr` reads. `open-pr` reads it with a fallback: a base update's light path reaches `open-pr` again without `describe`, and then it reads the `pr.md` an earlier pass left, else opens the change with norn's footer alone. A unit that pinned its workflow before `produces:` existed loads it to the same graph and hash.
+
+## What an agent step writes
+
+An agent step's `writes:` says where its agent may write, as the worktree hooks hold it ([Concepts](concepts.md#what-an-agent-step-may-write)).
+
+| Value | The agent may write | Needs |
+|---|---|---|
+| `worktree` (default) | its unit's worktree, and the temp folders (`$TMPDIR`, `/tmp`) | nothing |
+| `docs` | the story's spec folder in the worktree (`.agents/specs/<story>/`), and the temp folders | an executor whose harness can refuse a tool call (`denyTool`); on any other the unit parks `stuck` with `agent.unguarded` before an agent starts |
+
+Every step is refused a write into norn's run state. Only the agent tool's file writes are judged; a shell command is not. `writes:` on a step that is not an agent step is refused when the workflow loads.
 
 ## Generated reference
 
@@ -190,6 +244,8 @@ norn story create <title> [--body <text>] [--workflow <name>]
 
 Approve the gate a story waits at
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn story approve <key> [--gate <step>] [--reason <text>]
 ```
@@ -200,6 +256,8 @@ norn story approve <key> [--gate <step>] [--reason <text>]
 ##### `norn story reject`
 
 Reject the gate a story waits at, with the reason the next attempt gets
+
+A person's command: refused in an agent's session (`person_only`).
 
 ```sh
 norn story reject <key> --reason <text> [--gate <step>]
@@ -212,6 +270,8 @@ norn story reject <key> --reason <text> [--gate <step>]
 
 Answer the question a story's agent asked, or the permission or trust prompt in its pane
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn story answer <key> <text>   (a prompt in the pane: an option's number, yes or no)
 ```
@@ -219,6 +279,8 @@ norn story answer <key> <text>   (a prompt in the pane: an option's number, yes 
 ##### `norn story round`
 
 Start a story's next round on a workflow
+
+A person's command: refused in an agent's session (`person_only`).
 
 ```sh
 norn story round <key> --workflow <name> [--at <step>] [--force] [--reason <text>]
@@ -233,6 +295,8 @@ norn story round <key> --workflow <name> [--at <step>] [--force] [--reason <text
 
 Take a story's claim to this machine, so its next tick carries the story on
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn story take <key> [--force] [--reason <text>]
 ```
@@ -244,6 +308,8 @@ norn story take <key> [--force] [--reason <text>]
 
 Merge the base into a finished story's branch and push it, for its open change
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn story update-branch <key> [--reason <text>]
 ```
@@ -253,6 +319,8 @@ norn story update-branch <key> [--reason <text>]
 ##### `norn story close`
 
 Close a story and stop its runs
+
+A person's command: refused in an agent's session (`person_only`).
 
 ```sh
 norn story close <key>
@@ -266,6 +334,8 @@ Runs: start one manual mode holds, stop a live one, run a step again, bring one'
 
 Start the agent of a step manual mode holds, or of an attended step
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn run start <unit>
 ```
@@ -274,6 +344,8 @@ norn run start <unit>
 
 Stop a unit's live run
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn run stop <unit>
 ```
@@ -281,6 +353,8 @@ norn run stop <unit>
 ##### `norn run rerun`
 
 Run a unit's step again, or move it to another step, counters reset
+
+A person's command: refused in an agent's session (`person_only`).
 
 ```sh
 norn run rerun <unit> [--step <step>] [--reset <counter>]... [--reason <text>]
@@ -387,6 +461,8 @@ norn help [<command>]
 ##### `norn tidy`
 
 Remove the worktrees and local branches of ended stories that no live claim holds, and close their runs' panes
+
+A person's command: refused in an agent's session (`person_only`).
 
 ```sh
 norn tidy [--dry-run]

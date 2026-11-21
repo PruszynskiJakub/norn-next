@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { briefOf, criteriaOf, handoffArtifact, mirrorItem, readStoryDoc, reportRun, SPEC_ARTIFACT } from "../../src/index.ts";
-import { has, harness, type Harnessed, record, tickUntil, trackerItem } from "./support.ts";
+import { loadWorkflow, type WorkflowLoad } from "@norn/kernel";
+import { parse } from "yaml";
+import { briefOf, criteriaOf, handoffArtifact, loadPackWorkflows, loadPinned, mirrorItem, readStoryDoc, reportRun, SPEC_ARTIFACT } from "../../src/index.ts";
+import { has, harness, type Harnessed, record, tickUntil, trackerItem, WORKFLOWS } from "./support.ts";
 
 const UNIT = "lt-1";
 const WORKTREE = "/machine/repo/worktrees/lt-1";
@@ -109,7 +111,6 @@ describe("readable inputs", () => {
     expect(spec).toContain("says `teh` twice.");
     expect(spec).toContain("## Plan\n\nFix it in one place.");
     expect(md).toContain("- `diff` — the change so far. run `git diff main...HEAD` in this worktree");
-    expect(md).toContain("- `mystery` — norn holds nothing for this input yet");
   });
 
   test("an untouched copy left in a worktree never overwrites a newer document", async () => {
@@ -119,5 +120,34 @@ describe("readable inputs", () => {
     expect(write?.ok).toBe(true);
     await brief(h);
     expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`)).toContain("newer, from elsewhere");
+  });
+});
+
+describe("an input name the host does not provide", () => {
+  const TYPO = (WORKFLOWS["handed.yaml"] as string).replace("inputs: [spec, handoff, last_findings, diff]", "inputs: [spec, handoff, last_findings, diff, mystery]");
+
+  test("a unit that pinned a revision naming one before such names were refused keeps running it, and its brief notes the input", async () => {
+    const h = harness({ workflow: "handed" });
+    const byName = h.env.workflows as Record<string, WorkflowLoad>;
+    const fixed = byName.handed as WorkflowLoad;
+    const asFile = loadPackWorkflows({ workflows: { "handed.yaml": TYPO }, shared: {}, skills: {} }, h.env.slots.stepKinds, h.env.config.kernel);
+    expect(asFile.ok && asFile.value.handed?.ok).toBe(false);
+    // the same loader without the host's inputs, as a norn from before the refusal loaded the file
+    const before = loadWorkflow(parse(TYPO), { stepKinds: h.env.slots.stepKinds, sharedFiles: {}, config: h.env.config.kernel });
+    if (!before.ok) throw new Error(JSON.stringify(before.errors));
+    byName.handed = before;
+    h.items.push(trackerItem(1, ITEM));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const build = (await record(h, UNIT)).state;
+    expect(build?.workflow.hash).toBe(before.workflow.pinned.hash);
+    // the file fixed since: the unit decides by the revision it pinned, which still loads
+    byName.handed = fixed;
+    expect(loadPinned(h.env, before.workflow.pinned)?.pinned.hash).toBe(before.workflow.pinned.hash);
+    expect((await reportRun(h.env, UNIT, build?.run?.id as string, { verb: "done", outcome: "done" }, "r1")).ok).toBe(true);
+    await tickUntil(h, async () => (await record(h, UNIT)).state?.run?.step === "review");
+    const review = (await record(h, UNIT)).state;
+    expect({ ended: review?.ended, hash: review?.workflow.hash }).toEqual({ ended: undefined, hash: before.workflow.pinned.hash });
+    expect(await brief(h)).toContain("- `mystery` — norn provides no input of this name");
   });
 });

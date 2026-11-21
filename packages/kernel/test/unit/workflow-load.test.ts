@@ -160,12 +160,32 @@ describe("the shipped workflows", () => {
     expect(w.graph.steps["approve-slices"]?.outcomes).toEqual(["approve", "reject"]);
     expect(w.graph.steps["human-qa"]).toMatchObject({ outcomes: ["approve", "reject"], signals: [{ name: "stale" }] });
     expect(w.graph.steps.qa?.agent).toMatchObject({ criteria: true, hand_back: { fail: "findings" }, nudges: CONFIG.maxNudges, deadline_ms: CONFIG.deadlineMs });
+    // a review never edits code, and QA may write its evidence
+    expect([w.graph.steps.review?.agent?.writes, w.graph.steps["resolution-review"]?.agent?.writes, w.graph.steps.qa?.agent?.writes]).toEqual(["docs", "docs", "worktree"]);
     expect(w.graph.base).toEqual({ stale: "conflict", step: "update", verify: "test" });
   });
 });
 
 const agent = (outcomes: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ agent: "Do the work.", outcomes, ...extra });
 const wf = (steps: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ name: "t", start: Object.keys(steps)[0], steps, ...extra });
+
+describe("writes", () => {
+  test("an agent step writes its worktree unless it declares writes: docs", () => {
+    const w = loaded(loadWorkflow(wf({ build: agent({ done: "review" }), review: agent({ done: "again" }, { writes: "docs" }), again: agent({ done: "$done" }, { writes: "worktree" }) }), opts()));
+    expect([w.graph.steps.build?.agent?.writes, w.graph.steps.review?.agent?.writes]).toEqual(["worktree", "docs"]);
+  });
+
+  test("a step that never names writes pins none, so the hash of a workflow written before it stays", () => {
+    const w = loaded(loadWorkflow(wf({ build: agent({ done: "$done" }) }), opts()));
+    expect(w.pinned.doc.steps.build).not.toHaveProperty("writes");
+  });
+
+  test("writes takes worktree or docs, and only on an agent step", () => {
+    expect(new Set(errorsOf(loadWorkflow(wf({ build: agent({ done: "$done" }, { writes: "everything" }) }), opts())).map((e) => e.path))).toEqual(new Set(["/steps/build/writes"]));
+    const errors = errorsOf(loadWorkflow(wf({ test: { check: "bun test", timeout: "5m", writes: "docs", outcomes: { pass: "$done", fail: "$stuck" } } }), opts()));
+    expect(errors).toEqual([{ path: "/steps/test/writes", message: "`writes` is not a key of a check step" }]);
+  });
+});
 
 describe("refusals", () => {
   test("an unknown head key names the missing step kind", () => {
@@ -318,6 +338,29 @@ describe("refusals", () => {
     const shared = { start: "go", steps: { go: { push: null, outcomes: { done: { exit: "pushed" } } } } };
     const errors = errorsOf(loadWorkflow(wf({ p: { use: "p", outcomes: { pushed: "$done", landed: "$done" } } }), opts({ sharedFiles: { p: shared } })));
     expect(errors).toEqual([{ path: "/steps/p/outcomes/landed", message: "`landed` is not an exit of shared/p.yaml (its exits: pushed)" }]);
+  });
+
+  test("an input name the host does not provide, naming the inputs it does", () => {
+    const doc = wf({ work: agent({ done: "fix" }, { inputs: ["spec", "last_finding"] }), fix: agent({ done: "$done" }, { inputs: ["handoff", { file: "docs/x.md" }, "mystery"] }) });
+    const errors = errorsOf(loadWorkflow(doc, opts({ inputs: ["spec", "handoff", "last_findings"] })));
+    expect(errors).toEqual([
+      { path: "/steps/work/inputs/1", message: "`last_finding` is not an input norn provides: name one of spec, handoff, last_findings, or a file as {file: <path>}" },
+      { path: "/steps/fix/inputs/2", message: "`mystery` is not an input norn provides: name one of spec, handoff, last_findings, or a file as {file: <path>}" },
+    ]);
+  });
+
+  test("an unknown input inside a shared file is refused, naming the file", () => {
+    const shared = { start: "go", steps: { go: agent({ done: { exit: "done" } }, { inputs: ["nope"] }) } };
+    const errors = errorsOf(loadWorkflow(wf({ p: { use: "p", outcomes: { done: "$done" } } }), opts({ sharedFiles: { p: shared }, inputs: ["spec"] })));
+    expect(errors).toEqual([{ path: "/steps/go/inputs/0", message: "shared/p.yaml: `nope` is not an input norn provides: name one of spec, or a file as {file: <path>}", shared: "p" }]);
+  });
+
+  test("without the host's inputs, as a pinned revision loads, any input name loads to the same hash", () => {
+    const doc = wf({ work: agent({ done: "$done" }, { inputs: ["spec", "mystery", { file: "docs/x.md", label: "Design" }] }) });
+    const pinned = loaded(loadWorkflow(doc, opts()));
+    expect(pinned.graph.steps.work?.agent?.inputs).toEqual(["spec", "mystery", { file: "docs/x.md", label: "Design" }]);
+    expect(loaded(loadWorkflow(structuredClone(pinned.pinned.doc), opts())).pinned.hash).toBe(pinned.pinned.hash);
+    expect(loaded(loadWorkflow(wf({ work: agent({ done: "$done" }, { inputs: ["spec", { file: "docs/x.md" }] }) }), opts({ inputs: ["spec"] }))).graph.steps.work?.agent?.inputs).toEqual(["spec", { file: "docs/x.md" }]);
   });
 
   test("a schema failure is data, never a throw", () => {

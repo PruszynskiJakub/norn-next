@@ -41,6 +41,13 @@ export interface BriefInputView {
   note?: string;
 }
 
+/** A file a step produces, as the brief asks for it before the outcomes it is due on. */
+export interface BriefProduced {
+  name: string;
+  path: string;
+  outcomes: readonly string[];
+}
+
 /** The story the unit delivers, as its tracker item names it. */
 export interface BriefStory {
   key: string;
@@ -71,6 +78,8 @@ export interface BriefRenderInput {
   criteria?: { required: boolean; verdict: Readonly<Record<string, Verdict>> };
   /** outcome → what its `done` must hand back, as the step's `hand_back` says */
   handBack?: Readonly<Record<string, HandBack>>;
+  /** the files the step produces for later steps: each one's name, path relative to the worktree, and the outcomes it is due on */
+  produced?: readonly BriefProduced[];
   /** a person works in the session: questions go to them, and `done` waits for their agreement */
   attended?: boolean;
   /** answers given to earlier sessions of this step, which a fresh session would otherwise never see */
@@ -183,6 +192,10 @@ function finishLines(input: BriefRenderInput, c: BriefCommands): string[] {
   }
   if (criteria) out.push(criteriaLine(criteria));
   if (input.outcomes.some((o) => input.handBack?.[o] === "findings")) out.push(FINDINGS_LINE);
+  for (const p of input.produced ?? []) {
+    const due = p.outcomes.filter((o) => input.outcomes.includes(o));
+    if (due.length > 0) out.push(`- Before ${due.map((o) => `\`${c.done} ${o}\``).join(" or ")}, write \`${p.name}\` to \`${p.path}\`: a report without it, or with it empty, is refused.`);
+  }
   if (input.outcomes.length === 0) out.push(`- \`${c.done}\` — the step's work is finished`);
   if (input.attended) out.push("- A question goes to the person in this session, never through `" + c.ask + "`.");
   else out.push(`- \`${c.ask} "<one self-contained question>"\` — you need a person's decision; the step waits until it is answered.`);

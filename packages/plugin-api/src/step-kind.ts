@@ -28,7 +28,8 @@ export type BuiltinStepKind = (typeof BUILTIN_STEP_KINDS)[number];
 
 /**
  * Every other key a workflow step may hold. A step kind's name or config key may not be one of these,
- * or the loader could not tell which key of a step is its head.
+ * or the loader could not tell which key of a step is its head. A keyword added here refuses a plugin
+ * that used its name, so it takes a minor bump of the plugin API.
  */
 export const STEP_KEYWORDS = [
   "use",
@@ -39,11 +40,13 @@ export const STEP_KEYWORDS = [
   "verdict",
   "skills",
   "inputs",
+  "produces",
   "attended",
   "by",
   "model",
   "criteria",
   "hand_back",
+  "writes",
   "deadline",
   "nudges",
   "retries",
@@ -81,6 +84,11 @@ export interface StepKindInput<C = Record<string, unknown>> {
    */
   base?: StepKindBase;
   /**
+   * Each name the kind `reads` that the unit's workflow produces → its file, relative to the worktree,
+   * as the producing step declares it (plugin API 1.20). A name no step produces is absent.
+   */
+  reads?: Record<string, string>;
+  /**
    * The receipt the host wrote before running the kind (the run's intent); the idempotence key of
    * every effect the kind asks a provider for, so a run the host repeats after a crash replays it.
    */
@@ -99,6 +107,17 @@ export interface StepKindOutcome {
   detail?: unknown;
 }
 
+/**
+ * A name a step kind reads (plugin API 1.20): one an agent step declares under `produces:`, or one the
+ * host provides. A bare name must be produced on every path to a step of the kind, which the loader
+ * checks; `{name, fallback}` is optional, and `fallback` says what the kind does without it, for a
+ * workflow that reaches the step on a path no producer is on.
+ */
+export type StepKindRead = string | { name: string; fallback: string };
+
+/** The name a read declares, bare or optional. */
+export const readName = (read: StepKindRead): string => (typeof read === "string" ? read : read.name);
+
 export interface StepKindDefinition<S extends TSchema = TSchema> {
   /** the head key, the same as the key the plugin provides it under */
   name: string;
@@ -107,6 +126,8 @@ export interface StepKindDefinition<S extends TSchema = TSchema> {
   /** every outcome `run` may answer; each must be routed by a step that uses the kind */
   outcomes: string[];
   mode: StepKindMode;
+  /** what the kind reads that an earlier step produces; absent: nothing */
+  reads?: StepKindRead[];
   run(input: StepKindInput<Static<S>>, ctx: HostContext): Promise<PluginResult<StepKindOutcome>>;
 }
 
@@ -140,6 +161,19 @@ export function stepKindProblems(key: string, value: unknown): string[] {
     if (new Set(outcomes).size !== outcomes.length) out.push("outcomes repeat");
     if (outcomes.includes(WAITING_OUTCOME)) out.push(`outcome ${WAITING_OUTCOME} is implied for a wait kind and never declared`);
   }
+  if (v.reads !== undefined) out.push(...readsProblems(v.reads));
+  return out;
+}
+
+function readsProblems(reads: unknown): string[] {
+  if (!Array.isArray(reads)) return ["reads must be a list"];
+  const shaped = reads.every((r) => typeof r === "string" || (r !== null && typeof r === "object" && typeof r.name === "string" && typeof r.fallback === "string" && r.fallback.trim() !== ""));
+  if (!shaped) return ["a read is a name, or {name, fallback} with the fallback it takes without it"];
+  const names = (reads as StepKindRead[]).map(readName);
+  const out: string[] = [];
+  const bad = names.filter((n) => !OUTCOME_RE.test(n));
+  if (bad.length > 0) out.push(`reads ${bad.map((n) => JSON.stringify(n)).join(", ")} are not input names`);
+  if (new Set(names).size !== names.length) out.push("reads repeat");
   return out;
 }
 

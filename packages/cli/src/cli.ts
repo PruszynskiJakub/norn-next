@@ -8,6 +8,7 @@ import { type Command, parseCommandArgs } from "./command.ts";
 import { COMMANDS, findCommand, findNoun, NOUNS } from "./commands/index.ts";
 import { CliContext, type CliIo } from "./context.ts";
 import { type CliFailure, ExitCode, failureMarkdown, isRaw, isRendered, isWithExit, render, rendered, toFailure, usageError } from "./output.ts";
+import { personOnlyRefusal } from "./person-only.ts";
 import { bundledNames } from "./plugins/bundled.ts";
 
 export interface CliResult {
@@ -71,6 +72,8 @@ async function dispatch(command: Command, rest: readonly string[], json: boolean
   const ctx = new CliContext(io, { acts: command.acts === true });
   const withStderr = (r: CliResult): CliResult => (ctx.stderr.length > 0 ? { ...r, stderr: ctx.stderr.map((l) => `${l}\n`).join("") } : r);
   try {
+    const refused = personOnlyRefusal(command, io.env);
+    if (refused) throw refused;
     const args = parseCommandArgs(command, own, json);
     const result = await command.run(ctx, args);
     if (isRaw(result)) return withStderr({ exit: result.exit, value: null, stdout: result.stdout, ...(result.after && { after: result.after }) });

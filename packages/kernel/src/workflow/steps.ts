@@ -9,6 +9,7 @@ import { check } from "@norn/schema";
 import { Type } from "@sinclair/typebox";
 import { ON_ROUTE_KEYS, type OnRoute, type Route, type WorkflowStepDoc } from "./document.ts";
 import type { StepKindInfo } from "./load.ts";
+import { produceErrors } from "./produces.ts";
 import { BUILTIN_STEP_OUTCOMES, OVERRIDABLE_OUTCOMES, type StepRunner, type WorkflowError } from "./graph.ts";
 
 /** A signal a step routes, as a tick weighs it: its name, and the parameters its `on:` entry gives. */
@@ -38,7 +39,7 @@ const OVERRIDABLE: readonly string[] = OVERRIDABLE_OUTCOMES;
 
 /** The keys beside its head each built-in kind takes; a plugin kind takes `description`, `outcomes` and its configSchema's keys, and `on` when it waits. */
 const KEYS_OF: Readonly<Record<string, readonly string[]>> = {
-  agent: ["description", "outcomes", "means", "verdict", "skills", "inputs", "attended", "by", "model", "criteria", "hand_back", "deadline", "nudges", "retries"],
+  agent: ["description", "outcomes", "means", "verdict", "skills", "inputs", "produces", "attended", "by", "model", "criteria", "hand_back", "writes", "deadline", "nudges", "retries"],
   check: ["description", "outcomes", "timeout", "exits"],
   gate: ["description", "outcomes", "on"],
   slices: ["description", "outcomes"],
@@ -59,6 +60,9 @@ export function readStep(
   step: WorkflowStepDoc,
   stepKinds: Readonly<Record<string, StepKindInfo>>,
   signals: Readonly<Record<string, SignalDeclaration>>,
+  inputs?: readonly string[],
+  produced: readonly string[] = [],
+  specFiles: readonly string[] = [],
 ): { ok: true; step: ReadStep } | { ok: false; errors: WorkflowError[] } {
   const at = `/steps/${name}`;
   const raw = step as Record<string, unknown>;
@@ -93,9 +97,17 @@ export function readStep(
     const r = check(plugin.configSchema, config);
     if (!r.ok) errors.push(...r.errors.map((e) => ({ path: `${at}${e.path}`, message: `${head}: ${e.message}` })));
   }
+  if (head === "agent" && inputs !== undefined) {
+    const known = [...inputs, ...produced.filter((p) => !inputs.includes(p))];
+    (step.inputs ?? []).forEach((input, i) => {
+      if (typeof input === "string" && !known.includes(input))
+        errors.push({ path: `${at}/inputs/${i}`, message: `\`${input}\` is not an input norn provides${produced.length ? " or a step produces" : ""}: name one of ${known.join(", ")}, or a file as {file: <path>}` });
+    });
+  }
   if (head === "check" && step.timeout === undefined) errors.push({ path: at, message: "a check needs a timeout" });
 
   const ends = endsOf(head, step, plugin, outcomeRoutes, at, errors);
+  if (head === "agent") errors.push(...produceErrors(step, at, ends, inputs, specFiles));
   // a wait kind may answer by itself what the host also reports between its polls (await-merge's
   // `unpushed`): one route under on: serves both, so the name still sits in one block
   const onRoutes = waits ? ((step.on ?? {}) as Record<string, OnRoute>) : {};
