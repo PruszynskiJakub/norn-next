@@ -118,6 +118,19 @@ function stepTypes<S extends TSchema>(outcome: S) {
       hand_back: Type.Optional(
         Type.Record(OutcomeName, HandBack, { minProperties: 1, additionalProperties: false, description: "Outcome → what its norn done must come with" }),
       ),
+      produces: Type.Optional(
+        Type.Record(
+          OutcomeName,
+          Type.Object(
+            {
+              file: Type.String({ minLength: 1, pattern: "\\S", description: "The file, relative to the story's spec folder (`pr.md`)" }),
+              on: Type.Optional(Type.Array(OutcomeName, { minItems: 1, uniqueItems: true, description: "The outcomes whose report needs the file" })),
+            },
+            { additionalProperties: false },
+          ),
+          { minProperties: 1, additionalProperties: false, description: "Name → the file the step writes for later steps, which list the name under inputs:" },
+        ),
+      ),
       writes: Type.Optional(Type.Union(StepWrites.anyOf, { description: "worktree (default): the unit's worktree; docs: only the story's documents in its spec folder" })),
       /**
        * Declared outcomes. May also override classified routes by naming

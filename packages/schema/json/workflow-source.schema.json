@@ -213,6 +213,39 @@
                     }
                   }
                 },
+                "produces": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "description": "Name → the file the step writes for later steps, which list the name under inputs:",
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_-]*$": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "file"
+                      ],
+                      "properties": {
+                        "file": {
+                          "minLength": 1,
+                          "pattern": "\\S",
+                          "description": "The file, relative to the story's spec folder (`pr.md`)",
+                          "type": "string"
+                        },
+                        "on": {
+                          "minItems": 1,
+                          "uniqueItems": true,
+                          "description": "The outcomes whose report needs the file",
+                          "type": "array",
+                          "items": {
+                            "pattern": "^[a-z][a-z0-9_-]*$",
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
                 "writes": {
                   "description": "worktree (default): the unit's worktree; docs: only the story's documents in its spec folder",
                   "anyOf": [
@@ -1167,6 +1200,7 @@
                 "retries": {},
                 "criteria": {},
                 "hand_back": {},
+                "produces": {},
                 "writes": {},
                 "by": {},
                 "outcomes": {},
