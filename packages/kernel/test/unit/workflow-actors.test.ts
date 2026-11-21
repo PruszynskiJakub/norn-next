@@ -227,6 +227,16 @@ describe("refusals of the step form", () => {
     ]);
   });
 
+  test("allow: beside an older head key with no role, which would pin a request no grant is read from", () => {
+    expect(refusals(wf({ a: { agent: "Do it.", allow: ["docs:write"], outcomes: { done: "$done" } } }))).toEqual([
+      { path: "/steps/a/allow", message: "step 'a' is written with the head key `agent` and with `allow`, which narrows a role's capabilities: write it with by: <role> and do:" },
+    ]);
+    // the pinned document of a step written with by: holds both, and loads again as it is
+    const pinned = loaded(loadWorkflow(wf({ a: { by: "reviewer", do: "Do it.", allow: ["docs:write"], outcomes: { done: "$done" } } }), opts())).pinned;
+    expect(pinned.doc.steps.a).toEqual({ agent: "Do it.", role: "reviewer", allow: ["docs:write"], writes: "docs", outcomes: { done: "$done" } });
+    expect(loaded(loadWorkflow(structuredClone(pinned.doc), opts())).pinned.hash).toBe(pinned.hash);
+  });
+
   test("a step with do: and no actor", () => {
     expect(refusals(wf({ a: { do: "Do it.", outcomes: { done: "$done" } } }))).toEqual([
       { path: "/steps/a", message: "step 'a' names no actor: give it by: (an agent role, person, shell, or a step kind as <namespace>.<kind>)" },

@@ -17,7 +17,7 @@ const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !
 
 const KNOWN: readonly string[] = CAPABILITIES;
 
-/** The keys only the step form holds: one beside an older head key mixes the two forms. `allow` is pinned as written, so a pinned step holds it too. */
+/** The keys only the step form holds: one beside an older head key mixes the two forms. `allow` is pinned as written beside `role`, so it is held apart (see lowerActor). */
 const FORM_ONLY: readonly string[] = ["do", "with", "reads", "limits"];
 const BUILTIN: readonly string[] = BUILTIN_STEP_KINDS;
 const KEYWORDS: readonly string[] = STEP_KEYWORDS;
@@ -70,6 +70,9 @@ export function lowerActor(name: string, step: Obj, names: SurfaceNames): Lowere
   const formOnly = Object.keys(step).filter((k) => FORM_ONLY.includes(k));
   if (heads.length) {
     if (formOnly.length) return refused(at, `step '${name}' is written with the head key \`${heads[0]}\` and with \`${formOnly[0]}\`: write it with by: and do: alone`);
+    // a grant is read from a role, so allow: with none would pin a narrowing nothing enforces
+    if (step.allow !== undefined && step.role === undefined)
+      return refused(`${at}/allow`, `step '${name}' is written with the head key \`${heads[0]}\` and with \`allow\`, which narrows a role's capabilities: write it with by: <role> and do:`);
     if (typeof step.attended === "string") return refused(`${at}/attended`, `\`attended: ${step.attended}\` belongs to a step written with by:; ${/^[aeiou]/.test(heads[0] as string) ? "an" : "a"} ${heads[0]}: step takes attended: true`);
     return { step };
   }
