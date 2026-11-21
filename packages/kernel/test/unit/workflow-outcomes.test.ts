@@ -196,6 +196,31 @@ describe("refusals of the outcome form", () => {
     ]);
   });
 
+  test("an outcome that leaves by an exit carries no bound: the use step's route for the exit holds it", () => {
+    const shared = { s: { start: "x", steps: { x: agent({ done: { exit: "out", max: 2 } }) } } };
+    expect(refused(wf({ u: { use: "s", outcomes: { out: "$done" } } }), { sharedFiles: shared })).toEqual([
+      { path: "/steps/x/outcomes/done", message: "shared/s.yaml: outcome 'done' of step 'x' leaves by `exit:`: its bound is set on the use step's route for the exit", shared: "s" },
+    ]);
+  });
+
+  test("a produces list on a step that is not an agent step", () => {
+    expect(refused(wf({ a: agent({ done: "g" }), g: { gate: "ok?", produces: ["findings"], outcomes: { approve: "$done", reject: "a" } } }))).toEqual([
+      { path: "/steps/g/produces", message: "`produces` lists what an agent step's outcomes produce, and step 'g' is not an agent step" },
+    ]);
+  });
+
+  test("a step that writes verdict both as a map and on an outcome is told to keep one", () => {
+    expect(refused(wf({ a: agent({ pass: { to: "$done", verdict: "pass", produces: ["criteria"] } }, { verdict: { pass: "pass" } }) }))).toEqual([
+      { path: "/steps/a/verdict", message: "step 'a' writes verdict on its outcomes: move these onto the outcomes too (`pass: { to: …, verdict: … }`)" },
+    ]);
+  });
+
+  test("a file the step declares that every outcome's own list leaves out", () => {
+    expect(refused(wf({ a: agent({ done: { to: "$done", produces: [] } }, { produces: [{ name: "n", file: "n.md" }] }) }))).toEqual([
+      { path: "/steps/a/produces/0", message: "`n` is due on no outcome step 'a' reports: name it in the list of an outcome that writes it" },
+    ]);
+  });
+
   test("a step copied with like takes the outcome objects it writes whole", () => {
     pinsAlike(
       wf({
