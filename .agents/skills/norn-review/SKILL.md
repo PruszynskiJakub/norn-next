@@ -40,7 +40,7 @@ The order below matters where it is numbered; how deep each part goes is yours t
 ```
 
    One row per acceptance criterion, by its id and what it says; a user story no criterion covers gets a row of its own, in words with no id. The words column is never empty: the next reader, agent or person, has only the table. Every `UNTRACED` row has its finding.
-8. **Write the findings** as JSON to a file outside the repository (e.g. under `$TMPDIR`) unless told where, and report it with your verdict: `norn done <outcome> --findings <file>` (or the report command your instructions name). An outcome that sends the work back is refused without findings, and the rework reads them from that report, not from the handoff. Keep the axes separate; do not merge or rerank them. The fields are read by code, so keep them exactly as below.
+8. **Write the findings** as JSON to `$NORN_OUT/findings.json` (the brief names it) unless told where, and report your verdict: `norn done <outcome>` (or the report command your instructions name) collects them. An outcome that sends the work back is refused without findings, and the rework reads them from that report, not from the handoff. Keep the axes separate; do not merge or rerank them. The fields are read by code, so keep them exactly as below.
 
 ```json
 {
