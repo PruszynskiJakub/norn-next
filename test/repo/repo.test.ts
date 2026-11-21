@@ -426,7 +426,8 @@ describe("release metadata", () => {
  * hit: `norn status <key>` (now `story view`) and the flags that changed what an old command did
  * (`cockpit --next`, `approve --reject`, …), with or without `norn`.
  */
-const REMOVED_COMMANDS = ["drop", "inbox", "cockpit", "orient", "open", "answer", "approve", "unstick", "update", "mode", "workflow", "take", "release", "trace", "why"];
+// `workflow` is a noun again (`norn workflow confirm`); the old command's `workflow --to` is still caught as an old flag
+const REMOVED_COMMANDS = ["drop", "inbox", "cockpit", "orient", "open", "answer", "approve", "unstick", "update", "mode", "take", "release", "trace", "why"];
 const OLD_COMMAND = new RegExp(`(?:\\bnorn|"\\$NORN")\\s+(${REMOVED_COMMANDS.join("|")})(?![\\w-])`);
 const OLD_STATUS_KEY = /\bnorn status (?:<(?:key|story|unit|slice)>|g[hl]-\d+)/;
 const OLD_FLAG = /\b(?:cockpit --(?:next|open|interval)|approve --reject|unstick --to|orient --open|workflow --to)\b/;

@@ -1,8 +1,10 @@
 /**
- * The pack slot: workflows, the shared files they `use`, and the skills their steps name, shipped
- * together as text. A pack carries files, never code, so the runtime loads its workflows through the
- * kernel's loader exactly as it would a repo's own and a pack can never bypass the workflow checks.
+ * The pack slot: workflows, the shared files they `use`, the skills their steps name, and the roles
+ * their agent steps name, shipped together as text and data. A pack carries files, never code, so the
+ * runtime loads its workflows through the kernel's loader exactly as it would a repo's own and a pack
+ * can never bypass the workflow checks.
  */
+import { type RoleDefinition, rolesProblems } from "./role.ts";
 
 export interface Pack {
   /** workflow file name (`story.yaml`) to its YAML text */
@@ -11,8 +13,9 @@ export interface Pack {
   shared: Record<string, string>;
   /** skill name to its files, each by a path relative to the skill's folder; every skill has a `SKILL.md` */
   skills: Record<string, Record<string, string>>;
+  /** the roles its workflows' agent steps name with `by:` (plugin API 1.23); absent: the shipped pack's */
+  roles?: Record<string, RoleDefinition>;
 }
-
 export const SKILL_NAME_PATTERN = "^[a-z][a-z0-9-]*$";
 const SKILL_NAME_RE = new RegExp(SKILL_NAME_PATTERN);
 const YAML_FILE_RE = /\.ya?ml$/;
@@ -53,5 +56,6 @@ export function packProblems(value: unknown): string[] {
     out.push(...found);
     if (found.length === 0 && typeof (files as Loose)["SKILL.md"] !== "string") out.push(`skill ${name} has no SKILL.md`);
   }
+  if (v.roles !== undefined) out.push(...rolesProblems(v.roles));
   return out;
 }

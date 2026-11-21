@@ -2,11 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { memoryHost } from "@norn/conformance";
 import { forgeNonePlugin } from "@norn/forge-none";
 import { DEFAULT_KERNEL_CONFIG } from "@norn/kernel";
-import { defineNornPlugin, type NornPlugin } from "@norn/plugin-api";
+import { defineNornPlugin, type NornPlugin, ok } from "@norn/plugin-api";
+import { Type } from "@sinclair/typebox";
 import { localStorePlugin } from "@norn/store-local";
 import { localTrackerPlugin } from "@norn/tracker-local";
 import { vcsGitPlugin } from "@norn/vcs-git";
-import { collectStepKinds, createRuntime, HOST_INPUTS, loadPackWorkflows, type RuntimeConfig, resolveSlots, SPEC_FOLDER_FILES, stepsForgePlugin } from "../../src/index.ts";
+import { collectSignals, collectStepKinds, createRuntime, HOST_INPUTS, loadPackWorkflows, type RuntimeConfig, resolveSlots, SPEC_FOLDER_FILES, signalDeclarations, stepsForgePlugin } from "../../src/index.ts";
 
 const pack = defineNornPlugin({
   name: "norn-pack-tiny",
@@ -62,6 +63,26 @@ describe("resolveSlots", () => {
     const r = collectStepKinds([vcsGitPlugin, again]);
     expect(r.ok ? null : r.failure.message).toBe("step kind push is provided by norn-vcs-git and other");
   });
+
+  test("each step kind and signal carries the namespace a workflow file names it by: the slot it works over, else its plugin's name", () => {
+    const preview = { name: "preview", configSchema: Type.Object({}), outcomes: ["done"], mode: "effect" as const, run: async () => ok({ outcome: "done" }) };
+    const read = async () => ok(null);
+    const vercel = defineNornPlugin({ name: "vercel", api: "^1.21", provides: { stepKinds: { preview }, signals: { deployed: { read }, "ci-failed": { read, slot: "forge" } } } });
+    const kinds = collectStepKinds([vcsGitPlugin, stepsForgePlugin, vercel]);
+    if (!kinds.ok) throw new Error(kinds.failure.message);
+    expect(Object.fromEntries(Object.entries(kinds.value).map(([k, d]) => [k, d.namespace]))).toEqual({
+      "update-branch": "vcs",
+      integrate: "vcs",
+      push: "vcs",
+      "verify-base": "vcs",
+      "open-pr": "forge",
+      "await-merge": "forge",
+      preview: "vercel",
+    });
+    const signals = collectSignals([vercel]);
+    if (!signals.ok) throw new Error(signals.failure.message);
+    expect(Object.values(signalDeclarations(signals.value)).map((d) => `${d.namespace}.${d.name}`)).toEqual(["vercel.deployed", "forge.ci-failed"]);
+  });
 });
 
 describe("loadPackWorkflows and createRuntime", () => {
@@ -77,6 +98,16 @@ describe("loadPackWorkflows and createRuntime", () => {
     expect(r.value.typo).toEqual({ ok: false, errors: [{ path: "/steps/build/inputs/1", message: `\`last_finding\` is not an input norn provides: name one of ${HOST_INPUTS.join(", ")}, or a file as {file: <path>}` }] });
     expect(r.value.fine?.ok).toBe(true);
     expect([...HOST_INPUTS].sort()).toEqual(["base_side", "diff", "handoff", "last_check", "last_findings", "record", "resolution", "signal", "slice", "slices", "spec"]);
+  });
+
+  test("a step's by: names a role the pack registers for a step, or the shipped roles when the pack registers none", () => {
+    const file = (role: string) => `name: r\nstart: build\nsteps:\n  build:\n    by: ${role}\n    do: Build it.\n    outcomes: { done: $done }\n`;
+    const roles = { designer: { purpose: "Designs it.", allow: ["docs:write" as const] }, supervisor: { purpose: "Answers.", allow: ["answer" as const], supervises: true as const } };
+    const r = loadPackWorkflows({ workflows: { "designer.yaml": file("designer"), "qa.yaml": file("qa"), "supervisor.yaml": file("supervisor") }, shared: {}, skills: {}, roles }, {});
+    if (!r.ok) throw new Error(r.failure.message);
+    expect([r.value.designer?.ok, r.value.qa?.ok, r.value.supervisor?.ok]).toEqual([true, false, false]);
+    const shipped = loadPackWorkflows({ workflows: { "qa.yaml": file("qa") }, shared: {}, skills: {} }, {});
+    expect(shipped.ok && shipped.value.qa?.ok).toBe(true);
   });
 
   test("a workflow file producing a file norn writes in the spec folder itself is refused, naming the ones it keeps", () => {

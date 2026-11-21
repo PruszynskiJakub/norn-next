@@ -9,12 +9,15 @@
  */
 import { RUN_ENV } from "@norn/plugin-api";
 import { installSkills, REPO_WORKFLOWS_DIR, repoFileOf, repoSkills, type RuntimeEnv, SKILLS_DIR, shellQuote } from "@norn/runtime";
+import { runnerPicks } from "./config/derive.ts";
 import { problemText } from "./config/load.ts";
 import type { NornConfig } from "./config/schema.ts";
 import type { CliContext } from "./context.ts";
 import { GIT_UPGRADE, gitTooOld, MIN_GIT_TEXT } from "./git-version.ts";
 import { ensureLabels, nornLabels } from "./labels.ts";
 import { CliFailure, toFailure } from "./output.ts";
+import { NARROW_POLICY } from "./commands/person-support.ts";
+import { policyRefused } from "./plugins/pack-check.ts";
 import { legacySignalWarning } from "./plugins/signal-check.ts";
 import { unseenSkillWarning } from "./plugins/skill-check.ts";
 
@@ -59,11 +62,59 @@ export function toolsNeeded(config: NornConfig | null): Array<{ tool: string; wh
   const uses = [config.tracker.use, config.forge.use];
   if (uses.includes("github")) out.push({ tool: "gh", why: "the github tracker or forge calls the GitHub CLI", install: "install the GitHub CLI (https://cli.github.com) and run gh auth login" });
   const executors = Object.values(config.executors);
-  if (executors.some((e) => (typeof e.runner === "string" ? e.runner : e.runner.use) === "herdr"))
-    out.push({ tool: "herdr", why: "an executor runs in the herdr runner", install: "install herdr, or norn config set executors.<name>.runner headless" });
+  const herdr = runnerPicks(config).find((r) => r.name === "herdr");
+  if (herdr) out.push({ tool: "herdr", why: "an executor runs in the herdr runner", install: `install herdr, or norn config set ${herdr.at.replace(/^executors\.[^.]+\./, "executors.<name>.")} headless` });
   if (executors.some((e) => e.harness === "claude")) out.push({ tool: "claude", why: "an executor runs the claude harness", install: "install Claude Code (https://claude.com/claude-code)" });
   if (executors.some((e) => e.harness === "pi")) out.push({ tool: "pi", why: "an executor runs the pi harness", install: "install the pi coding agent (https://pi.dev), or norn config set executors.<name>.harness claude" });
   return out;
+}
+
+/**
+ * The sources a loaded workflow's steps read that neither the workflow nor this machine's config
+ * binds: such a step parks `source.unbound` when it is reached, so doctor names it before any runs.
+ */
+function unboundSourceWarning(env: RuntimeEnv): { warning: string; do_instead: string } | null {
+  const bound = env.config.kernel.sources ?? {};
+  const found: { workflow: string; source: string; step: string }[] = [];
+  for (const [name, load] of Object.entries(env.workflows).sort(([a], [b]) => a.localeCompare(b))) {
+    if (!load.ok) continue;
+    const graph = load.workflow.graph;
+    for (const step of Object.values(graph.steps))
+      for (const source of step.agent?.sources ?? []) if (graph.sources?.[source]?.path === undefined && bound[source] === undefined) found.push({ workflow: name, source, step: step.name });
+  }
+  if (found.length === 0) return null;
+  return {
+    warning: found.map((f) => `workflow ${f.workflow} reads the source ${f.source} (step ${f.step}), which nothing binds on this machine`).join("; "),
+    do_instead: [...new Set(found.map((f) => `norn config set sources.${f.source} <path>`))].join(", "),
+  };
+}
+
+/**
+ * The repo's workflows held for the person's confirmation: what changed, and what new rounds run
+ * meanwhile. A tick goes on, so doctor is where the person learns a file is waiting for them.
+ */
+function heldWarning(env: RuntimeEnv): { warning: string; do_instead: string } | null {
+  const held = Object.entries(env.held).sort(([a], [b]) => a.localeCompare(b));
+  if (held.length === 0) return null;
+  const running = (r: (typeof held)[number][1]["running"]): string => (r === null ? "none of it" : r.from === "pack" ? "the pack's revision" : "the revision you last confirmed");
+  return {
+    warning: held
+      .map(([name, h]) => `workflow ${name} is held for your confirmation (${h.changes.join("; ")}); new rounds run ${running(h.running)}${h.refused ? `, as the floor refuses the revision you confirmed under your policy now: ${h.refused}` : ""}`)
+      .join("; "),
+    do_instead: held.map(([name]) => `norn workflow confirm ${name}`).join(", "),
+  };
+}
+
+/** The workflows only the person's policy takes off the floor: no tick stops for them, so doctor names the grant to narrow. */
+function policyWarning(env: RuntimeEnv): { warning: string; do_instead: string } | null {
+  const refused = policyRefused(env.workflows).sort((a, b) => a.workflow.localeCompare(b.workflow));
+  if (refused.length === 0) return null;
+  return {
+    warning: refused
+      .map((r) => `workflow ${r.workflow} starts no new round: your policy grants its gate${r.gates.length > 1 ? "s" : ""} ${r.gates.join(", ")} to a stand-in (policy.stand_in.gates), which leaves no person's step before an effect only a person may let happen; units already on it go on`)
+      .join("; "),
+    do_instead: NARROW_POLICY,
+  };
 }
 
 /** Which workflows load, and which of them are the repo's own files rather than the pack's. */
@@ -266,8 +317,12 @@ export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Prom
         if (workflows.check) checks.push(workflows.check);
         else {
           const legacy = legacySignalWarning(env.value);
-          const warning = [await unseenSkillWarning(env.value), legacy?.warning].filter((w) => w).join("; ");
-          checks.push({ ...passed("workflows", workflowsDetail(env.value)), ...(warning ? { warning } : {}), ...(legacy ? { do_instead: legacy.do_instead } : {}) });
+          const unbound = unboundSourceWarning(env.value);
+          const held = heldWarning(env.value);
+          const policy = policyWarning(env.value);
+          const warning = [await unseenSkillWarning(env.value), legacy?.warning, unbound?.warning, held?.warning, policy?.warning].filter((w) => w).join("; ");
+          const doInstead = [legacy?.do_instead, unbound?.do_instead, held?.do_instead, policy?.do_instead].filter((w) => w).join("; ");
+          checks.push({ ...passed("workflows", workflowsDetail(env.value)), ...(warning ? { warning } : {}), ...(doInstead ? { do_instead: doInstead } : {}) });
         }
         if (!opts.repoOnly) {
           checks.push(await labelsCheck(env.value), await hooksCheck(ctx, cwd, env.value.slots.executors), await skillsCheck(env.value));

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
 import { PLUGIN_API_VERSION } from "@norn/plugin-api";
 import { parse } from "yaml";
-import { bundledNames, configPaths, ExitCode, homePaths, machineDir, machineId, type PluginImporter, REPO_LOCK_FILE, runCli } from "../../src/index.ts";
+import { acceptedPluginPath, bundledNames, configPaths, ExitCode, homePaths, machineDir, machineId, type PluginImporter, REPO_LOCK_FILE, runCli } from "../../src/index.ts";
 import { COMMON, HOME, LOCAL_CONFIG, machine, ROOT, type TestMachine } from "./support.ts";
 
 const PATHS = configPaths(HOME, ROOT);
@@ -151,5 +151,51 @@ describe("norn plugin list, update and remove", () => {
     expect(r.exit).toBe(ExitCode.refused);
     expect(json(r.stdout)).toMatchObject({ code: "plugin_in_use", do_instead: "norn config set executors.claude.runner <another runner>" });
     expect(await m.files.read(LOCK)).toBe(LOCKED);
+  });
+});
+
+describe("the effects a plugin's step kinds declare, accepted at plugin add", () => {
+  const kindModule = (effects: string[]) => ({
+    plugin: {
+      name: "vercel",
+      api: "^1.24",
+      provides: { stepKinds: { preview: { name: "preview", configSchema: {}, outcomes: ["done"], mode: "effect", effects, run: async () => ({ ok: true, value: { outcome: "done" } }) } } },
+    },
+  });
+  const SPEC = { "/src/vercel/package.json": JSON.stringify({ name: "norn-plugin-vercel", version: "1.0.0" }) };
+
+  test("are named when the plugin is added and recorded as the person's acceptance in the norn home", async () => {
+    const m = world({ mods: { "norn-plugin-vercel": kindModule(["outward"]) }, seed: SPEC });
+    const r = await runCli(["plugin", "add", "/src/vercel", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(json(r.stdout)).toMatchObject({ effects: { "vercel.preview": ["outward"] } });
+    expect(JSON.parse((await m.files.read(acceptedPluginPath(HOME, "norn-plugin-vercel"))) ?? "null")).toMatchObject({ plugin: "vercel", version: "1.0.0", effects: { "vercel.preview": ["outward"] } });
+    expect((await runCli(["plugin", "add", "/src/vercel"], m.io)).stdout).toContain("vercel.preview: outward");
+    expect((await runCli(["tick", "--json"], m.io)).exit).toBe(ExitCode.ok);
+  });
+
+  test("a plugin whose kinds declare other effects than the person accepted is refused until they accept them again", async () => {
+    const mods: Record<string, unknown> = { "norn-plugin-vercel": kindModule(["outward"]) };
+    const m = world({ mods, seed: SPEC });
+    await runCli(["plugin", "add", "/src/vercel", "--json"], m.io);
+    mods["norn-plugin-vercel"] = kindModule([]);
+    const r = await runCli(["tick", "--json"], m.io);
+    expect({ exit: r.exit, body: json(r.stdout) }).toMatchObject({ exit: ExitCode.refused, body: { code: "plugin_effects", do_instead: "norn plugin update norn-plugin-vercel" } });
+    expect(String(json(r.stdout).error)).toContain("vercel.preview declares no effects, where you accepted outward");
+  });
+
+  test("a plugin added before acceptance existed loads while its kinds declare no effect, and is refused once one does", async () => {
+    const mods: Record<string, unknown> = { "norn-plugin-vercel": kindModule([]) };
+    const lock = JSON.stringify({ format: 1, plugins: [{ name: "norn-plugin-vercel", spec: "/src/vercel", version: "1.0.0", api: "^1.24" }] });
+    const m = world({ mods, seed: { ...SPEC, [LOCK]: lock } });
+    expect((await runCli(["tick", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    mods["norn-plugin-vercel"] = kindModule(["cost"]);
+    expect(json((await runCli(["tick", "--json"], m.io)).stdout)).toMatchObject({ code: "plugin_effects" });
+  });
+
+  test("only a person adds a plugin or updates one: an agent's session is refused", async () => {
+    const m = world({ mods: { "norn-plugin-vercel": kindModule(["outward"]) }, seed: SPEC });
+    const r = await runCli(["plugin", "add", "/src/vercel", "--json"], { ...m.io, env: { ...m.io.env, NORN_UNIT: "gh-1", NORN_RUN_ID: "r" } });
+    expect(json(r.stdout)).toMatchObject({ code: "person_only" });
   });
 });

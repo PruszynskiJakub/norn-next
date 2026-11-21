@@ -287,3 +287,29 @@ describe("vcs facts", () => {
     expect(story?.signals).toBeUndefined();
   });
 });
+
+describe("an executor's OS sandbox", () => {
+  const TICK = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+  const capsOf = async (env: Parameters<typeof gatherFacts>[0]) => {
+    const r = await gatherFacts(env, TICK, { readOnly: true, local: true });
+    if (!r.ok) throw new Error(r.failure.message);
+    return r.value.facts.capabilities.executors.claude;
+  };
+
+  test("is a fact only when its harness or its runner declares one; none declared reads as none", async () => {
+    const h = harness();
+    expect((await capsOf(h.env))?.sandbox).toBeUndefined();
+    const harnessed = h.env.slots.executors.claude;
+    if (!harnessed) throw new Error("no claude executor");
+    const byHarness = { ...h.env, slots: { ...h.env.slots, executors: { claude: { ...harnessed, capabilities: { ...harnessed.capabilities, sandbox: true } } } } };
+    expect((await capsOf(byHarness))?.sandbox).toBe(true);
+    const boxed = defineNornPlugin({
+      name: "fake-runners",
+      api: "^1.5",
+      provides: { runners: { boxed: { configSchema: Type.Object({}), create: () => ({ name: "boxed", capabilities: { attended: false, headless: true, paneInput: false, sandbox: true }, start: async () => ok({ handle: "x" }), alive: async () => ok(true), send: async () => ok(undefined), stop: async () => ok(undefined) }) } } },
+    });
+    const byRunner = createRuntimeEnv({ ctx: h.ctx, plugins: [...h.plugins, boxed], config: { ...h.config, runner: { name: "boxed" } }, sessions: h.sessions });
+    if (!byRunner.ok) throw new Error(byRunner.failure.message);
+    expect((await capsOf(byRunner.value))?.sandbox).toBe(true);
+  });
+});

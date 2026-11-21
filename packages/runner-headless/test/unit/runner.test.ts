@@ -157,10 +157,19 @@ describe("headless alive and stop", () => {
     expect(slept).toEqual([100, 100, 100]);
   });
 
-  test("stopping a process already gone, or a pid now someone else's, signals nothing", async () => {
+  test("a leader that already exited still has its group killed, so a child it left running cannot write after the stop", async () => {
     const f = fakeProcs();
     const runner = createHeadlessRunner(memoryHost(), f.procs, {}, { sleep: noSleep });
-    expect(await runner.stop("555@start-555")).toEqual({ ok: true, value: undefined });
+    const started = await runner.start(req());
+    if (!started.ok) throw new Error(started.failure.message);
+    f.live.delete(100);
+    expect(await runner.stop(started.value.handle)).toEqual({ ok: true, value: undefined });
+    expect(f.kills).toEqual([{ pid: 100, signal: "KILL" }]);
+  });
+
+  test("a pid now someone else's signals nothing", async () => {
+    const f = fakeProcs();
+    const runner = createHeadlessRunner(memoryHost(), f.procs, {}, { sleep: noSleep });
     f.live.set(556, "a-stranger");
     expect(await runner.stop("556@start-556")).toEqual({ ok: true, value: undefined });
     expect(f.kills).toEqual([]);

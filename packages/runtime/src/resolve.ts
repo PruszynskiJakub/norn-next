@@ -20,13 +20,17 @@ import {
   type SignalDeclaration,
   type SignalSourceDefinition,
   type StepKindDefinition,
+  stepRoles,
+  kindEffects,
+  type Capability,
+  type RoleDefinition,
   type Store,
   type Tracker,
   type Vcs,
 } from "@norn/plugin-api";
 import { parse } from "yaml";
 import { HOST_INPUTS, SPEC_FOLDER_FILES } from "./inputs.ts";
-import type { RuntimeConfig } from "./types.ts";
+import type { RuntimeConfig, StandIn } from "./types.ts";
 
 export interface ResolvedSlots {
   tracker: Tracker;
@@ -34,11 +38,14 @@ export interface ResolvedSlots {
   store: Store;
   vcs: Vcs;
   executors: Readonly<Record<string, Harness>>;
-  stepKinds: Readonly<Record<string, StepKindDefinition>>;
+  stepKinds: Readonly<Record<string, ProvidedStepKind>>;
   /** the signal sources the plugins provide, by signal name; the host's own (vcs, clock) are not among them */
   signals: Readonly<Record<string, ProvidedSignal>>;
   pack: Pack;
 }
+
+/** A plugin's step kind with the namespace a workflow file names it by (`vcs` in `vcs.update-branch`). */
+export type ProvidedStepKind = StepKindDefinition & { namespace?: string };
 
 /** A plugin's signal source with the plugin that provides it, the `source` its signals name. */
 export interface ProvidedSignal {
@@ -59,14 +66,16 @@ export function findProvided<T>(plugins: readonly NornPlugin[], slot: SlotName, 
 }
 
 /** Every step kind the plugins provide; two plugins giving one head key is a refusal, since a workflow could not say which it means. */
-export function collectStepKinds(plugins: readonly NornPlugin[]): PluginResult<Readonly<Record<string, StepKindDefinition>>> {
-  const out: Record<string, StepKindDefinition> = {};
+export function collectStepKinds(plugins: readonly NornPlugin[]): PluginResult<Readonly<Record<string, ProvidedStepKind>>> {
+  const out: Record<string, ProvidedStepKind> = {};
   const by: Record<string, string> = {};
   for (const p of plugins) {
     for (const [key, kind] of Object.entries(p.provides.stepKinds ?? {})) {
       if (by[key] !== undefined) return fail("invalid", `step kind ${key} is provided by ${by[key]} and ${p.name}`);
       by[key] = p.name;
-      out[key] = kind;
+      // a kind over a slot is named by the slot, so a workflow moves between providers unchanged
+      const namespace = kind.slot ?? p.name;
+      out[key] = { ...kind, namespace, effects: kindEffects(namespace, key, kind.effects) };
     }
   }
   return ok(out);
@@ -87,7 +96,9 @@ export function collectSignals(plugins: readonly NornPlugin[]): PluginResult<Rea
 
 /** What the workflow loader reads of the plugins' signals: each name, who reports it, and the parameters an `on:` entry may give it. */
 export function signalDeclarations(signals: Readonly<Record<string, ProvidedSignal>>): Record<string, SignalDeclaration> {
-  return Object.fromEntries(Object.entries(signals).map(([name, s]) => [name, { name, source: s.source, ...(s.def.params !== undefined && { params: s.def.params }) }]));
+  return Object.fromEntries(
+    Object.entries(signals).map(([name, s]) => [name, { name, source: s.source, namespace: s.def.slot ?? s.source, ...(s.def.params !== undefined && { params: s.def.params }) }]),
+  );
 }
 
 export function resolveSlots(ctx: HostContext, plugins: readonly NornPlugin[], config: RuntimeConfig): PluginResult<ResolvedSlots> {
@@ -131,6 +142,18 @@ function parseYaml(text: string): { ok: true; value: unknown } | { ok: false; me
   }
 }
 
+const NO_STAND_IN: StandIn = { gates: [], attended: [] };
+
+/**
+ * The gates of one workflow a policy grant lets a stand-in decide: a grant names a step as
+ * `<workflow>.<step>` by the workflow's name, the one `bind:` names it by, else by its file's.
+ */
+export function delegatedGates(standIn: StandIn, doc: unknown, file: string): string[] {
+  const named = (doc as { name?: unknown } | null)?.name;
+  const prefix = `${typeof named === "string" ? named : file}.`;
+  return standIn.gates.filter((ref) => ref.startsWith(prefix)).map((ref) => ref.slice(prefix.length));
+}
+
 /**
  * Load every workflow of a pack by its file name without the extension. A workflow that fails to load
  * is kept as its failure, not dropped, and so is one whose file does not parse: decide parks a story
@@ -138,11 +161,17 @@ function parseYaml(text: string): { ok: true; value: unknown } | { ok: false; me
  * command over one file. A shared file that does not parse is named in the failure of every workflow
  * that does not load without it.
  */
+/** Each role a pack registers → the capabilities it may be granted, as decide and the loader read them. */
+export function roleCapabilities(roles: Readonly<Record<string, RoleDefinition>>): Record<string, Capability[]> {
+  return Object.fromEntries(Object.entries(roles).map(([name, r]) => [name, [...r.allow]]));
+}
+
 export function loadPackWorkflows(
   pack: Pack,
-  stepKinds: Readonly<Record<string, StepKindDefinition>>,
+  stepKinds: Readonly<Record<string, ProvidedStepKind>>,
   config: Pick<RuntimeConfig["kernel"], "counterDefaults" | "maxNudges" | "maxRetries" | "deadlineMs"> = DEFAULT_KERNEL_CONFIG,
   signals: Readonly<Record<string, SignalDeclaration>> = {},
+  standIn: StandIn = NO_STAND_IN,
 ): PluginResult<KernelWorkflows["byName"]> {
   const sharedFiles: Record<string, unknown> = {};
   const sharedBroken: WorkflowError[] = [];
@@ -152,6 +181,8 @@ export function loadPackWorkflows(
     else sharedBroken.push({ path: "", message: `shared/${file} does not parse: ${doc.message}`, shared: file.replace(/\.ya?ml$/, "") });
   }
   const byName: Record<string, WorkflowLoad> = {};
+  const roles = pack.roles && stepRoles(pack.roles);
+  const roleAllow = pack.roles && roleCapabilities(pack.roles);
   for (const [file, text] of Object.entries(pack.workflows)) {
     const name = file.replace(/\.ya?ml$/, "");
     const doc = parseYaml(text);
@@ -159,7 +190,8 @@ export function loadPackWorkflows(
       byName[name] = { ok: false, errors: [{ path: "", message: `${file} does not parse: ${doc.message}` }] };
       continue;
     }
-    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config, signals, inputs: HOST_INPUTS, specFiles: SPEC_FOLDER_FILES });
+    const floor = { delegated: delegatedGates(standIn, doc.value, name) };
+    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config, signals, inputs: HOST_INPUTS, specFiles: SPEC_FOLDER_FILES, floor, ...(roles && { roles }), ...(roleAllow && { roleAllow }) });
     byName[name] = load.ok || sharedBroken.length === 0 ? load : { ok: false, errors: [...sharedBroken, ...load.errors] };
   }
   return ok(byName);

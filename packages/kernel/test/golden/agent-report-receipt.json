@@ -913,7 +913,8 @@
         "parked": {
           "reason": "agent.asked",
           "since": "2026-11-17T09:00:00.000Z",
-          "text": "Which database should the cache use?"
+          "text": "Which database should the cache use?",
+          "input_id": "01JD5G00007X6WZ5RMAVTMTBG5"
         }
       },
       "expect_version": 2,

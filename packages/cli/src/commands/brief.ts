@@ -1,6 +1,6 @@
 /**
- * `norn brief`: print the brief of the step this agent runs.
- * The unit and run come from NORN_UNIT and NORN_RUN_ID.
+ * `norn brief`: print the brief of the step this agent runs, or, for a supervisor norn launched
+ * beside it, the supervisor's own brief. The unit and run come from NORN_UNIT and NORN_RUN_ID.
  */
 import { briefOf } from "@norn/runtime";
 import { defineCommand } from "../command.ts";
@@ -13,7 +13,8 @@ export const briefCommand = defineCommand({
   usage: "norn brief",
   async run(ctx) {
     const { unit, runId } = agentRunOf(ctx, "brief");
-    const shown = await briefOf(await ctx.runtimeEnv(), unit);
+    // a supervisor norn launched beside the step's run is briefed with what it stands in for
+    const shown = await briefOf(await ctx.runtimeEnv(), unit, runId);
     if (!shown.ok) throw fromRefusal(shown.refusal);
     // the brief is of the unit's live run; a session whose run was replaced must not work from it
     if (shown.value.run_id !== runId) {

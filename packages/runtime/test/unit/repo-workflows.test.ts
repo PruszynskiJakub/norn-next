@@ -25,6 +25,7 @@ const pack = defineNornPlugin({
         workflows: { "story.yaml": flow("story", "build"), "triage.yaml": flow("triage", "look"), "shared-user.yaml": usesShared },
         shared: { "work.yaml": sharedWork("pack-work") },
         skills: {},
+        roles: { designer: { purpose: "Designs it.", allow: ["docs:write"] } },
       },
     },
   },
@@ -107,6 +108,13 @@ describe("the repo's workflows laid over the pack", () => {
     expect(story && !story.ok && story.errors[0]?.message).toContain("story.yaml does not parse");
     expect(env.workflows.half?.ok).toBe(false);
     expect(env.workflows.triage?.ok).toBe(true);
+  });
+
+  test("a repo file names a role the pack registers, as the pack's own files do", () => {
+    const role = (by: string) => `name: design\nstart: draw\nsteps:\n  draw:\n    by: ${by}\n    do: Draw it.\n    outcomes: { done: $done }\n`;
+    const env = envWith({ workflows: { "design.yaml": role("designer"), "build.yaml": role("builder").replace("name: design", "name: build") }, shared: {} });
+    expect(steps(env, "design")).toEqual(["draw"]);
+    expect(env.workflows.build?.ok).toBe(false);
   });
 
   test("the env keeps the repo files, so a failure can name the repo's path", () => {

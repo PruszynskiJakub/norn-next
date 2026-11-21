@@ -63,7 +63,7 @@ norn init
 - **tracker** `github` when `origin` is on GitHub and `gh` is installed, else `local`;
 - **forge** `github` with the GitHub tracker, else `none`;
 - **store** `local` (run data in `~/.norn/repos/<id>/`);
-- **executor** `claude` when Claude Code is on `PATH`, else `pi`, running in the `headless` runner (`herdr` when you ask, inside Herdr);
+- **executor** `claude` when Claude Code is on `PATH`, else `pi`, running in the `headless` runner (`herdr` when you ask, inside Herdr). An attended step, which you work through beside the agent (the refinement workflow's), runs only in a runner with presence: in the headless runner it waits for one ([Executors and runners](docs/reference.md#executors-and-runners));
 - **mode** `auto` with the headless runner, `manual` with Herdr;
 - **base** the remote's default branch.
 

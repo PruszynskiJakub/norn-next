@@ -13,7 +13,7 @@ import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import type { RuntimeEnv } from "./env.ts";
 import { readEvents } from "./events/log.ts";
 import { historyOf, rulingsOf } from "./input-history.ts";
-import { findingsList, INPUTS_NOTE, materializeInputs, specFolder, unsettledCriteria, worktreeOf } from "./inputs.ts";
+import { findingsList, INPUTS_NOTE, materializeInputs, OUT_DIR, specFolder, unsettledCriteria, worktreeOf } from "./inputs.ts";
 import { reportableOutcomes } from "./live-run.ts";
 import { readStepRun } from "./step-runs.ts";
 import { loadPinned } from "./workflows.ts";
@@ -148,9 +148,10 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
     ...(step.description !== undefined && { description: step.description }),
     ...(Object.keys(means).length > 0 && { means }),
     ...(wantsCriteria(spec) && { criteria: { required: spec.criteria, verdict: { ...spec.verdict } } }),
-    ...(attendedRun(record, runId, spec.attended) && { attended: true }),
+    ...(attendedRun(record, runId, spec.attended === "person") && { attended: true }),
     ...(Object.keys(spec.hand_back).length > 0 && { handBack: { ...spec.hand_back } }),
     ...(produced.length > 0 && { produced }),
+    outDir: OUT_DIR,
     ...(rework !== undefined && { rework }),
     ...(answered.length > 0 && { answered }),
     ...(retry !== undefined && { retry }),

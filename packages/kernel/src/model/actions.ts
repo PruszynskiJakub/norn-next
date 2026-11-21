@@ -8,8 +8,9 @@ import { TrackerItem } from "@norn/plugin-api";
 import { IsoTime, NonEmpty, PosInt, StepName, TaggedUnion } from "@norn/schema";
 import { type Static, type TProperties, Type } from "@sinclair/typebox";
 import { StepInputDoc } from "../workflow/document.ts";
+import { CapabilitySchema } from "./grant.ts";
 import { ReceiptIntent, RejectedReceipt } from "./receipts.ts";
-import { RunState } from "./run-state.ts";
+import { GuardedCode, RunState, SupervisorSubject } from "./run-state.ts";
 
 const closed = { additionalProperties: false } as const;
 const Id = Type.String({ minLength: 1 });
@@ -57,6 +58,8 @@ export const BriefInputs = Type.Object(
     model: Type.Optional(NonEmpty),
     /** the receipt whose findings or failure the run reworks (a red check, a reject), when there is one */
     rework_from: Type.Optional(PosInt),
+    /** the step's effective grant, which the launcher guards, detection checks and the brief's Rules state; absent: nothing narrows it */
+    grant: Type.Optional(Type.Array(CapabilitySchema)),
   },
   { ...closed, title: "BriefInputs" },
 );
@@ -103,7 +106,18 @@ const ACTIONS = [
     resume: Type.Optional(NonEmpty),
     intent: ReceiptIntent,
   }),
+  /**
+   * write `intent` (`supervisor.started`), then launch the supervisor on `executor` beside the step's
+   * own run, briefed with the question `input_id` names or the gate, and record it again with its session
+   */
+  action("start_supervisor", { run_id: Id, executor: NonEmpty, subject: SupervisorSubject, input_id: Type.Optional(Id), intent: ReceiptIntent }),
   action("nudge", { run_id: Id, reason: NonEmpty, intent: ReceiptIntent }),
+  /**
+   * check a reported run that may not keep code before its report applies: write `intent` (`run.checking`),
+   * kill the run's processes, compare what changed since the visit's snapshot by `code` and whether the
+   * outcome `passes` the step, reset what may be reset, and record `run.checked`
+   */
+  action("check_run", { run_id: Id, code: GuardedCode, passes: Type.Boolean(), intent: ReceiptIntent }),
   /** the intent records the order, so it is sent once; absent on a stop no rule needs to remember */
   action("stop_run", { run_id: Id, reason: NonEmpty, intent: Type.Optional(ReceiptIntent) }),
   action("retry_run", {

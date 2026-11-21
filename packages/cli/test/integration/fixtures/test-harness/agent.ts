@@ -231,7 +231,7 @@ async function permission(): Promise<void> {
 
 /** The base commit the `base_side` input names, as the resolver is told to merge it. */
 function baseToMerge(): string {
-  const text = readFileSync(join(cwd, ".agents", "inputs", "base_side.md"), "utf8");
+  const text = readFileSync(join(process.env.NORN_IN ?? join(cwd, ".agents", "run", "in"), "base_side.md"), "utf8");
   const sha = text.match(/git merge ([0-9a-f]{40})/)?.[1];
   if (sha === undefined) throw new Error(`base_side names no commit to merge:\n${text}`);
   return sha;

@@ -43,6 +43,13 @@ function readSettings(path: string): JsonObject | null {
 
 const same = (a: JsonObject, b: JsonObject) => JSON.stringify(a) === JSON.stringify(b);
 
+/** The settings a worktree's hooks follow: the local file norn wires and the committed one, each read for its hooks and its switch for them alone. */
+export async function hookConfig(worktree: string): Promise<string | null> {
+  const files = [settingsLocalPath(worktree), join(worktree, ".claude", "settings.json")].map((p) => readSettings(p));
+  if (files.every((f) => f === null)) return null;
+  return JSON.stringify(files.map((f) => (f === null ? null : { hooks: f.hooks ?? null, disableAllHooks: f.disableAllHooks ?? null })));
+}
+
 export async function install(target: InstallTarget): Promise<{ changed: string[] }> {
   const path = settingsLocalPath(target.worktree);
   const before = readSettings(path);

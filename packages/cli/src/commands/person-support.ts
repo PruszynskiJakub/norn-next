@@ -5,20 +5,31 @@
  */
 import { loadProblem, type UnitJournal } from "@norn/kernel";
 import { parseStoryKey, STORE_ID_PATTERN } from "@norn/plugin-api";
-import { branchOf, REPO_WORKFLOWS_DIR, repoFileOf, type RuntimeEnv } from "@norn/runtime";
+import { branchOf, heldRunning, REPO_WORKFLOWS_DIR, repoFileOf, type RuntimeEnv } from "@norn/runtime";
 import { type CliFailure, corruptError, failure, refuse } from "../output.ts";
+import { policyRefused } from "../plugins/pack-check.ts";
+
+/** What a person does when only their own policy grant takes a workflow off the floor. */
+export const NARROW_POLICY = "narrow your grant: norn config set policy.stand_in.gates <the gates a stand-in may still decide> --user";
 
 /**
- * Why a person may not name this workflow, or null when it loads. One no file holds is named with
- * the ones that load and the repo file that would add it; one whose file fails to load, with why.
+ * Why a person may not name this workflow, or null when it loads as its file says. One no file holds
+ * is named with the ones that load and the repo file that would add it; one whose file fails to load,
+ * with why; one only the person's own grant takes off the floor, with the policy key to narrow; one
+ * held for the person's confirmation, with the confirmation, even when a revision runs in its place,
+ * so nobody starts work on the pack's file believing it runs the repo's.
  */
 export function workflowRefusal(env: RuntimeEnv, name: string): CliFailure | null {
   const load = env.workflows[name];
+  const held = env.held[name];
+  if (load?.ok && held) return refuse(`workflow ${name} is held for the person's confirmation (${held.changes.join("; ")}); new rounds would run ${heldRunning(held)}`, `norn workflow confirm ${name}`, "workflow_held");
   if (load?.ok) return null;
   if (!load) {
     const loading = Object.entries(env.workflows).flatMap(([n, w]) => (w.ok ? [n] : [])).sort();
     return refuse(`no workflow ${name}`, `name one of ${loading.join(", ")}, or write ${REPO_WORKFLOWS_DIR}/${name}.yaml`, "unknown_workflow");
   }
+  if (policyRefused({ [name]: load }).length > 0) return refuse(loadProblem(name, load) ?? `workflow ${name} is off the floor`, NARROW_POLICY, "workflow_policy_floor");
+  if (env.held[name]) return refuse(loadProblem(name, load) ?? `workflow ${name} is held for the person's confirmation`, `norn workflow confirm ${name}`, "workflow_held");
   const file = repoFileOf(env.repoWorkflows, name, "workflow");
   return refuse(loadProblem(name, load) ?? `workflow ${name} is invalid`, `fix ${file ?? `the workflow ${name}`}, then norn doctor`, "invalid_workflow");
 }

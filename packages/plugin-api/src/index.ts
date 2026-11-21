@@ -8,6 +8,7 @@ export * from "./plugin.ts";
 export * from "./provider.ts";
 export * from "./prompt-mark.ts";
 export * from "./result.ts";
+export * from "./role.ts";
 export * from "./runner.ts";
 export * from "./signal.ts";
 export * from "./step-kind.ts";

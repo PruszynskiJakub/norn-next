@@ -11,6 +11,7 @@ import type { Signal } from "@norn/schema";
 import type { Decision } from "../model/actions.ts";
 import type { RunInfo } from "../model/run-state.ts";
 import type { CheckStepSpec } from "../workflow/graph.ts";
+import { decideGrantedGate, grantedTo } from "./supervisor.ts";
 import { applyDecision, applyOrPark, endStuckDecision, intentFor, noop, parkDecision, type UnitView } from "./unit-support.ts";
 
 /** The step run the facts show, when it belongs to the step the unit is at. */
@@ -101,6 +102,9 @@ function signalFinished(v: UnitView, rule: string, s: Signal, run_id?: string): 
 export function decideGate(v: UnitView, prompt: string): Decision {
   const signal = routedSignal(v);
   if (signal) return signalFinished(v, "gate.signal", signal);
+  if (grantedTo(v.ctx.config, "gates", v.state.workflow.name, v.state.step)) return decideGrantedGate(v, prompt);
+  // a supervisor whose grant was withdrawn hands the gate back before the gate waits on the person alone
+  if (v.state.supervisor?.subject === "gate") return applyDecision(v, "supervisor.revoked", [intentFor(v, { kind: "supervisor.escalated", run_id: v.state.supervisor.id, reason: "the person's policy no longer grants this gate to a stand-in" })]);
   return parkDecision(v, "gate.park", "gate", { text: prompt });
 }
 

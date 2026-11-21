@@ -7,7 +7,7 @@
 import { stringify } from "yaml";
 import { defineCommand } from "../command.ts";
 import { type ConfigProblem, loadConfig, problemText } from "../config/load.ts";
-import { mergeLayers } from "../config/merge.ts";
+import { keyPath, mergeLayers } from "../config/merge.ts";
 import { type Origin, originsOf } from "../config/origins.ts";
 import { configPaths, LAYERS, type Layer, layerFileName } from "../config/paths.ts";
 import { CONFIG_DEFAULTS } from "../config/schema.ts";
@@ -30,7 +30,7 @@ function markdown(s: ConfigShown): string {
   if (!s.valid) out.push("**Invalid:**", ...s.problems.map((p) => `- ${problemText(p)}`), "");
   out.push("```yaml", stringify(s.config).trimEnd(), "```", "", "| key | value | from |", "| --- | --- | --- |");
   for (const [key, from] of Object.entries(s.origins)) {
-    const value = key.split(".").reduce<unknown>((at, k) => (at as Record<string, unknown>)?.[k], s.config);
+    const value = keyPath(key).reduce<unknown>((at, k) => (at as Record<string, unknown>)?.[k], s.config);
     out.push(`| ${key} | ${cellValue(value)} | ${from === "default" ? "default" : layerFileName(from)} |`);
   }
   return out.join("\n");

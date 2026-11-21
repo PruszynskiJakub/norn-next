@@ -80,6 +80,8 @@ describe("the repo's own workflows in .agents/workflows", () => {
     const legacy = [...TIDY.trimEnd().replace("{ done: $done }", "{ done: ready }").split("\n"), ...gate("      stale: work\n      unpushed: work"), ""].join("\n");
     const sharedLegacy = ["start: ready", "steps:", ...gate("      stale: $stuck"), ""].join("\n");
     const m = repoWith({ "tidy.yaml": legacy, "shared/hold.yaml": sharedLegacy });
+    // the workflow brings a person's step, which the person confirms before new rounds run it
+    await runCli(["workflow", "confirm", "tidy"], m.io);
     expect((await runCli(["tick", "--json"], m.io)).exit).toBe(ExitCode.ok);
     const doctor = await runCli(["doctor", "--json"], m.io);
     const check = (json(doctor.stdout).checks as Array<{ name: string; ok: boolean; warning?: string; do_instead?: string }>).find((c) => c.name === "workflows");
@@ -92,6 +94,7 @@ describe("the repo's own workflows in .agents/workflows", () => {
     const moved = legacy.replace("      reject: work\n      stale: work", "      reject: work\n    on:\n      stale: work");
     await m.files.write(`${DIR}/tidy.yaml`, moved);
     await m.files.write(`${DIR}/shared/hold.yaml`, sharedLegacy.replace("      reject: work\n", "      reject: work\n    on:\n"));
+    await runCli(["workflow", "confirm", "tidy"], m.io);
     const again = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; warning?: string; do_instead?: string }>).find((c) => c.name === "workflows");
     expect(again).not.toHaveProperty("warning");
     expect(again).not.toHaveProperty("do_instead");
@@ -114,5 +117,29 @@ describe("the repo's own workflows in .agents/workflows", () => {
     expect(body.error).toContain(".agents/workflows/tidy.yaml: /steps/work/inputs/1: `last_finding` is not an input norn provides: name one of spec, handoff, last_check, last_findings,");
     const checks = json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; ok: boolean; code?: string; error?: string }>;
     expect(checks.find((c) => c.name === "workflows")).toEqual(expect.objectContaining({ ok: false, code: "repo_workflow_invalid", error: expect.stringContaining("`last_finding`") }));
+  });
+});
+
+describe("a repo workflow's sources", () => {
+  const SOURCED = ["name: sourced", "start: design", "sources:", "  brand: { type: folder }", "steps:", "  design:", "    by: builder", "    do: Design it.", "    reads: [spec, brand]", "    outcomes: { done: $done }", ""].join("\n");
+
+  test("doctor warns, before any step runs, about a source a workflow reads that nothing binds, and how to bind it; bound in the config, it says nothing", async () => {
+    const m = repoWith({ "sourced.yaml": SOURCED });
+    const check = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; ok: boolean; warning?: string; do_instead?: string }>).find((c) => c.name === "workflows");
+    expect(check?.ok).toBe(true);
+    expect(check?.warning).toContain("workflow sourced reads the source brand (step design), which nothing binds on this machine");
+    expect(check?.do_instead).toBe("norn config set sources.brand <path>");
+    expect((await runCli(["config", "set", "sources.brand", "/assets/brand", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    const again = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; warning?: string }>).find((c) => c.name === "workflows");
+    expect(again).not.toHaveProperty("warning");
+  });
+
+  test("a hyphenated source name a workflow may give is one the config binds, so doctor's fix applies", async () => {
+    const m = repoWith({ "sourced.yaml": SOURCED.replaceAll("brand", "brand-assets") });
+    const check = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; do_instead?: string }>).find((c) => c.name === "workflows");
+    expect(check?.do_instead).toBe("norn config set sources.brand-assets <path>");
+    expect((await runCli(["config", "set", "sources.brand-assets", "/assets/brand", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    const again = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; warning?: string }>).find((c) => c.name === "workflows");
+    expect(again).not.toHaveProperty("warning");
   });
 });

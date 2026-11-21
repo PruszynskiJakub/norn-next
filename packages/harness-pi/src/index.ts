@@ -1,5 +1,5 @@
 import { defineNornPlugin, type Harness } from "@norn/plugin-api";
-import { install, uninstall } from "./install.ts";
+import { hookConfig, install, uninstall } from "./install.ts";
 import { launch } from "./launch.ts";
 import { normalize } from "./normalize.ts";
 import { respond } from "./respond.ts";
@@ -23,6 +23,7 @@ export const piHarness: Harness = Object.freeze({
   launch,
   normalize,
   respond,
+  hookConfig,
 });
 
 export const piPlugin = defineNornPlugin({ name: "norn-harness-pi", api: "^1", provides: { harness: { pi: piHarness } } });

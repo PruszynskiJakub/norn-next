@@ -96,6 +96,24 @@ describe("headless runner on the node host", () => {
     expect(await until(() => !pidRuns(stubborn))).toBe(true);
   });
 
+  test("stop after the leader has exited still ends the child it left, before that child writes", async () => {
+    const late = join(root, "late.txt");
+    const pidFile = join(root, "left.pid");
+    const handle = await start(req({ argv: ["sh", "-c", `(sleep 1; echo x > ${late}) & echo $! > ${pidFile}`] }));
+    const dead = async () => {
+      const a = await runner.alive(handle);
+      return a.ok && !a.value;
+    };
+    expect(await until(dead)).toBe(true);
+    expect(await until(() => existsSync(pidFile) && readFileSync(pidFile, "utf8").trim() !== "")).toBe(true);
+    const left = Number(readFileSync(pidFile, "utf8").trim());
+    expect(pidRuns(left)).toBe(true);
+    expect(await runner.stop(handle)).toEqual({ ok: true, value: undefined });
+    expect(await until(() => !pidRuns(left))).toBe(true);
+    await Bun.sleep(1_200);
+    expect(existsSync(late)).toBe(false);
+  });
+
   test("a handle whose pid now belongs to another start reads as dead", async () => {
     const handle = await start(req({}));
     const h = decodeHandle(handle);

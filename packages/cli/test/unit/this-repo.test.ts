@@ -182,7 +182,10 @@ describe("this repo's workflows, as norn loads them", () => {
     // `on:` is compared with the outcomes: the released norn reads only the form that routes signals under
     // `outcomes:`, so the repo's copies keep it until a release reads `on:`, and both forms load to one graph
     // `produces:` and `writes:` likewise: the released norn refuses the keys, so the copies leave them out until a release reads them
-    const NOT_KIND = new Set(["outcomes", "on", "skills", "inputs", "produces", "means", "hand_back", "writes", "timeout", "exits"]);
+    // outcome objects likewise: the released norn refuses `means`, `verdict` or `produces` on an outcome, so the copies keep the
+    // step's sibling maps; both spellings pin one step, but the lowering appends those keys, so the kind keys compare as a set
+    // `role` likewise: the pack's steps name an agent role with by:, which the released norn refuses
+    const NOT_KIND = new Set(["outcomes", "on", "skills", "inputs", "produces", "means", "hand_back", "writes", "timeout", "exits", "role"]);
     // a counter's name follows the exit its edge leaves by, and the copies name their exits apart: compare its bound
     const bounded = (w: Written, outcomes: Record<string, unknown>) =>
       Object.fromEntries(
@@ -194,7 +197,7 @@ describe("this repo's workflows, as norn loads them", () => {
       );
     const shape = (w: Written) => ({
       start: w.start,
-      steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { kind: Object.keys(step).filter((k) => !NOT_KIND.has(k)), skills: step.skills, outcomes: bounded(w, { ...step.outcomes, ...step.on }) }])),
+      steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { kind: Object.keys(step).filter((k) => !NOT_KIND.has(k)).sort(), skills: step.skills, outcomes: bounded(w, { ...step.outcomes, ...step.on }) }])),
     });
     for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(repo[wf] as Written) }).toEqual({ wf, ...shape(pack[wf] as Written) });
   });

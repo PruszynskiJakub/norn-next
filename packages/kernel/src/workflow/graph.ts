@@ -3,9 +3,10 @@
  * compiled from it that applyReceipts and decide walk. The graph holds no `use` or `like` step and no
  * `max:`; every bounded edge names its counter, and every counter is declared.
  */
-import { Mode, NonEmpty, NonNegInt, OutcomeName, PosInt, StepName, StepWrites, Target, Verdict } from "@norn/schema";
+import { Attendance, Mode, NonEmpty, NonNegInt, OutcomeName, PosInt, StepName, StepWrites, Target, Verdict } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
-import { BaseDoc, DocCounterName, HandBack, StepInputDoc, WorkflowDocument } from "./document.ts";
+import { CapabilitySchema } from "../model/grant.ts";
+import { BaseDoc, DocCounterName, HandBack, SourcesDoc, StepInputDoc, WorkflowDocument } from "./document.ts";
 
 const closed = { additionalProperties: false } as const;
 const Sha256 = Type.String({ pattern: "^[0-9a-f]{64}$" });
@@ -63,10 +64,17 @@ export const AgentStepSpec = Type.Object(
     instructions: NonEmpty,
     skills: Type.Array(NonEmpty),
     inputs: Type.Array(StepInputDoc),
+    /** the sources the step reads without a `?`: one nothing binds holds the step before it starts */
+    sources: Type.Optional(Type.Array(OutcomeName)),
     /** the executor named by `by:`; null takes the config's */
     executor: Type.Union([NonEmpty, Type.Null()]),
     model: Type.Optional(NonEmpty),
-    attended: Type.Boolean(),
+    /** the agent role the step names, which the config's `bind:` maps to executors; absent for a step in the older form */
+    role: Type.Optional(NonEmpty),
+    /** the capabilities the step's `allow:` asks of its role; absent, all of the role's */
+    allow: Type.Optional(Type.Array(CapabilitySchema)),
+    /** who stays beside the agent, which picks the runner: the person, a supervisor, or nobody */
+    attended: Attendance,
     criteria: Type.Boolean(),
     hand_back: Type.Record(OutcomeName, HandBack),
     /** produced name → its file and outcomes; absent when the step produces nothing */
@@ -79,6 +87,8 @@ export const AgentStepSpec = Type.Object(
     deadline_ms: Type.Union([PosInt, Type.Null()]),
     nudges: NonNegInt,
     retries: NonNegInt,
+    /** the questions its supervisor answers in one visit (`limits.asks`); absent: `DEFAULT_SUPERVISOR_ASKS` */
+    asks: Type.Optional(NonNegInt),
   },
   closed,
 );
@@ -135,6 +145,7 @@ export const WorkflowGraph = Type.Object(
     steps: Type.Record(StepName, CompiledStep),
     counters: Type.Record(GraphCounterName, CompiledCounter),
     base: Type.Optional(BaseDoc),
+    sources: Type.Optional(SourcesDoc),
   },
   { ...closed, title: "WorkflowGraph" },
 );
@@ -145,9 +156,13 @@ export interface LoadedWorkflow {
   graph: WorkflowGraph;
 }
 
-/** One refusal at a JSON pointer into the document; `missing_kind` names an unregistered step kind so a host can say which plugin to add. */
+/**
+ * One refusal at a JSON pointer into the document; `missing_kind` names an unregistered step kind so a
+ * host can say which plugin to add; `granted` names the gates a policy grant delegates when the grant
+ * alone breaks the floor, so a host sends the person to their policy rather than to the file.
+ */
 export const WorkflowError = Type.Object(
-  { path: Type.String(), message: NonEmpty, missing_kind: Type.Optional(NonEmpty), shared: Type.Optional(NonEmpty) },
+  { path: Type.String(), message: NonEmpty, missing_kind: Type.Optional(NonEmpty), shared: Type.Optional(NonEmpty), granted: Type.Optional(Type.Array(NonEmpty, { minItems: 1 })) },
   { ...closed, title: "WorkflowError" },
 );
 export type WorkflowError = Static<typeof WorkflowError>;

@@ -5,9 +5,9 @@
  * clean is pushed and recorded, and the next tick applies the record and finishes the story again.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { type NornOut, norn, setUp, sh, tickUntil, type World, world } from "./world.ts";
+import { type NornOut, norn, setUp, sh, tickUntil, type World, world, writeWorkflow } from "./world.ts";
 
 const KEY = "lt-1";
 const BRANCH = `norn/${KEY}`;
@@ -73,8 +73,7 @@ describe("story update-branch over real git", () => {
   beforeAll(async () => {
     w = await world("work");
     await setUp(w);
-    mkdirSync(join(w.root, ".agents", "workflows"), { recursive: true });
-    writeFileSync(join(w.root, ".agents", "workflows", "shipped.yaml"), SHIPPED);
+    await writeWorkflow(w, "shipped", SHIPPED);
     const set = await norn(w, ["config", "set", "base_ref", "origin/main", "--json"]);
     if (set.code !== 0) throw new Error(`config set base_ref: ${set.stdout}${set.stderr}`);
     await norn(w, ["story", "create", "Ship it", "--workflow", "shipped", "--json"]);

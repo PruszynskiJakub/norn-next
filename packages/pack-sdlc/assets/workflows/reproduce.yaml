@@ -11,7 +11,8 @@ description: Reproduce a bug through the real interface, confirm its cause and t
 start: reproduce
 steps:
   reproduce:
-    agent: >-
+    by: investigator
+    do: >-
       The issue is mirrored in spec.md; read its comments too. First follow the report as a user, through
       the real interface (the UI, the command, the request), and record what you saw. Then build a loop
       that goes red on that exact symptom, minimise it and confirm the cause. You are told not to fix:
@@ -21,11 +22,12 @@ steps:
       hypotheses left) and the seam for a regression test. That one comment is the only remote write this
       step allows, an exception to the brief's rule on remote writes; never edit the issue, label, assign or close.
       Write the same under Notes in the handoff (the next agent reads the handoff, never this session); a long loop output goes in a file outside the repository, named there.
-    skills: [norn-diagnose]
-    inputs: [spec, handoff]
+    with: { skills: [norn-diagnose] }
+    reads: [spec, handoff]
     outcomes:
-      reproduced:       $done
-      cannot_reproduce: $done
-    means:
-      reproduced: "the bug was observed as a user and a loop goes red on it; loop, repro, cause and seam posted and in the handoff"
-      cannot_reproduce: "followed the report faithfully and the bug did not occur, nor in any loop tried; what was tried posted and in the handoff"
+      reproduced:
+        to: $done
+        means: "the bug was observed as a user and a loop goes red on it; loop, repro, cause and seam posted and in the handoff"
+      cannot_reproduce:
+        to: $done
+        means: "followed the report faithfully and the bug did not occur, nor in any loop tried; what was tried posted and in the handoff"

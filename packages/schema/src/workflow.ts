@@ -4,6 +4,7 @@ import {
   Duration,
   Mode,
   NonEmpty,
+  OUTCOME_NAME_PATTERN,
   OutcomeName,
   PosInt,
   StepName,
@@ -24,6 +25,49 @@ export type HandBack = Static<typeof HandBack>;
  */
 export const StepWrites = Type.Union([Type.Literal("worktree"), Type.Literal("docs")]);
 export type StepWrites = Static<typeof StepWrites>;
+
+/** A signal as a step written with `by:` names it under `on:`: `<namespace>.<signal>`. */
+const SignalSurfaceName = Type.String({ pattern: "^[^.\\s]+\\.[a-z][a-z0-9_-]*$" });
+
+/**
+ * The agent roles a step written with `by:` may name when its host registers none: the roles the
+ * shipped pack registers that do a step (its supervisor does none).
+ */
+export const AGENT_ROLES = ["builder", "reviewer", "qa", "investigator", "writer"] as const;
+export type AgentRole = (typeof AGENT_ROLES)[number];
+
+/**
+ * Every capability a role may be granted. The code levels and `docs:write` say what an agent may change,
+ * `exec:` what it may run, `out:` which reports it may write, `tracker:` what it may post, and the last
+ * four what a supervisor may do on the person's behalf. Kept here so the published workflow schema and
+ * the kernel's loader accept the same `allow:` list.
+ */
+export const CAPABILITIES = [
+  "code:read",
+  "code:scratch",
+  "code:write",
+  "docs:write",
+  "exec:checks",
+  "exec:any",
+  "out:criteria",
+  "out:findings",
+  "out:evidence",
+  "tracker:comment",
+  "tracker:label",
+  "read:any",
+  "answer",
+  "decide:granted",
+  "escalate",
+] as const;
+export type Capability = (typeof CAPABILITIES)[number];
+
+/**
+ * Who stays beside an agent step's agent: the person (in a runner with presence), a supervisor, or
+ * nobody. It picks the runner the agent runs in, from the config's `runners:`.
+ */
+export const ATTENDANCE = ["person", "agent", "none"] as const;
+export const Attendance = Type.Union(ATTENDANCE.map((a) => Type.Literal(a)));
+export type Attendance = Static<typeof Attendance>;
 
 /** Full outcome edge: `{ to, counter?, means? }`. */
 export const OutcomeEdge = Type.Object(
@@ -80,6 +124,10 @@ export const InputKind = Type.Union([
 export type InputKind = Static<typeof InputKind>;
 export const StepInput = Type.Union([
   InputKind,
+  Type.String({
+    pattern: `${OUTCOME_NAME_PATTERN.slice(0, -1)}\\??$`,
+    description: "a name an earlier step produces, a source the workflow names, or findings, the open findings; a trailing ? makes it optional",
+  }),
   Type.Object({ file: NonEmpty, label: Type.Optional(NonEmpty) }, { additionalProperties: false }),
 ]);
 export type StepInput = Static<typeof StepInput>;
@@ -214,10 +262,13 @@ function stepTypes<S extends TSchema>(outcome: S) {
 /**
  * The step shapes as a file writes them: one head key says what happens (`agent: <orientation>`,
  * `check: <command>`, `gate: <decision>`, or a verb with no value), the loader reads each into the
- * model's `type`-tagged step. `outcomes:` holds only routes; an agent step's meanings and verdicts sit
- * beside it in `means:` and `verdict:`.
+ * model's `type`-tagged step. An agent step's outcome may be an object saying everything about the
+ * outcome (`agentRoute`: its route, `means`, `verdict` and `produces`), and its step-level `produces:`
+ * lists what every outcome produces unless the outcome lists its own; the older sibling maps (`means:`,
+ * `verdict:`, `criteria:`, `hand_back:`, `produces:` as a map of files) still load. Any other step's
+ * outcome is a route only.
  */
-function fileStepTypes<R extends TSchema>(route: R, onRoute: TSchema) {
+function fileStepTypes<R extends TSchema>(route: R, agentRoute: TSchema, onRoute: TSchema) {
   const routes = openOutcomes(route);
   /** What may interrupt a waiting step from outside: signal name → route, with the signal's parameters (`after:` for `timeout`). */
   const on = Type.Optional(
@@ -230,7 +281,8 @@ function fileStepTypes<R extends TSchema>(route: R, onRoute: TSchema) {
       agent: Type.String({ minLength: 1, pattern: "\\S", description: "The orientation: what the step is for" }),
       ...agentKeys,
       by: Type.Optional(Type.String({ minLength: 1, description: "Name from config.agents; default config.agent" })),
-      outcomes: routes,
+      produces: Type.Optional(Type.Union([agentKeys.produces, ProducesList], { description: "What every outcome produces unless it lists its own, or the older map of files" })),
+      outcomes: openOutcomes(agentRoute),
       means: Type.Optional(Type.Record(OutcomeName, Type.String({ minLength: 1 }), { additionalProperties: false, description: "Outcome → what it means, shown to the agent in the brief" })),
       verdict: Type.Optional(Type.Record(OutcomeName, Verdict, { additionalProperties: false, description: "Outcome → the worst criteria verdict it may be reported with" })),
     },
@@ -256,7 +308,91 @@ function fileStepTypes<R extends TSchema>(route: R, onRoute: TSchema) {
       } & typeof common & { outcomes: TSchema },
       { additionalProperties: false },
     );
+  // a step written with by: names a signal by its namespace (`vcs.stale`) and a step kind by value
+  const onNamed = Type.Optional(
+    Type.Record(SignalSurfaceName, onRoute, { minProperties: 1, additionalProperties: false, description: "Signal → route: vcs.stale, vcs.unpushed, norn.timeout, or one a plugin declares as <namespace>.<signal>" }),
+  );
+  const instruction = (description: string) => Type.String({ minLength: 1, pattern: "\\S", description });
+  const AgentActorStep = Type.Object(
+    {
+      by: Type.Union(AGENT_ROLES.map((r) => Type.Literal(r)), { description: "The agent role that does the step" }),
+      do: instruction("The agent's instruction: what the step is for"),
+      ...common,
+      with: Type.Optional(Type.Object({ skills: agentKeys.skills }, { additionalProperties: false, description: "How the agent works: the skills it uses" })),
+      reads: agentKeys.inputs,
+      produces: Type.Optional(ProducesList),
+      allow: Type.Optional(
+        Type.Array(Type.Union(CAPABILITIES.map((c) => Type.Literal(c))), {
+          minItems: 1,
+          uniqueItems: true,
+          description: "The capabilities the step asks of its role, narrowing them; with no code level above read it keeps to the story's documents",
+        }),
+      ),
+      attended: Type.Optional(
+        Type.Union(
+          [
+            Type.Literal("person", { description: "A person stays alongside the agent, in a runner with presence, and starts the step" }),
+            Type.Literal("agent", { description: "A supervisor stays alongside the agent; it runs in the config's runners.agent" }),
+            Type.Literal("none", { description: "Nobody stays alongside the agent (the default); it runs in the config's runners.none" }),
+          ],
+          { description: "Who stays alongside the agent, which picks its runner" },
+        ),
+      ),
+      limits: Type.Optional(
+        Type.Object(
+          {
+            deadline: agentKeys.deadline,
+            nudges: agentKeys.nudges,
+            retries: agentKeys.retries,
+            asks: Type.Optional(Type.Integer({ minimum: 0, description: "The questions a supervisor answers in one visit; only an attended: agent step has one" })),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      outcomes: openOutcomes(agentRoute),
+    },
+    { additionalProperties: false },
+  );
+  const PersonStep = Type.Object(
+    { by: Type.Literal("person"), do: instruction("What the person decides; shown in inbox"), ...common, outcomes: fixedOutcomes(["approve", "reject"] as const, route), on: onNamed },
+    { additionalProperties: false },
+  );
+  const ShellStep = Type.Object(
+    {
+      by: Type.Literal("shell"),
+      do: NonEmpty,
+      ...common,
+      with: Type.Optional(Type.Object({ exits: model.CheckStep.properties.exits }, { additionalProperties: false })),
+      limits: Type.Object({ timeout: Duration }, { additionalProperties: false }),
+      outcomes: routes,
+    },
+    { additionalProperties: false },
+  );
+  const KindStep = Type.Object(
+    {
+      by: Type.String({ pattern: "^(?!norn\\.)[^.\\s]+\\.[a-z][a-z0-9-]*$", description: "A step kind as <slot>.<kind> (forge.open-pr) or <plugin>.<kind>" }),
+      ...common,
+      with: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: "The step kind's settings" })),
+      outcomes: routes,
+      on: onNamed,
+    },
+    { additionalProperties: false },
+  );
+  const EachStep = Type.Object(
+    {
+      by: Type.Literal("norn.each", { description: "Runs each slice of the story through the config's slice_workflow" }),
+      ...common,
+      reads: Type.Optional(Type.Tuple([Type.Literal("slices")])),
+      outcomes: fixedOutcomes(["done", "stuck"] as const, route),
+    },
+    { additionalProperties: false },
+  );
   return {
+    AgentActorStep,
+    PersonStep,
+    ShellStep,
+    KindStep,
+    EachStep,
     AgentStep,
     CheckStep,
     GateStep,
@@ -264,7 +400,7 @@ function fileStepTypes<R extends TSchema>(route: R, onRoute: TSchema) {
     OpenPrStep: verb("open-pr", ["done", "conflict"]),
     IntegrateStep: verb("integrate", ["done", "conflict"]),
     PushStep: verb("push", ["done", "conflict"]),
-    AwaitMergeStep: verb("await-merge", ["stale"], true),
+    AwaitMergeStep: verb("await-merge", ["merged", "unpushed", "stale"], true),
     SlicesStep: verb("slices", ["done", "stuck"]),
   };
 }
@@ -338,6 +474,21 @@ export const Workflow = Type.Object(
     steps: Type.Record(StepName, Step, { minProperties: 1, additionalProperties: false }),
     counters: Type.Optional(Type.Record(StoredCounterName, CounterSpec, { additionalProperties: false })),
     base: Type.Optional(BaseSync),
+    /** Places the steps read that are neither norn's nor the repo's code, by a name of the workflow's own */
+    sources: Type.Optional(
+      Type.Record(
+        OutcomeName,
+        Type.Object(
+          {
+            type: Type.Union([Type.Literal("folder"), Type.Literal("file")]),
+            path: Type.Optional(Type.String({ minLength: 1, pattern: "\\S", description: "Relative to the repo's root; the config's sources binding wins" })),
+            description: Type.Optional(Type.String()),
+          },
+          { additionalProperties: false },
+        ),
+        { additionalProperties: false, description: "A source a step reads by name; one with no path is bound in the config's sources" },
+      ),
+    ),
   },
   {
     $id: "https://norn.dev/schema/workflow.json",
@@ -359,14 +510,41 @@ export const ExitEdge = Type.Object(
 export type ExitEdge = Static<typeof ExitEdge>;
 
 /**
- * A route as a file writes it: a bare target or `{ to, counter, max }`; its meaning and verdict sit in the step's sibling maps.
- * `max` bounds the counter derived from the edge; the loader turns it into a counter, so the loaded workflow never holds it.
+ * A route as a file writes it: a bare target or `{ to, counter, max }`. `max` bounds the counter
+ * derived from the edge; the loader turns it into a counter, so the loaded workflow never holds it.
  */
 const RouteEdge = Type.Object(
   { to: Target, counter: Type.Optional(CounterName), max: Type.Optional(PosInt) },
   { additionalProperties: false },
 );
 const FileRoute = Type.Union([Target, RouteEdge]);
+
+/**
+ * What an agent's report of an outcome comes with: a report norn takes with it (`criteria`,
+ * `findings`, `evidence`), bare, or a file of the spec folder, given once in the step as
+ * `{ name, file }` and named bare elsewhere in it. Which names are reports is the loader's check.
+ */
+export const ProducesEntry = Type.Union([
+  OutcomeName,
+  Type.Object(
+    { name: OutcomeName, file: Type.String({ minLength: 1, pattern: "\\S", description: "The file, relative to the story's spec folder (`pr.md`)" }) },
+    { additionalProperties: false },
+  ),
+]);
+export type ProducesEntry = Static<typeof ProducesEntry>;
+export const ProducesList = Type.Array(ProducesEntry, { uniqueItems: true });
+export type ProducesList = Static<typeof ProducesList>;
+
+/** What an agent step's outcome object says of the outcome beside its route. */
+const outcomeFields = {
+  means: Type.Optional(Type.String({ minLength: 1, description: "Shown to the agent in the brief" })),
+  verdict: Type.Optional(Verdict),
+  produces: Type.Optional(ProducesList),
+};
+/** An agent step's outcome as a file writes it: a bare target, or the route with everything about the outcome. */
+const AgentRoute = Type.Union([Target, Type.Object({ ...RouteEdge.properties, ...outcomeFields }, { additionalProperties: false })]);
+/** An outcome of a shared file's agent step may leave the file instead; its bound sits on the `use` step's route. */
+const SharedExitOutcome = Type.Object({ exit: OutcomeName, ...outcomeFields }, { additionalProperties: false });
 /**
  * A route under `on:`: a route as under `outcomes:`, whose edge may also carry the signal's parameters.
  * Open, since a plugin's signal declares its own parameters, which only the loader knows to check.
@@ -374,10 +552,14 @@ const FileRoute = Type.Union([Target, RouteEdge]);
 const signalParams = { after: Type.Optional(Duration) };
 const OnEdge = Type.Object({ ...RouteEdge.properties, ...signalParams }, { additionalProperties: true });
 const OnExit = Type.Object({ exit: OutcomeName, ...signalParams }, { additionalProperties: true });
-const fileSteps = (route: TSchema, onRoute: TSchema) => Object.values(fileStepTypes(route, onRoute)) as TObject[];
-const FileSteps = fileSteps(FileRoute, Type.Union([Target, OnEdge]));
+const fileSteps = (route: TSchema, agentRoute: TSchema, onRoute: TSchema) => Object.values(fileStepTypes(route, agentRoute, onRoute)) as TObject[];
+const FileSteps = fileSteps(FileRoute, AgentRoute, Type.Union([Target, OnEdge]));
 // A shared file's route may also leave it through an exit, which its `use` step routes by name
-const SharedSteps = fileSteps(Type.Union([FileRoute, Type.Object({ exit: OutcomeName }, { additionalProperties: false })]), Type.Union([Target, OnEdge, OnExit]));
+const SharedSteps = fileSteps(
+  Type.Union([FileRoute, Type.Object({ exit: OutcomeName }, { additionalProperties: false })]),
+  Type.Union([AgentRoute, SharedExitOutcome]),
+  Type.Union([Target, OnEdge, OnExit]),
+);
 
 // As written in a shared file: a declared (dotless) counter, and a `max` the loader turns into a derived counter
 const SharedModelEdge = Type.Object(
@@ -435,6 +617,22 @@ export const WorkflowSource = Type.Object(
     steps: Type.Record(StepName, Type.Union([...FileSteps, UseStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
     // a dotted name is derived from its edge, so a declared one never clashes with it
     counters: Type.Optional(Type.Record(CounterName, CounterSpec, { additionalProperties: false })),
+    signals: Type.Optional(
+      Type.Object(
+        {
+          "vcs.stale": Type.Optional(
+            Type.Object(
+              { when: BaseSync.properties.stale, verify: BaseSync.properties.verify },
+              { additionalProperties: false, description: "when: conflict (default) or behind; verify: the check step run on a base move without a conflict" },
+            ),
+          ),
+        },
+        { additionalProperties: false, description: "A signal's settings for the whole workflow, written once" },
+      ),
+    ),
+    entries: Type.Optional(
+      Type.Object({ "update-branch": Type.Optional(StepName) }, { additionalProperties: false, description: "A way back in → the step it enters: update-branch is what norn story update-branch re-enters" }),
+    ),
   },
   {
     $id: "https://norn.dev/schema/workflow-source.json",

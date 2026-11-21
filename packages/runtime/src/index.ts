@@ -1,6 +1,6 @@
 export { act } from "./act.ts";
 export { briefRenderInput, renderInputFrom } from "./brief-context.ts";
-export { HOST_INPUTS, INPUTS_DIR, INPUTS_NOTE, SPEC_FOLDER_FILES, SPECS_DIR, specFolder, type MaterializedInputs, materializeInputs, mirrorSpec, readBackDocs, storyItem, worktreeOf } from "./inputs.ts";
+export { clearOut, HOST_INPUTS, INPUTS_DIR, INPUTS_NOTE, OUT_DIR, RUN_DIR, runDirsEnv, SPEC_FOLDER_FILES, SPECS_DIR, specFolder, type MaterializedInputs, materializeInputs, mirrorSpec, readBackDocs, storyItem, worktreeOf } from "./inputs.ts";
 export { installSkills, type PackSkills, repoSkills, SKILLS_DIR } from "./skills.ts";
 export { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 export { HANDOFFS_DIR, handoffArtifact, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
@@ -55,7 +55,8 @@ export { type GatherOptions, type GatheredFacts, gatherFacts } from "./facts.ts"
 export { acquireTickLock, DEFAULT_LOCK_STALE_MS, type TickLock, tickLockPath } from "./lock.ts";
 export { lastSeqIn, unitInFacts, writeAndCommit, type Written } from "./record.ts";
 export { NO_REPO_WORKFLOWS, overlayRepoWorkflows, readRepoWorkflows, REPO_WORKFLOWS_DIR, type RepoWorkflows, repoFileOf, workflowNameOf } from "./repo-workflows.ts";
-export { collectSignals, collectStepKinds, findProvided, loadPackWorkflows, type ProvidedSignal, type ResolvedSlots, resolveSlots, signalDeclarations, type SlotName } from "./resolve.ts";
+export { CONFIRMED_DIR, confirmedWorkflowPath, type HeldWorkflow, heldProblems, heldRunning, holdChanged, readConfirmedWorkflows } from "./confirm.ts";
+export { collectSignals, collectStepKinds, findProvided, loadPackWorkflows, type ProvidedSignal, type ProvidedStepKind, type ResolvedSlots, resolveSlots, signalDeclarations, type SlotName } from "./resolve.ts";
 export { clockSignalSource } from "./signal-clock.ts";
 export { VERIFY_BASE_KIND, vcsSignalSources } from "./signal-vcs.ts";
 export { gatherSignals, waitingVisit, type WaitingVisit } from "./signals.ts";
@@ -71,3 +72,4 @@ export type * from "./types.ts";
 export { loadPinned, tickWorkflows } from "./workflows.ts";
 export { criteriaOf, declaredCriteria, frontmatterOf } from "./criteria.ts";
 export { CHECK_WAKE_WRITER, newWakeWriter, readWake, stampingReceipts, WAKE_FILE, wakePath, wakeWriterOf } from "./wake.ts";
+export { type CollectedReports, CRITERIA_HINT, collectReports, FINDINGS_HINT, parseCriteria, parseFindings } from "./reports.ts";

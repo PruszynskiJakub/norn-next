@@ -9,19 +9,33 @@
  * records once. It is refused, never guessed at, when the run is not the unit's live one or `done`
  * names an outcome the step does not route.
  */
-import { type BriefInputs, checkCriteriaReport, HANDOFF_MAX_BYTES, producedOn, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
-import type { HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
+import {
+  type BriefInputs,
+  checkCriteriaReport,
+  type GuardedCode,
+  grantOf,
+  HANDOFF_MAX_BYTES,
+  judgeChanges,
+  producedOn,
+  renderBrief,
+  type UnitJournal,
+  verdictCounts,
+  worstVerdict,
+} from "@norn/kernel";
+import type { Capability, HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
 import { parseUnitId, STORE_ID_PATTERN } from "@norn/plugin-api";
-import type { CriterionVerdict, Finding, Note, Verdict } from "@norn/schema";
+import { type CriterionVerdict, type Finding, type Note, OUT_ENV, REPORT_TYPES, reportPath, type Verdict } from "@norn/schema";
+import { changesSince, hookDigest, ownedBy, snapshotOf } from "./detect.ts";
 import { branchOf, baseRefOf, cutFrom } from "./branches.ts";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
 import { baseConflictOf } from "./input-history.ts";
-import { INPUTS_DIR, producedOf, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
+import { producedOf, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
+import { collectReports } from "./reports.ts";
+import { renderSupervisorBrief, supervisorOfRun, supervisorReceipt } from "./supervisor.ts";
 import { handoffArtifact } from "./story-docs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
-import { skillLinks } from "./skills.ts";
 import { type LiveStep, liveStepOf, reportOnRecord } from "./live-run.ts";
 
 export type ReportRequest =
@@ -85,7 +99,7 @@ async function liveAgent(env: RuntimeEnv, unit: string): Promise<Refusable<{ rec
   return { ok: true, value: { record, live } };
 }
 
-function briefInputsOf(record: UnitJournal, live: LiveStep, spec: { skills: string[]; inputs: BriefInputs["inputs"]; model?: string }): BriefInputs {
+function briefInputsOf(record: UnitJournal, live: LiveStep, spec: { skills: string[]; inputs: BriefInputs["inputs"]; model?: string }, grant: Capability[] | null): BriefInputs {
   const state = record.state as NonNullable<UnitJournal["state"]>;
   // the state's rework belongs to the visit it is at; a live run of any other visit was not sent back by it
   const sameVisit = state.step === live.step && state.attempt === live.attempt;
@@ -98,15 +112,23 @@ function briefInputsOf(record: UnitJournal, live: LiveStep, spec: { skills: stri
     inputs: structuredClone(spec.inputs),
     ...(spec.model !== undefined && { model: spec.model }),
     ...(sameVisit && state.rework_from !== undefined && { rework_from: state.rework_from }),
+    ...(grant !== null && { grant }),
   };
 }
 
-export async function briefOf(env: RuntimeEnv, unit: string): Promise<Refusable<BriefShown>> {
+/** The brief of `runId` when it is the unit's supervisor, else of the unit's live run. */
+export async function briefOf(env: RuntimeEnv, unit: string, runId?: string): Promise<Refusable<BriefShown>> {
+  if (runId !== undefined) {
+    const read = await env.journal.readUnit(unit);
+    const sup = read.ok && read.value.corrupt === undefined ? supervisorOfRun(read.value, runId) : null;
+    if (read.ok && sup) return { ok: true, value: { unit, run_id: runId, markdown: await renderSupervisorBrief(env, read.value, sup) } };
+  }
   const found = await liveAgent(env, unit);
   if (!found.ok) return found;
   const { record, live } = found.value;
   const doc = record.state?.workflow.doc.steps[live.step];
-  const brief = briefInputsOf(record, live, { skills: doc?.skills ?? [], inputs: doc?.inputs ?? [], ...(doc?.model !== undefined && { model: doc.model }) });
+  const grant = doc ? grantOf({ ...(doc.role !== undefined && { role: doc.role }), ...(doc.allow !== undefined && { allow: doc.allow }) }, env.config.kernel) : null;
+  const brief = briefInputsOf(record, live, { skills: doc?.skills ?? [], inputs: doc?.inputs ?? [], ...(doc?.model !== undefined && { model: doc.model }) }, grant);
   const input = await renderInputFrom(env, record, brief, live.run.id);
   if (!input.ok) return refuse(`cannot brief ${unit}: ${input.failure.message}`, "tell the person: the unit's workflow does not load", input.failure.code);
   return { ok: true, value: { unit, run_id: live.run.id, markdown: renderBrief(input.value) } };
@@ -135,6 +157,8 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
       return { ok: true, value: { seq: earlier.seq, replayed: true, ...(summary !== undefined && { criteria: summary }) } };
     }
   }
+  const supervised = await supervisorReport(env, unit, runId, req, receiptId);
+  if (supervised) return supervised;
   const found = await liveAgent(env, unit);
   if (!found.ok) return found;
   const { record, live } = found.value;
@@ -149,6 +173,11 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   }
   if (req.verb === "ask" && !textOf(req)) return refuse("an ask without a question", "ask one self-contained question", "invalid");
   if (req.verb === "done") {
+    const collected = await collectReports(env, unit, { criteria: req.criteria !== undefined, findings: req.findings !== undefined });
+    if (!collected.ok) return refuse(collected.error, collected.do_instead, collected.code);
+    req = { ...req, ...collected.value, ...(req.criteria !== undefined && { criteria: req.criteria }), ...(req.findings !== undefined && { findings: req.findings }) };
+  }
+  if (req.verb === "done") {
     const handBack = handBackRefusal(live, req);
     if (handBack) return handBack;
     const missing = await producedRefusal(env, record, live, req.outcome);
@@ -157,7 +186,11 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     if (long) return long;
     const stopped = await unfinishedRefusal(env, unit);
     if (stopped) return stopped;
-    const dirty = await uncommittedRefusal(env, unit, live.run.executor);
+    const hooked = await hooksRefusal(env, record.unit, live);
+    if (hooked) return hooked;
+    const detected = await detectedRefusal(env, record, live, req.outcome);
+    if (detected) return detected;
+    const dirty = await uncommittedRefusal(env, unit, live.run.executor, live.run.code);
     if (dirty) return dirty;
     const unmerged = await baseUnmergedRefusal(env, record, live);
     if (unmerged) return unmerged;
@@ -167,7 +200,7 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   const text = textOf(req);
   const outcome = req.verb === "done" ? req.outcome : undefined;
   // before the receipt: once it is applied the next step may launch, and it must read what this run wrote
-  await readBackDocs(env, unit, undefined, producedOf(record));
+  await readBackDocs(env, unit, undefined, producedOf(env, record));
   let criteria: { report: CriterionVerdict[]; summary: CriteriaSummary } | undefined;
   if (req.verb === "done") {
     const checked = await checkCriteria(env, unit, live, req);
@@ -198,6 +231,25 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     await appendEvents(env.ctx, unit, runId, [{ ...eventOf(runId, req), seq: next_seq, at: env.ctx.now() }]);
   }
   return { ok: true, value: { seq: wrote.value.seq, replayed: wrote.value.replayed, ...(criteria !== undefined && { criteria: criteria.summary }) } };
+}
+
+/**
+ * A report from the unit's supervisor, recorded as the receipt its subject takes, or null when `runId`
+ * is not the supervisor at work. Nothing of the step's own run is read back or checked: a supervisor
+ * changes nothing in the worktree, and what it reports stands only as its own.
+ */
+async function supervisorReport(env: RuntimeEnv, unit: string, runId: string, req: ReportRequest, receiptId: string): Promise<Refusable<ReportRecorded> | null> {
+  const read = await env.journal.readUnit(unit);
+  if (!read.ok || read.value.corrupt !== undefined) return null;
+  const sup = supervisorOfRun(read.value, runId);
+  if (!sup) return null;
+  const moved = await claimMovedRefusal(env, unit, runId);
+  if (moved) return moved;
+  const receipt = supervisorReceipt(read.value, sup, req);
+  if (!receipt.ok) return { ok: false, refusal: receipt.refusal };
+  const wrote = await env.journal.record(unit, { id: receiptId, data: receipt.value });
+  if (!wrote.ok) return refuse(`cannot record the report: ${wrote.failure.message}`, "report again with the same report id", wrote.failure.code);
+  return { ok: true, value: { seq: wrote.value.seq, replayed: wrote.value.replayed } };
 }
 
 /**
@@ -234,9 +286,8 @@ export async function claimHeldElsewhere(env: RuntimeEnv, unit: string): Promise
   return holder === undefined || isOwnHolder(env, holder) ? null : holder;
 }
 
-/** The findings file `norn done --findings` reads, as a refusal names it. */
-export const FINDINGS_SHAPE =
-  'a JSON file {"findings": [{"severity": "blocking" | "major" | "minor" | "nit", "title": "...", "detail"?, "file"?, "line"?, "criterion"?, "repro"?}]} with at least one finding';
+/** The findings report, as a refusal names it. */
+export const FINDINGS_SHAPE = REPORT_TYPES.findings.shape;
 
 /**
  * Why a `done` whose outcome hands findings back cannot be recorded as it is, or null when it can:
@@ -248,10 +299,9 @@ function handBackRefusal(live: LiveStep, req: Extract<ReportRequest, { verb: "do
   if (live.handBack[req.outcome] !== "findings") return null;
   const carries = (req.findings?.length ?? 0) > 0 || textOf(req) !== undefined || (req.criteria ?? []).some((c) => c.verdict !== "pass");
   if (carries) return null;
-  const criteria = live.criteria || live.verdict[req.outcome] !== undefined ? " --criteria <file>" : "";
   return refuse(
     `step ${live.step} hands back findings with outcome ${req.outcome} (hand_back), and this report has none`,
-    `write ${FINDINGS_SHAPE}, then run: norn done ${req.outcome}${criteria} --findings <file>`,
+    `write the findings to ${reportPath("findings")}: ${FINDINGS_SHAPE}; at least one finding; then run: norn done ${req.outcome}`,
     "hand_back_required",
   );
 }
@@ -308,7 +358,7 @@ async function handoffSizeRefusal(env: RuntimeEnv, unit: string): Promise<Refusa
   const kb = (n: number) => `${Math.ceil(n / 1024)} KB`;
   return refuse(
     `the handoff ${file} is ${kb(bytes)}; it may hold at most ${kb(HANDOFF_MAX_BYTES)}`,
-    `rewrite it as the unit's current state (State, Notes): drop what the brief's history already says and the attempts that led nowhere, move long repros and logs into the findings of \`norn done --findings\` when the outcome hands findings back, or into a file of their own under ${specFolder(unit)}/, and name it there, then report again`,
+    `rewrite it as the unit's current state (State, Notes): drop what the brief's history already says and the attempts that led nowhere, move long repros and logs into the findings (\`${reportPath("findings")}\`) when the outcome hands findings back, or into a file of their own under ${specFolder(unit)}/, and name it there, then report again`,
     "handoff_too_large",
   );
 }
@@ -400,27 +450,73 @@ const DIRTY_SHOWN = 10;
  * Why a `done` cannot be recorded while the unit's checkout holds work not committed, or null when
  * it can: the steps after it (a branch update, a push, a pull request) carry commits only, so what
  * is left in the worktree would be lost or make them fail. norn's own files there never count: the
- * inputs and the story's spec folder, which it reads back itself (though a repo that commits its
+ * run folder (inputs, reports) and the story's spec folder, which it reads back itself (though a repo that commits its
  * specs tracks them), and what it installed for the run's executor, which a repo's own `.gitignore`
  * can leave showing and which committing would carry norn's hooks into the branch. An ask or stuck
  * is never held back: the work is not handed on.
  */
-async function uncommittedRefusal(env: RuntimeEnv, unit: string, executor: string): Promise<Refusable<never> | null> {
+async function uncommittedRefusal(env: RuntimeEnv, unit: string, executor: string, code: GuardedCode | undefined): Promise<Refusable<never> | null> {
   const vcs = env.slots.vcs;
-  if (!vcs.uncommitted) return null;
+  // a run that may not keep code answers for its tracked changes to the check; only what it left untracked is held here
+  const list = code === undefined ? vcs.uncommitted?.bind(vcs) : vcs.untracked?.bind(vcs);
+  if (!list) return null;
   const worktree = worktreeOf(env, unit);
-  const r = await vcs.uncommitted(worktree);
+  const r = await list(worktree);
   if (!r.ok) return refuse(`cannot tell whether ${worktree} holds uncommitted work: ${r.failure.message}`, "report again with the same command", r.failure.code);
-  const owned = [`${INPUTS_DIR}/`, `${specFolder(unit)}/`];
-  const harness = env.slots.executors[executor];
-  const installed = new Set([...(harness?.localFiles ?? []), ...skillLinks(harness?.skillsDir, env.slots.pack.skills)]);
-  const left = r.value.filter((p) => !installed.has(p) && !owned.some((o) => p.startsWith(o)));
+  const owned = ownedBy(env, unit, executor);
+  const left = r.value.filter((p) => !owned(p));
   if (left.length === 0) return null;
   const named = left.slice(0, DIRTY_SHOWN).join(", ") + (left.length > DIRTY_SHOWN ? ` and ${left.length - DIRTY_SHOWN} more` : "");
+  if (code !== undefined)
+    return refuse(`${worktree} holds files this run made: ${named}`, `delete them (this step keeps no code: code:${code}), or move a report into $${OUT_ENV}, then report again`, "dirty_worktree");
   return refuse(
     `${worktree} holds uncommitted work: ${named}`,
     "run `git status` in the worktree, commit the work this step made, then report again; ask a person about a change you cannot tell whether to commit",
     "dirty_worktree",
+  );
+}
+
+/**
+ * Why a `done` cannot be recorded once the agent's hook config differs from the one its launch pinned,
+ * or null when it holds: hooks the agent changed, removed or turned off guarded nothing since, so what
+ * it reports cannot be taken as a guarded run's. Only a person can tell what happened.
+ */
+async function hooksRefusal(env: RuntimeEnv, unit: string, live: LiveStep): Promise<Refusable<never> | null> {
+  const pinned = live.run.hooks;
+  if (pinned === undefined) return null;
+  const worktree = worktreeOf(env, unit);
+  if ((await hookDigest(env, live.run.executor, worktree)) === pinned) return null;
+  return refuse(
+    `the agent's hook config in ${worktree} changed since run ${live.run.id} started`,
+    "put back the hooks norn installed (and any setting that turns hooks off) as the run found them, then report again; if you cannot, report stuck saying what changed",
+    "hooks_changed",
+  );
+}
+
+/**
+ * Why the done of a run that may not keep code cannot be recorded as it is, or null when it can: what
+ * changed since the visit's snapshot, judged as the check after the report judges it, so the agent puts
+ * it right now rather than the unit parking later. Its processes still run here, so the tick's check
+ * after killing them is the one that counts.
+ */
+async function detectedRefusal(env: RuntimeEnv, record: UnitJournal, live: LiveStep, outcome: string): Promise<Refusable<never> | null> {
+  const code = live.run.code;
+  if (code === undefined) return null;
+  const snap = snapshotOf(record.receipts, live.run.id);
+  if (snap === null) return refuse(`no snapshot of run ${live.run.id} is on the record, so what it changed cannot be checked`, "report stuck: a person has to look at the unit", "detect_failed");
+  const seen = await changesSince(env, record.unit, worktreeOf(env, record.unit), snap, live.run.executor);
+  if (!seen.ok) return refuse(`cannot check what run ${live.run.id} changed: ${seen.failure.message}`, "report again with the same command; if it keeps failing, report stuck", seen.failure.code);
+  const judged = judgeChanges({ code, passes: live.verdict[outcome] === "pass", ...seen.value });
+  if (judged.verdict !== "refused") return null;
+  const fix =
+    code === "read"
+      ? `put the code back as the run found it (\`git restore <file>\`, \`git reset --keep ${snap.head ?? "<the run's first commit>"}\` for a commit), then report again; a change the code needs is a finding for the step that keeps code`
+      : "report an outcome that does not pass the step (norn then resets what you changed), or put the code back as the run found it and report again";
+  const repo = seen.value.remoteMoved || seen.value.configChanged || seen.value.hooksChanged;
+  return refuse(
+    `the run may not keep code (code:${code}), and ${judged.reasons.join("; ")}`,
+    repo ? `put back what changed in the repo's git config, hooks or remote branch, or report stuck saying what changed; ${fix}` : fix,
+    "code_changed",
   );
 }
 

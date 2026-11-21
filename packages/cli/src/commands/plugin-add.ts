@@ -11,6 +11,8 @@ export const pluginAddCommand = defineCommand({
   summary: "Install a plugin (npm spec, git URL or local path) and pin it in the lock",
   usage: "norn plugin add <spec>",
   positionals: { min: 1, max: 1 },
+  // the effects its step kinds declare are accepted here, which is a person's to do
+  personOnly: true,
   async run(ctx, args) {
     return pinPlugin(ctx, args.positionals[0] as string, "add");
   },

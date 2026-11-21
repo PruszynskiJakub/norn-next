@@ -287,6 +287,22 @@ describe("norn watch's cadence", () => {
       1: async () => {
         // the repo's own file of the shipped workflow's name replaces it: its first step waits for a person
         await m.files.write(`${ROOT}/.agents/workflows/story.yaml`, TIDY_YAML.replace("name: tidy", "name: story"));
+        // it drops the pack's person steps, so it runs once the person confirms it
+        await runCli(["workflow", "confirm", "story"], m.io);
+        await addItem(m, "First");
+      },
+    });
+    await runCli(["watch", "--interval", "30s", "--max-ticks", "5", "--json"], m.io);
+    expect(w.events).toContain("config reloaded");
+    expect(w.ticks[4]?.lines).toEqual(["lt-1  agent.ready.manual → park"]);
+  });
+
+  test("a held repo workflow the person confirms during the pause runs from the next tick, with no file changed in the repo", async () => {
+    // the repo's story.yaml drops the pack's person steps, so it is held before the watch starts
+    const m = repo({ seed: { [PATHS.local]: CONFIG, [`${ROOT}/.agents/workflows/story.yaml`]: TIDY_YAML.replace("name: tidy", "name: story") } });
+    const w = timedWatch(m, {
+      1: async () => {
+        await runCli(["workflow", "confirm", "story"], m.io);
         await addItem(m, "First");
       },
     });

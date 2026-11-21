@@ -141,6 +141,7 @@ export const openPr: StepKindDefinition<typeof OpenPrConfig> = {
   configSchema: OpenPrConfig,
   outcomes: ["done"],
   mode: "effect",
+  slot: "forge",
   reads: [{ name: PR_BODY_READ, fallback: `the ${PR_BODY_FILE} in the story's spec folder an earlier pass left, else a body of norn's footer alone (the story's link)` }],
   run,
 };

@@ -22,6 +22,7 @@ import {
   validateRunState,
   validateSharedWorkflowDocument,
   validateWorkflowDocument,
+  validateWorkflowFile,
   validateWorkflowGraph,
 } from "../../src/index.ts";
 
@@ -49,7 +50,7 @@ const WORKFLOW: LoadedWorkflow = {
           skills: [],
           inputs: [],
           executor: null,
-          attended: false,
+          attended: "none",
           criteria: false,
           hand_back: {},
           writes: "worktree",
@@ -139,10 +140,15 @@ describe("kernel schemas", () => {
       { kind: "step.finished", step_kind: "open-pr", outcome: "done", detail: { id: 4 } },
       { kind: "gate.decided", outcome: "approve", by: "a-person" },
       { kind: "answer.sent", input_id: "q1", text: "yes", by: "a-person" },
+      { kind: "supervisor.started", run_id: "s", executor: "claude", subject: "gate", step: "ready", attempt: 1 },
+      { kind: "supervisor.escalated", run_id: "s", reason: "the question names a merge" },
       { kind: "nudge.sent", run_id: "r", reason: "silent" },
       { kind: "run.resumed", run_id: "r" },
       { kind: "stop.sent", run_id: "r", reason: "timeout" },
       { kind: "run.limited", run_id: "r", resets_at: "2026-11-17T10:00:00.000Z" },
+      { kind: "run.snapshot", run_id: "r", failed: "no vcs snapshot" },
+      { kind: "run.checking", run_id: "r" },
+      { kind: "run.checked", run_id: "r", verdict: "clean" },
       { kind: "round.started", workflow: pinned },
       { kind: "step.moved", to: "work", by: "a-person" },
       { kind: "claim.taken", from: "machine-a", from_expires_at: "2026-11-17T10:00:00.000Z", to: "machine-b", version: 4, by: "machine-b", reason: "a is off" },
@@ -178,8 +184,8 @@ describe("workflow documents", () => {
   const dirs = [join(ROOT, "packages", "pack-sdlc", "assets", "workflows"), join(ROOT, ".agents", "workflows")];
   const yamls = (dir: string) => readdirSync(dir).filter((n) => n.endsWith(".yaml")).map((n) => join(dir, n));
 
-  test.each(dirs.flatMap(yamls).map((f) => [f.slice(ROOT.length + 1), f]))("%s fits the workflow document schema", (_name, file) => {
-    expect(errorsOf(validateWorkflowDocument(parse(readFileSync(file, "utf8"))))).toEqual([]);
+  test.each(dirs.flatMap(yamls).map((f) => [f.slice(ROOT.length + 1), f]))("%s fits the workflow file schema", (_name, file) => {
+    expect(errorsOf(validateWorkflowFile(parse(readFileSync(file, "utf8"))))).toEqual([]);
   });
 
   test.each(dirs.flatMap((d) => yamls(join(d, "shared"))).map((f) => [f.slice(ROOT.length + 1), f]))("%s fits the shared document schema", (_name, file) => {
@@ -189,7 +195,14 @@ describe("workflow documents", () => {
   test("an exit route belongs to a shared file only", () => {
     const doc = { name: "w", start: "a", steps: { a: { agent: "x", outcomes: { done: { exit: "out" } } } } };
     expect(validateWorkflowDocument(doc).ok).toBe(false);
+    expect(validateWorkflowFile(doc).ok).toBe(false);
     expect(validateSharedWorkflowDocument({ start: "a", steps: doc.steps }).ok).toBe(true);
+  });
+
+  test("an outcome object belongs to a file; the document a unit pins keeps routes only under outcomes", () => {
+    const doc = { name: "w", start: "a", steps: { a: { agent: "x", outcomes: { done: { to: "$done", means: "finished" } } } } };
+    expect(validateWorkflowFile(doc).ok).toBe(true);
+    expect(validateWorkflowDocument(doc).ok).toBe(false);
   });
 });
 

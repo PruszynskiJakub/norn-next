@@ -3,7 +3,7 @@
  * corrupt unit or a refused fact names the exact place that failed.
  */
 import { check, type ValidationResult } from "@norn/schema";
-import { WorkflowDocument, SharedWorkflowDocument } from "../workflow/document.ts";
+import { SharedWorkflowDocument, WorkflowDocument, WorkflowFile } from "../workflow/document.ts";
 import { WorkflowGraph } from "../workflow/graph.ts";
 import { Decision } from "./actions.ts";
 import { KernelConfig } from "./config.ts";
@@ -18,5 +18,6 @@ export const validateReceiptData = (v: unknown): ValidationResult<ReceiptData> =
 export const validateMailboxLetter = (v: unknown): ValidationResult<MailboxLetter> => check(MailboxLetter, v);
 export const validateDecision = (v: unknown): ValidationResult<Decision> => check(Decision, v);
 export const validateWorkflowDocument = (v: unknown): ValidationResult<WorkflowDocument> => check(WorkflowDocument, v);
+export const validateWorkflowFile = (v: unknown): ValidationResult<WorkflowFile> => check(WorkflowFile, v);
 export const validateSharedWorkflowDocument = (v: unknown): ValidationResult<SharedWorkflowDocument> => check(SharedWorkflowDocument, v);
 export const validateWorkflowGraph = (v: unknown): ValidationResult<WorkflowGraph> => check(WorkflowGraph, v);

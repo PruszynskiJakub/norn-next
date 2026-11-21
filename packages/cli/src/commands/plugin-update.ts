@@ -10,6 +10,8 @@ import { repoLock } from "../plugins/install.ts";
 import { pinPlugin } from "../plugins/pin.ts";
 
 export const pluginUpdateCommand = defineCommand({
+  // the effects its step kinds declare are accepted here, which is a person's to do
+  personOnly: true,
   name: "plugin update",
   summary: "Update an installed plugin to the newest version its spec allows",
   usage: "norn plugin update <name>",

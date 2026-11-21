@@ -10,3 +10,4 @@ export * from "./state.ts";
 export * from "./validate.ts";
 export * from "./version.ts";
 export * from "./workflow.ts";
+export * from "./report-types.ts";

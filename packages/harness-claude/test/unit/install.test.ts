@@ -142,3 +142,29 @@ describe("claude uninstall", () => {
     expect(readFileSync(local(), "utf8")).toBe(before);
   });
 });
+
+describe("claude hook config", () => {
+  test("is the hooks of the local and committed settings, and whether hooks are off: a permission granted meanwhile changes nothing", async () => {
+    expect(await claudeHarness.hookConfig?.(wt)).toBeNull();
+    write(local(), PERSON);
+    await claudeHarness.install({ worktree: wt, hookCommand: HOOK_COMMAND });
+    const pinned = await claudeHarness.hookConfig?.(wt);
+    expect(typeof pinned).toBe("string");
+    write(local(), { ...read(), permissions: { allow: ["Bash(bun test:*)", "Bash(ls:*)"] } });
+    expect(await claudeHarness.hookConfig?.(wt)).toBe(pinned);
+    write(local(), { ...read(), disableAllHooks: true });
+    expect(await claudeHarness.hookConfig?.(wt)).not.toBe(pinned);
+  });
+
+  test("changes when a hook is removed from the local file or added to the committed one", async () => {
+    await claudeHarness.install({ worktree: wt, hookCommand: HOOK_COMMAND });
+    const pinned = await claudeHarness.hookConfig?.(wt);
+    const settings = read();
+    write(committed(), { hooks: { PreToolUse: [{ matcher: "*", hooks: [{ type: "command", command: "true" }] }] } });
+    expect(await claudeHarness.hookConfig?.(wt)).not.toBe(pinned);
+    rmSync(committed());
+    delete settings.hooks.PreToolUse;
+    write(local(), settings);
+    expect(await claudeHarness.hookConfig?.(wt)).not.toBe(pinned);
+  });
+});

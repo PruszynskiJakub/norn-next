@@ -3,7 +3,7 @@
  * has it), then merged over the defaults and checked whole. Any problem is a config error, exit 6:
  * norn never runs on a config it had to guess at.
  */
-import type { HostFiles } from "@norn/plugin-api";
+import { CAPABILITIES, type Capability, type HostFiles } from "@norn/plugin-api";
 import { check } from "@norn/schema";
 import { parse } from "yaml";
 import { configFailure } from "../output.ts";
@@ -12,7 +12,7 @@ import { isOldUserConfig } from "./migrate-user.ts";
 import { type ConfigPaths, LAYERS, type Layer, layerFileName } from "./paths.ts";
 import { renamedProblems } from "./renamed.ts";
 import { withoutRetired } from "./retired.ts";
-import { CONFIG_DEFAULTS, ConfigLayer, NornConfig } from "./schema.ts";
+import { CONFIG_DEFAULTS, ConfigLayer, NornConfig, type Policy } from "./schema.ts";
 
 export interface ConfigProblem {
   /** the file at fault, or `merged` when only the files together are wrong */
@@ -75,12 +75,46 @@ function crossProblems(config: NornConfig): { executor: string; problems: Config
     problems.push({ layer: "merged", path: "/executor", message: `names ${config.executor}, which is not under \`executors\` (${names.join(", ")})` });
     executor = "";
   }
+  for (const [key, bound] of Object.entries(config.bind ?? {}))
+    for (const name of typeof bound === "string" ? [bound] : bound)
+      if (!names.includes(name)) problems.push({ layer: "merged", path: `/bind/${key}`, message: `names ${name}, which is not under \`executors\` (${names.join(", ")})` });
   return { executor, problems };
+}
+
+/**
+ * The policy the layers leave: the user's file grants, and each repo file that sets a list keeps only
+ * what it names of it. The reverse of every other key's order, since an agent inside its step can
+ * change a repo file but not the person's own; a grant only a repo file makes is no grant.
+ */
+export function narrowPolicy(layers: Readonly<Record<Layer, ConfigLayer | null>>): Policy | undefined {
+  if (LAYERS.every((l) => layers[l]?.policy === undefined)) return undefined;
+  const lists = ["attended", "gates"] as const;
+  const standIn: NonNullable<Policy["stand_in"]> = {};
+  for (const list of lists) {
+    let kept: string[] | undefined;
+    for (const layer of LAYERS) {
+      const named = layers[layer]?.policy?.stand_in?.[list];
+      if (named === undefined) continue;
+      kept = layer === "user" ? [...named] : (kept ?? []).filter((ref) => named.includes(ref));
+    }
+    if (kept !== undefined) standIn[list] = kept;
+  }
+  // absent from the user's file caps nothing, so a repo file narrows from every capability
+  let capabilities: Capability[] | undefined;
+  for (const layer of LAYERS) {
+    const named = layers[layer]?.policy?.allow;
+    if (named === undefined) continue;
+    capabilities = layer === "user" ? [...named] : (capabilities ?? [...CAPABILITIES]).filter((c) => named.includes(c));
+  }
+  return { ...(Object.keys(standIn).length > 0 && { stand_in: standIn }), ...(capabilities !== undefined && { allow: capabilities }) };
 }
 
 /** Merge parsed layers over the defaults and check the whole. */
 export function mergeConfig(layers: Record<Layer, ConfigLayer | null>, paths: ConfigPaths, retired: ConfigProblem[] = []): ConfigLoad {
   const merged = mergeLayers([CONFIG_DEFAULTS, ...LAYERS.map((l) => layers[l])]);
+  const policy = narrowPolicy(layers);
+  if (policy === undefined) delete merged.policy;
+  else merged.policy = policy;
   const r = check(NornConfig, merged);
   if (!r.ok) return { ok: false, problems: r.errors.map((e) => ({ layer: "merged", path: e.path, message: e.message })), layers };
   const cross = crossProblems(r.value);

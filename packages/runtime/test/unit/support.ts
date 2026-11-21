@@ -16,11 +16,13 @@ import {
   type NornPlugin,
   ok,
   type PluginResult,
+  type RoleDefinition,
   type StepKindDefinition,
   type StepKindOutcome,
   type Tracker,
   type TrackerItem,
   type Vcs,
+  type VcsSnapshot,
   type VcsUnfinished,
 } from "@norn/plugin-api";
 import { deriveUlid } from "@norn/schema";
@@ -87,6 +89,19 @@ export interface VcsCall {
  * A vcs with worktrees under the data dir, heads from a map, and every call recorded but `unfinished`
  * `uncommitted` and `untracked`, which answer from `stopped`, `dirty` and `untracked` by checkout path.
  */
+/**
+ * What a checkout's snapshot answers, by checkout path: `snapshot` what it notes now (a string is the
+ * failure it answers), `changed` the tracked paths changed since; `none` drops the three methods, as a
+ * vcs that cannot snapshot. `restore` records its call and puts the checkout back as it was noted.
+ */
+export interface FakeCheckouts {
+  snapshot: Record<string, VcsSnapshot | string>;
+  changed: Record<string, string[]>;
+  none: boolean;
+}
+
+export const BASE_SNAPSHOT: VcsSnapshot = { head: "head-0", tree: "tree-0", refs: "refs-0", config: "config-0", hooks: "hooks-0" };
+
 export function fakeVcs(
   ctx: HostContext,
   heads: Record<string, string>,
@@ -94,7 +109,29 @@ export function fakeVcs(
   stopped: Record<string, VcsUnfinished> = {},
   dirty: Record<string, string[]> = {},
   untracked: Record<string, string[]> = {},
+  checkouts: FakeCheckouts = { snapshot: {}, changed: {}, none: false },
 ): Vcs {
+  const snapshotting: Partial<Vcs> = checkouts.none
+    ? {}
+    : {
+        snapshot: (p) => {
+          calls.push({ op: "snapshot", args: [p] });
+          const s = checkouts.snapshot[p] ?? BASE_SNAPSHOT;
+          return Promise.resolve(typeof s === "string" ? fail("unknown", s) : ok({ ...s }));
+        },
+        changedSince: (p, tree) => {
+          calls.push({ op: "changedSince", args: [p, tree] });
+          return Promise.resolve(ok([...(checkouts.changed[p] ?? [])]));
+        },
+        restore: (p, to, paths) => {
+          calls.push({ op: "restore", args: [p, to, [...paths]] });
+          const left = (checkouts.changed[p] ?? []).filter((c) => !paths.includes(c));
+          checkouts.changed[p] = left;
+          const now = checkouts.snapshot[p];
+          if (typeof now === "object") checkouts.snapshot[p] = { ...now, head: to.head, ...(left.length === 0 && { tree: to.tree }) };
+          return Promise.resolve(ok(undefined));
+        },
+      };
   const path = (unit: string) => `${ctx.repo.dataDir}/worktrees/${unit.replace("/", "-")}`;
   const call = <T>(op: string, args: unknown[], value: T): Promise<PluginResult<T>> => {
     calls.push({ op, args });
@@ -118,6 +155,7 @@ export function fakeVcs(
     deleteBranch: (branch) => call("deleteBranch", [branch], undefined),
     push: (branch) => call("push", [branch], undefined),
     fetch: () => call("fetch", [], undefined),
+    ...snapshotting,
   };
 }
 
@@ -220,14 +258,17 @@ export type StepAnswer = string | StepKindOutcome;
 
 /** Step kinds that answer from a queue per kind (the last answer repeats), recording each input. */
 export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: StepCall[]): Record<string, StepKindDefinition> {
-  const kind = (name: string, mode: "effect" | "wait", outcomes: string[], reads?: StepKindDefinition["reads"]): StepKindDefinition => ({
+  const kind = (name: string, mode: "effect" | "wait", outcomes: string[], reads?: StepKindDefinition["reads"], produces?: StepKindDefinition["produces"]): StepKindDefinition => ({
     name,
     ...(reads && { reads }),
+    ...(produces && { produces }),
     configSchema: Type.Object({ note: Type.Optional(Type.String()) }, { additionalProperties: false }),
     outcomes,
     mode,
-    run: async (input) => {
+    run: async (input, ctx) => {
       calls.push({ kind: name, input });
+      // a kind that produces a file writes it where the host says, as a real one would
+      for (const [product, path] of Object.entries(input.produces ?? {})) await ctx.files.write(`${input.worktree}/${path}`, `${product} from ${name}\n`);
       const queue = answers[name] ?? [];
       const answer = queue.length > 1 ? (queue.shift() as StepAnswer) : (queue[0] ?? (outcomes[0] as string));
       if (answer === "!fail") return fail("unavailable", `${name} failed`);
@@ -240,6 +281,7 @@ export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: Step
     // named as the vcs plugin's kind, so the inputs that read the base update's receipts find it
     "update-branch": kind("update-branch", "effect", ["done", "conflict", "resolved"]),
     integrate: kind("integrate", "effect", ["done", "conflict"]),
+    preview: kind("preview", "effect", ["done", "failed"], undefined, [{ name: "preview_url", file: "preview.md" }]),
   };
 }
 
@@ -259,6 +301,26 @@ export const WORKFLOWS: Record<string, string> = {
     "    means: { done: the thing is built }",
     "",
   ].join("\n"),
+  "supervised.yaml": [
+    "name: supervised",
+    "start: build",
+    "steps:",
+    "  build:",
+    "    by: builder",
+    "    do: Build the thing.",
+    "    attended: agent",
+    "    limits: { asks: 2 }",
+    "    outcomes: { done: ready }",
+    "  ready:",
+    "    by: person",
+    "    do: Ship it?",
+    "    outcomes: { approve: $done, reject: build }",
+    "",
+  ].join("\n"),
+  "granted.yaml": ["name: granted", "start: review", "steps:", "  review:", "    by: reviewer", "    do: Review the thing.", "    outcomes: { approve: $done }", ""].join("\n"),
+  "scratched.yaml": ["name: scratched", "start: try", "steps:", "  try:", "    by: qa", "    do: Try the thing.", "    outcomes: { done: $done }", ""].join("\n"),
+  "passed.yaml": ["name: passed", "start: try", "steps:", "  try:", "    by: qa", "    do: Try the thing.", "    produces: [criteria]", "    outcomes: { pass: { to: $done, verdict: pass } }", ""].join("\n"),
+  "widened.yaml": ["name: widened", "start: review", "steps:", "  review:", "    by: reviewer", "    do: Review the thing.", "    allow: [code:write]", "    outcomes: { approve: $done }", ""].join("\n"),
   "reviewed.yaml": [
     "name: reviewed",
     "start: review",
@@ -298,6 +360,34 @@ export const WORKFLOWS: Record<string, string> = {
     "  poke:",
     "    probe: null",
     "    outcomes: { done: $done, conflict: $stuck }",
+    "",
+  ].join("\n"),
+  "previewed.yaml": [
+    "name: previewed",
+    "start: deploy",
+    "steps:",
+    "  deploy:",
+    "    preview: null",
+    "    outcomes: { done: check, failed: check }",
+    "  check:",
+    "    agent: Check the preview.",
+    "    inputs: [spec, preview_url]",
+    "    outcomes: { done: $done }",
+    "",
+  ].join("\n"),
+  "sourced.yaml": [
+    "name: sourced",
+    "start: design",
+    "sources:",
+    "  adr: { type: folder, path: docs/adr }",
+    "  brand: { type: folder }",
+    "  tone: { type: file }",
+    "steps:",
+    "  design:",
+    "    by: builder",
+    "    do: Design the page.",
+    "    reads: [spec, adr, brand, tone?, findings?]",
+    "    outcomes: { done: $done }",
     "",
   ].join("\n"),
   "stepped.yaml": [
@@ -434,6 +524,10 @@ export interface Harnessed {
   dirty: Record<string, string[]>;
   /** untracked files, by checkout path, as the fake vcs reports them */
   untracked: Record<string, string[]>;
+  /** what each checkout's snapshot answers */
+  checkouts: FakeCheckouts;
+  /** the fake harness's hook config, by worktree; absent: nothing installed */
+  hookConfigs: Record<string, string>;
   stepCalls: StepCall[];
   stepAnswers: Record<string, StepAnswer[]>;
   launcher: FakeLauncher;
@@ -488,6 +582,10 @@ export interface HarnessOptions {
   formerHolders?: string[];
   /** plugins beside the fakes and the local store, such as one providing a signal a workflow routes */
   plugins?: NornPlugin[];
+  /** the roles the test pack registers; absent, it registers none and no step is narrowed */
+  roles?: Record<string, RoleDefinition>;
+  /** the vcs cannot snapshot a checkout */
+  noSnapshot?: boolean;
 }
 
 export function harness(opts: HarnessOptions = {}): Harnessed {
@@ -503,6 +601,8 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
   const stopped: Record<string, VcsUnfinished> = {};
   const dirty: Record<string, string[]> = {};
   const untracked: Record<string, string[]> = {};
+  const checkouts: FakeCheckouts = { snapshot: {}, changed: {}, none: opts.noSnapshot === true };
+  const hookConfigs: Record<string, string> = {};
   const stepCalls: StepCall[] = [];
   const stepAnswers: Record<string, StepAnswer[]> = {};
   const launcher = new FakeLauncher();
@@ -513,10 +613,10 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     provides: {
       tracker: { fake: { configSchema: Type.Object({}), create: () => fakeTracker(items) } },
       forge: { fake: { configSchema: Type.Object({}), create: () => fakeForge(changes) } },
-      vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped, dirty, untracked) } },
-      harness: { fake: HARNESS },
+      vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped, dirty, untracked, checkouts) } },
+      harness: { fake: { ...HARNESS, hookConfig: async (wt: string) => hookConfigs[wt] ?? null } },
       stepKinds: fakeStepKinds(stepAnswers, stepCalls),
-      packs: { test: { workflows: WORKFLOWS, shared: {}, skills: {} } },
+      packs: { test: { workflows: WORKFLOWS, shared: {}, skills: {}, ...(opts.roles && { roles: opts.roles }) } },
     },
   });
   const plugins: NornPlugin[] = [providers, localStorePlugin, ...(opts.plugins ?? [])];
@@ -544,7 +644,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     return id;
   };
   const runtime: Runtime = { tick: () => tick(env, nextId()) };
-  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stopped, dirty, untracked, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
+  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stopped, dirty, untracked, checkouts, hookConfigs, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
 }
 
 export type Report = Awaited<ReturnType<Runtime["tick"]>>;

@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parse } from "yaml";
-import { outcomeEdge, toJsonSchema, validate } from "../../src/index.ts";
+import { REPO_ROOT } from "../../../../test/support/repo-root.ts";
+import { Ajv } from "ajv";
+import addFormatsModule from "ajv-formats";
+import { CAPABILITIES, outcomeEdge, toJsonSchema, validate } from "../../src/index.ts";
 
 /** §11 slice workflow example of the rules, as a file writes it: one head key per step. */
 export const SLICE_EXAMPLE = `
@@ -57,6 +62,10 @@ const errorsOf = (v: unknown) => {
   const r = validate("workflow-source", v);
   return r.ok ? [] : r.errors;
 };
+const sharedErrorsOf = (v: unknown) => {
+  const r = validate("workflow-shared", v);
+  return r.ok ? [] : r.errors;
+};
 const modelErrorsOf = (v: unknown) => {
   const r = validate("workflow", v);
   return r.ok ? [] : r.errors;
@@ -105,6 +114,12 @@ describe("workflow schema", () => {
     expect(modelErrorsOf(wf)).toEqual([]);
   });
 
+  test("a step reads a produced name or a source by the name the workflow may give it, hyphens included, optional or not", () => {
+    const wf = (inputs: unknown[]) => ({ name: "x", start: "a", steps: { a: { type: "agent", instructions: "do it", inputs, outcomes: { done: "$done" } } } });
+    expect(modelErrorsOf(wf(["brand-assets", "pr_body?", "brand-kit?"]))).toEqual([]);
+    expect(modelErrorsOf(wf(["Brand"])).length).toBeGreaterThan(0);
+  });
+
   test("a loaded agent step holds a list of skills, maybe none; a single `skill` is the file's wording, not the model's", () => {
     const wf = (step: Record<string, unknown>) => ({ name: "x", start: "a", steps: { a: { type: "agent", instructions: "do it", ...step, outcomes: { done: "$done" } } } });
     expect(modelErrorsOf(wf({}))).toEqual([]);
@@ -139,8 +154,9 @@ describe("workflow schema", () => {
     ["agent with an empty orientation", (w: any) => (w.steps.merge.agent = " ")],
     ["two head keys", (w: any) => (w.steps.merge.check = "bun test")],
     ["a skill named twice", (w: any) => (w.steps.merge.skills = ["merge", "merge"])],
-    ["a meaning inside a route", (w: any) => (w.steps.merge.outcomes.done = { to: "integrate", means: "x" })],
-    ["a verdict inside a route", (w: any) => (w.steps.qa.outcomes.pass = { to: "integrate", verdict: "pass" })],
+    ["a meaning inside a check's route", (w: any) => (w.steps.test.outcomes.pass = { to: "review", means: "x" })],
+    ["a verdict inside a gate's route", (w: any) => (w.steps["human-qa"].outcomes.approve = { to: "integrate", verdict: "pass" })],
+    ["a verdict on an outcome that is not one", (w: any) => (w.steps.qa.outcomes.pass = { to: "integrate", verdict: "great" })],
     ["means on a check", (w: any) => (w.steps.test.means = { pass: "green" })],
     ["a verdict that is not one", (w: any) => (w.steps.qa.verdict.pass = "great")],
     ["agent with no outcomes", (w: any) => (w.steps.merge.outcomes = {})],
@@ -148,7 +164,8 @@ describe("workflow schema", () => {
     ["edge with unknown property", (w: any) => (w.steps.merge.outcomes.done = { to: "integrate", when: "x" })],
     ["edge without to", (w: any) => (w.steps.merge.outcomes.done = { counter: "x" })],
     ["counter max 0", (w: any) => (w.counters.test_loop.max = 0)],
-    ["unknown input kind", (w: any) => (w.steps.implement.inputs = ["everything"])],
+    // which names a step may read is the loader's check: a produced name or a source is the workflow's own
+    ["an input that is no name", (w: any) => (w.steps.implement.inputs = ["Every thing"])],
     ["negative nudges", (w: any) => (w.steps.implement.nudges = -1)],
     ["missing start", (w: any) => delete w.start],
     ["unknown top-level property", (w: any) => (w.lifecycle = "story")],
@@ -213,13 +230,15 @@ describe("workflow-source and workflow-shared schemas", () => {
   const source = (step: unknown) => ({ name: "x", start: "a", steps: { a: step } });
   const shared = (step: unknown) => ({ start: "a", steps: { a: step } });
 
-  test("each schema has one step shape per head key, besides `use` and `like`", () => {
+  test("each schema has one step shape per actor written with by:, one per head key of the older form, besides `use` and `like`", () => {
     const shapes = (name: "workflow-source" | "workflow-shared") => {
       const steps = (toJsonSchema(name) as any).properties.steps.patternProperties;
       const union = (Object.values(steps)[0] as { anyOf: Array<{ properties: Record<string, unknown>; required?: string[] }> }).anyOf;
-      return union.map((v) => (v.required ?? []).filter((k) => k in ONE_OF_EACH || k === "use" || k === "like"));
+      return union.map((v) => (v.required ?? []).filter((k) => k in ONE_OF_EACH || k === "use" || k === "like" || k === "by"));
     };
-    const expected = [...Object.keys(ONE_OF_EACH).map((k) => [k]), ["like"]];
+    // an agent role, person, shell, a step kind, norn.each
+    const actors = [["by"], ["by"], ["by"], ["by"], ["by"]];
+    const expected = [...actors, ...Object.keys(ONE_OF_EACH).map((k) => [k]), ["like"]];
     expect(shapes("workflow-source")).toEqual([...expected.slice(0, -1), ["use"], ["like"]]);
     expect(shapes("workflow-shared")).toEqual(expected);
     for (const [head, step] of Object.entries(ONE_OF_EACH)) {
@@ -242,15 +261,125 @@ describe("workflow-source and workflow-shared schemas", () => {
     }
   });
 
-  test("neither schema accepts a meaning or verdict inside a route, nor a step in the old wording", () => {
-    const routed = { agent: "Do it.", outcomes: { done: { to: "$done", means: "done" } } };
-    const judged = { agent: "Do it.", outcomes: { done: { to: "$done", verdict: "pass" } }, means: { done: "done" } };
+  test("an agent step says what an outcome means, needs and produces on the outcome, and lists what every outcome produces", () => {
+    const qa = {
+      agent: "Check it.",
+      produces: ["criteria", { name: "notes", file: "notes.md" }],
+      outcomes: {
+        pass: { to: "$done", verdict: "pass", means: "every criterion observed" },
+        fail: { to: "$stuck", max: 2, verdict: "fail", means: "a criterion fails", produces: ["criteria", "findings"] },
+      },
+    };
+    expect(errorsOf(source(qa))).toEqual([]);
+    const leaves = { agent: "Review it.", outcomes: { approve: { exit: "approved", means: "no blocking findings" }, rework: { exit: "rework", produces: ["findings"] } } };
+    expect(sharedErrorsOf(shared(leaves))).toEqual([]);
+    expect(sharedErrorsOf(shared(qa))).toEqual([]);
+  });
+
+  test("neither schema accepts an outcome's meaning, verdict or produces beside a route a person or a command takes, nor a step in the old wording", () => {
+    const gateMeans = { gate: "Approve?", outcomes: { approve: { to: "$done", means: "fine" } } };
+    const checkVerdict = { check: "bun test", timeout: "5m", outcomes: { pass: { to: "$done", verdict: "pass" } } };
     const exitMeans = { check: "bun test", timeout: "5m", outcomes: { pass: { exit: "tested", means: "green" } } };
-    for (const step of [routed, judged]) expect(validate("workflow-source", source(step)).ok).toBe(false);
-    expect(validate("workflow-shared", shared(exitMeans)).ok).toBe(false);
+    const gateProduces = { gate: "Approve?", produces: ["findings"], outcomes: { approve: "$done" } };
+    for (const step of [gateMeans, checkVerdict, gateProduces]) expect({ step, ok: validate("workflow-source", source(step)).ok }).toEqual({ step, ok: false });
+    for (const step of [gateMeans, exitMeans, gateProduces]) expect({ step, ok: validate("workflow-shared", shared(step)).ok }).toEqual({ step, ok: false });
     const old = { type: "agent", skill: "a", instructions: "Do it.", outcomes: { done: { to: "$done", means: "done" } } };
     expect(validate("workflow-source", source(old)).ok).toBe(false);
     expect(validate("workflow-shared", shared(old)).ok).toBe(false);
+  });
+
+  test("an outcome object refuses a key it has no use for, and a produced file entry holds its name and file only", () => {
+    const step = (outcome: unknown, extra: Record<string, unknown> = {}) => source({ agent: "Do it.", outcomes: { done: outcome }, ...extra });
+    for (const bad of [step({ to: "$done", mean: "x" }), step({ to: "$done", produces: [{ name: "n", file: "n.md", on: ["done"] }] }), step("$done", { produces: [{ name: "n" }] }), step({ to: "$done", produces: ["Not A Name"] })])
+      expect({ bad, ok: validate("workflow-source", bad).ok }).toEqual({ bad, ok: false });
+  });
+});
+
+describe("the shipped workflows against the schemas a person writes against", () => {
+  const dir = join(REPO_ROOT, "packages", "pack-sdlc", "assets", "workflows");
+  const yamls = (d: string) => readdirSync(d).filter((f) => f.endsWith(".yaml"));
+  test.each(yamls(dir))("%s validates against workflow-source", (file) => {
+    expect(errorsOf(parse(readFileSync(join(dir, file), "utf8")))).toEqual([]);
+  });
+  test.each(yamls(join(dir, "shared")))("shared/%s validates against workflow-shared", (file) => {
+    expect(sharedErrorsOf(parse(readFileSync(join(dir, "shared", file), "utf8")))).toEqual([]);
+  });
+});
+
+describe("a step written with by: in the workflow-source and workflow-shared schemas", () => {
+  const source = (steps: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ name: "x", start: Object.keys(steps)[0], steps, ...extra });
+  const shared = (steps: Record<string, unknown>) => ({ start: Object.keys(steps)[0], steps });
+  /** One step per actor, as a file writes it. */
+  const ACTORS: Record<string, Record<string, unknown>> = {
+    agent: {
+      by: "reviewer",
+      do: "Review it.",
+      with: { skills: ["norn-review"] },
+      reads: ["spec", "diff"],
+      produces: ["criteria"],
+      allow: ["docs:write"],
+      attended: "person",
+      limits: { deadline: "2h", nudges: 1, retries: 0 },
+      outcomes: { approve: { to: "$done", verdict: "pass", means: "fine" }, changes_requested: { to: "$stuck", produces: ["criteria", "findings"] } },
+    },
+    person: { by: "person", do: "Approve?", outcomes: { approve: "$done", reject: { to: "$stuck", max: 2 } }, on: { "vcs.stale": "$stuck", "norn.timeout": { to: "$stuck", after: "48h" } } },
+    shell: { by: "shell", do: "bun test", with: { exits: { 3: "stale" } }, limits: { timeout: "5m" }, outcomes: { pass: "$done", fail: "$stuck", stale: "$stuck" } },
+    kind: { by: "forge.await-merge", with: { note: "x" }, outcomes: { merged: "$done" }, on: { "vcs.stale": "$stuck", "vcs.unpushed": "$stuck" } },
+    each: { by: "norn.each", reads: ["slices"], outcomes: { done: "$done", stuck: "$stuck" } },
+  };
+
+  test("an agent role, a person, shell, a step kind and norn.each each validate as a file writes them", () => {
+    for (const [actor, step] of Object.entries(ACTORS)) expect({ actor, source: errorsOf(source({ a: step })), shared: sharedErrorsOf(shared({ a: step })) }).toEqual({ actor, source: [], shared: [] });
+    expect(validate("workflow", source({ a: ACTORS.person })).ok).toBe(false);
+  });
+
+  test("the published schemas take an agent step asking for every capability and bounding its supervisor's asks, as the loader does", () => {
+    const addFormats = addFormatsModule as unknown as (ajv: Ajv) => Ajv;
+    const step = { ...ACTORS.agent, allow: [...CAPABILITIES], attended: "agent", limits: { deadline: "2h", nudges: 1, retries: 0, asks: 3 } };
+    for (const [name, value] of [["workflow-source", source({ a: step })], ["workflow-shared", shared({ a: step })]] as const) {
+      const published = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "json", `${name}.schema.json`), "utf8")) as Record<string, unknown>;
+      const check = addFormats(new Ajv({ allErrors: true, strict: false, discriminator: true })).compile(published);
+      expect({ name, ok: check(value), errors: check.errors ?? null }).toEqual({ name, ok: true, errors: null });
+    }
+    expect(validate("workflow-source", source({ a: { ...step, allow: ["code:fly"] } })).ok).toBe(false);
+  });
+
+  test("an agent step names who stays beside it: the person, a supervisor or nobody", () => {
+    for (const attended of ["person", "agent", "none"]) expect({ attended, errors: errorsOf(source({ a: { ...ACTORS.agent, attended } })) }).toEqual({ attended, errors: [] });
+    expect(validate("workflow-source", source({ a: { ...ACTORS.agent, attended: "everyone" } })).ok).toBe(false);
+  });
+
+  test("a step written with by: takes none of the older form's keys, and each actor only its own", () => {
+    for (const [actor, extra] of [
+      ["agent", { skills: ["x"] }],
+      ["agent", { inputs: ["spec"] }],
+      ["agent", { writes: "docs" }],
+      ["agent", { attended: true }],
+      ["agent", { limits: { timeout: "5m" } }],
+      ["shell", { timeout: "5m" }],
+      ["shell", { exits: { 3: "stale" } }],
+      ["person", { reads: ["spec"] }],
+      ["person", { on: { stale: "$stuck" } }],
+      ["kind", { do: "Wait." }],
+    ] as const) {
+      const step = { ...ACTORS[actor], ...extra };
+      expect({ actor, extra, ok: validate("workflow-source", source({ a: step })).ok }).toEqual({ actor, extra, ok: false });
+    }
+  });
+
+  test("an agent step reads a produced name or a source, bare or with a trailing ? for optional, and the open findings as findings?", () => {
+    const wf = source({ a: { ...ACTORS.agent, reads: ["spec", "findings?", "brand", "notes?"] } }, { sources: { brand: { type: "folder" }, adr: { type: "folder", path: "docs/adr" } } });
+    expect(errorsOf(wf)).toEqual([]);
+    expect(validate("workflow-source", source({ a: ACTORS.shell }, { sources: { brand: { type: "url" } } })).ok).toBe(false);
+    expect(validate("workflow-source", source({ a: { ...ACTORS.agent, reads: ["Brand"] } })).ok).toBe(false);
+  });
+
+  test("a workflow file holds signals: and entries:, which neither a shared file nor the pinned workflow holds", () => {
+    const wf = source({ a: ACTORS.shell }, { signals: { "vcs.stale": { when: "conflict", verify: "a" } }, entries: { "update-branch": "a" } });
+    expect(errorsOf(wf)).toEqual([]);
+    expect(validate("workflow", wf).ok).toBe(false);
+    expect(validate("workflow-shared", { ...shared({ a: ACTORS.shell }), signals: {} }).ok).toBe(false);
+    expect(validate("workflow-source", source({ a: ACTORS.shell }, { signals: { "vcs.stale": { when: "sometimes" } } })).ok).toBe(false);
   });
 });
 

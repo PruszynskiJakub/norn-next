@@ -23,7 +23,7 @@ export const REFERENCE_END = "<!-- norn:reference:end -->";
  */
 export const REFERENCE_GROUPS: ReadonlyArray<{ title: string; commands: readonly string[] }> = [
   { title: "Setup", commands: ["init", "doctor", "config", "plugin"] },
-  { title: "A person's commands", commands: ["status", "story", "run"] },
+  { title: "A person's commands", commands: ["status", "story", "run", "workflow"] },
   { title: "Background: run by a person, cron or a terminal multiplexer", commands: ["watch", "tick"] },
   { title: "Agent protocol: the only commands an agent runs", commands: ["brief", "done", "ask", "stuck"] },
   { title: "Called by the harness's hooks, not by hand", commands: ["hook"] },
@@ -46,7 +46,7 @@ function renderCommand(c: Command): string[] {
       .filter((k) => !named.has(k))
       .map((k) => `- \`--${k}\``),
   ];
-  const personOnly = c.personOnly ? ["A person's command: refused in an agent's session (`person_only`).", ""] : [];
+  const personOnly = typeof c.personOnly === "object" ? [c.personOnly.help, ""] : c.personOnly ? ["A person's command: refused in an agent's session (`person_only`).", ""] : [];
   return [`##### \`norn ${c.name}\``, "", c.summary, "", ...personOnly, "```sh", c.usage, "```", "", ...(options.length ? [...options, ""] : [])];
 }
 
@@ -63,6 +63,8 @@ const patternProps = (s: Schema): Schema | undefined => Object.values((s.pattern
 function typeName(s: Schema): string {
   if (Array.isArray(s.anyOf)) {
     const branches = s.anyOf as Schema[];
+    // a long closed list is named by its title, and spelled out where the title is explained
+    if (branches.every((b) => "const" in b) && typeof s.title === "string") return s.title;
     if (branches.every((b) => "const" in b)) return branches.map((b) => `\`${JSON.stringify(b.const)}\``).join(" or ");
     return branches.map(typeName).join(" or ");
   }
@@ -74,14 +76,15 @@ function typeName(s: Schema): string {
   if (s.type === "array") {
     const items = s.items as Schema;
     const one = typeof s.maxItems === "number" && s.maxItems === 1 ? " (one)" : "";
-    return `list of ${typeName(items)}s${one}`;
+    const item = typeName(items);
+    return `list of ${item.endsWith("y") ? `${item.slice(0, -1)}ies` : `${item}s`}${one}`;
   }
   if (s.type === "object") return "map";
   return "any";
 }
 
 /** Keys that open a map: a record's keys are names a person picks, shown as a placeholder. */
-const RECORD_KEY: Record<string, string> = { executors: "<name>", plugins: "<name>", checks: "<name>" };
+const RECORD_KEY: Record<string, string> = { executors: "<name>", plugins: "<name>", checks: "<name>", sources: "<name>", bind: "<role>" };
 
 /**
  * Every key a config file can hold, walked from the file's schema: a map's own keys nest
@@ -129,6 +132,9 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   base_ref: { derived: "the remote's fetched copy of `base` (`origin/main`), else `base`" },
   holder: { derived: "user@ the machine's LocalHostName, else its hostname, fixed in `~/.norn/holder.json` on first use" },
   executor: { derived: "the only executor" },
+  "runners.person": { derived: "none, so an attended step parks until one with presence (herdr) is set" },
+  "runners.agent": "headless",
+  "runners.none": "headless",
   "tracker.intake.assignee": "me",
   "kernel.mode": d.mode,
   "kernel.workflow": d.workflow,
@@ -142,6 +148,9 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   "kernel.claim_renew_before": durationText(d.claimRenewBeforeMs),
   "kernel.lock_stale": durationText(DEFAULT_LOCK_STALE_MS),
   "trace.retain": durationText(DEFAULT_TRACE_RETAIN_MS),
+  "policy.stand_in.attended": { derived: "none: a supervisor answers no step's questions" },
+  "policy.stand_in.gates": { derived: "none: every gate is the person's" },
+  "policy.allow": { derived: "none: every capability a role names may be granted" },
   "checks.<name>": { derived: `\`checks.test\` is ${JSON.stringify(DEFAULT_CHECKS.test)}, which the shipped workflows' test steps run; init detects the repo's own` },
   "kernel.counters.check_fail": d.counterDefaults.checkFail,
   "kernel.counters.gate_reject": d.counterDefaults.gateReject,
@@ -167,7 +176,7 @@ export function configKeys(): { rows: ConfigRow[]; open: string[] } {
 function renderConfig(): string[] {
   const { rows, open } = configKeys();
   return [
-    "Every file takes every key: the user file, the repo-local file and the committed file, the nearer winning.",
+    "Every file takes every key: the user file, the repo-local file and the committed file, the nearer winning, except `policy`: only the user file grants it, and each repo file that sets a list keeps only what it names of the user file's.",
     "",
     "| Key | Type | Default |",
     "|---|---|---|",

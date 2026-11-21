@@ -65,12 +65,19 @@ export function createHeadlessRunner(ctx: HostContext, procs: HostProcesses, con
   /**
    * TERM to the group, then KILL to the group once the leader ends or outlives the grace: a child
    * that ignores TERM lives on after its leader, and a group id is not handed out again while any
-   * member lives, so the KILL reaches only what is left of this run. Nothing is sent when the leader
-   * is not the process the handle names: its pid may be someone else's by now.
+   * member lives, so the KILL reaches only what is left of this run. A leader already gone still has
+   * its group killed: an agent exits once its turn ends, and a child it left in the background could
+   * otherwise write after the check that stopped it. Nothing is sent when another process holds the
+   * pid: the id may be someone else's by now. What is left unguarded is a pid handed to a new group
+   * leader that itself exited while its members run on, which the group id cannot tell apart.
    */
   async function stopHandle(handle: string): Promise<void> {
     const h = decodeHandle(handle);
-    if (!h || !(await procs.alive(h.pid, h.started))) return;
+    if (!h) return;
+    if (!(await procs.alive(h.pid, h.started))) {
+      if (!(await procs.alive(h.pid))) await procs.kill(h.pid, "KILL");
+      return;
+    }
     await procs.kill(h.pid, "TERM");
     for (let waited = 0; waited < graceMs; waited += STOP_POLL_MS) {
       await sleep(STOP_POLL_MS);

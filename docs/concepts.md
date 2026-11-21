@@ -25,7 +25,7 @@ norn is a small **kernel** (the workflow model, decide, the journal's write rule
 | step kinds | workflow steps beyond `agent`, `check`, `gate` and `slices` | `update-branch`, `integrate`, `push`, `verify-base`, `open-pr`, `await-merge` |
 | pack | workflows and skills shipped together | `sdlc` |
 
-An **executor** is a harness in a runner, under a name: `claude` in `headless`, say, or `pi` in `herdr`. A workflow step picks one with `by:`; without it, the config's default executor runs it. The bundled plugins ship in the binary; `norn plugin add <spec>` installs another (an npm spec, a git URL or a local path), and `norn plugin list` shows each plugin and what it provides.
+A workflow's agent step names a **role** (`by: builder`), which the pack registers with what its agent is for and the capabilities it may be granted. An **executor** is a harness and a model, under a name: `claude` on `opus`, say, or `pi`. Each machine binds roles, or one workflow's step, to executors with `bind:` (a list is tried in order), and the step's `attended:` picks the **runner** from `runners:`: one with presence (`herdr`) when a person stays beside the agent, `headless` otherwise. Whether an executor can run a step (configured, with presence for a person, a harness that can refuse a tool for a docs-only step) is a fact decide reads, so a step no executor can hold parks before any agent starts ([Reference › Executors and runners](reference.md#executors-and-runners)). The bundled plugins ship in the binary; `norn plugin add <spec>` installs another (an npm spec, a git URL or a local path), and `norn plugin list` shows each plugin and what it provides.
 
 The **runtime** hosts both: each tick it takes the lock, gathers the facts through the plugins, asks the kernel to decide, carries out each decision through the plugins, and writes the trace.
 
@@ -41,61 +41,67 @@ A **unit** is a story or a slice: anything that runs a workflow. Commands that a
 
 **Workflows are data.** A workflow is a YAML file: its steps, and for each step the outcomes it may end with and where each one leads. The pack ships them (`sdlc`: `triage`, `reproduce`, `refinement`, `story`, `slice`, `quick`, with the steps several share in `shared/`); a file in `.agents/workflows/` (or `.agents/workflows/shared/`) replaces the pack's file of the same name or adds a new one, and goes through the same checks. A story takes its workflow at intake, from its label `norn:wf:<name>`, else the config's default (`kernel.workflow`, `story` when unset). A unit pins its workflow when it starts, so editing a file never changes a story already in flight.
 
-A **step** is one node of a workflow. Its head key says what happens there:
+A **step** is one node of a workflow. `by:` says who acts there, `do:` what they do, and `with:` how:
 
-| Step | What happens |
+| `by:` | What happens |
 |---|---|
-| `agent:` | an agent does the step, told what it is for by the head's text and, when the step lists `skills:`, with those skills; `by:` picks the executor; it reports an outcome |
-| `check:` | norn runs a command, such as your tests, in the unit's worktree; the exit code is the outcome (`pass` on 0, else `fail`, unless `exits` names another outcome for that code). Files it leaves there that git neither tracks nor ignores (a lockfile an install wrote, a report) are removed once it ends, and its output names them |
-| `gate:` | a person decides: `approve` or `reject` |
-| `slices:` | the story waits while its slices run, each with the slice workflow |
-| `update-branch:`, `integrate:`, `push:`, `verify-base:` | git work by the vcs plugin: merge the base into the story (never a rebase), integrate a slice into the story branch, push, check the merged tree after the base moved |
-| `open-pr:`, `await-merge:` | forge work: open the change (or rewrite its body), then wait for a person to merge it; the merge ends the story |
+| an agent role (`builder`, `reviewer`, `qa`, `investigator`, `writer`) | an agent does what `do:` says, with the skills `with: { skills: […] }` lists; `reads:` is what its brief gives it; it reports an outcome |
+| `shell` | norn runs the command in `do:`, such as your tests, in the unit's worktree, bounded by `limits: { timeout }`; the exit code is the outcome (`pass` on 0, else `fail`, unless `with: { exits }` names another outcome for that code). Files it leaves there that git neither tracks nor ignores (a lockfile an install wrote, a report) are removed once it ends, and its output names them |
+| `person` | a person decides what `do:` says: `approve` or `reject` |
+| `norn.each` | the story waits while its slices run, each with the slice workflow |
+| `vcs.update-branch`, `vcs.integrate`, `vcs.push`, `vcs.verify-base` | git work by the vcs plugin: merge the base into the story (never a rebase), integrate a slice into the story branch, push, check the merged tree after the base moved |
+| `forge.open-pr`, `forge.await-merge` | forge work: open the change (or rewrite its body), then wait for a person to merge it; the merge ends the story |
 
-A step written `use:` brings in a shared file's steps, and `like:` copies another step. An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). A step's `outcomes:` maps each outcome to the next step, `$done` or `$stuck`. Every route back (a failed test sends the story back to `implement`) carries a **counter** with a max, derived from the kind of edge and named `<step>.<outcome>`: a check's `fail` 5, a gate's `reject` 2, a `conflict` 2, `stale` 10, an agent sending work back 3. `max:` on an edge changes its bound, and the `kernel.counters` config keys change the defaults.
+A step kind is named by its namespace: the slot it works over (`vcs.`, `forge.`, `tracker.`), so a workflow moves between providers unchanged, else the plugin that provides it (`vercel.preview`); `norn.` is the core's. Its settings go under `with:`. A step is written with thirteen keys, `by`, `do`, `with`, `reads`, `produces`, `allow`, `attended`, `limits`, `outcomes`, `on`, `description`, `use` and `like`, and the set never grows ([Reference › Steps](reference.md#steps)). A step written `use:` brings in a shared file's steps, and `like:` copies another step. A workflow written in the older form, one head key per step (`agent:`, `check:`, `gate:`, `slices:`, `open-pr:`), still loads, and pins the same document. An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). A step's `outcomes:` maps each outcome to the next step, `$done` or `$stuck`, and on an agent step everything else about the outcome sits on it too: what it means, the verdict it needs and what its report comes with (`fail: { to: implement, verdict: fail, means: "…", produces: [criteria, findings] }`, [Reference › Outcomes](reference.md#outcomes)). Every route back (a failed test sends the story back to `implement`) carries a **counter** with a max, derived from the kind of edge and named `<step>.<outcome>`: a check's `fail` 5, a gate's `reject` 2, a `conflict` 2, `stale` 10, an agent sending work back 3. `max:` on an edge changes its bound, and the `kernel.counters` config keys change the defaults.
 
 ### What steps hand each other
 
-A step hands a file to the steps after it by declaring it. An agent step's `produces:` names each file it writes in the story's spec folder (`describe` produces `pr_body`, written to `pr.md`); a later agent step lists the name under `inputs:`, and a step kind declares what it reads (`open-pr` reads `pr_body`). Two rules hold:
+A step hands a file to the steps after it by declaring it. An agent step's `produces:` lists what each of its outcomes produces unless the outcome lists its own: a file it writes in the story's spec folder (`describe` produces `{ name: pr_body, file: pr.md }`), or a report norn takes with the outcome (`criteria`, `findings`). A later agent step lists a file's name under `reads:`, and a step kind declares what it reads (`open-pr` reads `pr_body`). Two rules hold:
 
 - **Inputs.** A step reads only what the host provides or what an earlier step on every path to it produces. A file breaking it is refused when it loads, with the step and one path that lacks a producer. A route back is fine: what counts is that a producer comes first on every path.
 - **Outputs.** A report is accepted only with everything its outcome produces. `norn done` is refused while a declared file is missing or empty in the worktree, and says which file to write. It checks only that the file is there and not empty, not that this run wrote it: a file an earlier pass left passes the check, so a step that must rewrite it says so in its text.
 
 A step kind may read a name with a fallback instead: it runs without the file, and says what it does then. `open-pr` reads `pr_body` that way, because the light path of a base update (only the base moved) reaches it again without `describe`, on a change an earlier pass already described.
 
-### What an agent step may write
+### What an agent step may do
 
-An agent step writes in its unit's worktree. `writes: docs` narrows that to the story's documents: the files in its spec folder, `.agents/specs/<story>/` (the spec, the handoffs, the slice files, `pr.md`), and files outside the repo, such as a findings file under `$TMPDIR`. The pack's review steps say it, so a review reports what needs changing as findings and never edits the code; QA and the build steps write their worktree.
+An agent step's role says what its agent may be granted, and its `allow:` may narrow that, never widen it; the person's `policy.allow` caps both. What is left is the step's **grant**, stated in its brief under Rules. Its code level matters most: a builder keeps what it changes (`code:write`), QA changes the code only to try things out and norn resets it once QA reports (`code:scratch`), and a review only reads it (`code:read`), so it reports what needs changing as findings and never edits the code.
 
 ```yaml
 review:
-  agent: "Review this slice's diff against its acceptance criteria and the spec."
-  skills: [norn-review]
-  writes: docs
-  hand_back: { changes_requested: findings }
-  outcomes: { approve: integrate, changes_requested: implement }
+  by: reviewer                # code:read, docs:write, exec:checks, out:findings
+  do: "Review this slice's diff against its acceptance criteria and the spec."
+  with: { skills: [norn-review] }
+  outcomes:
+    approve: integrate
+    changes_requested: { to: implement, produces: [findings] }
 ```
 
-The worktree hooks hold it (below), so a `writes: docs` step runs only on an executor whose harness can refuse a tool call: on any other, the unit parks `stuck` (`agent.unguarded`) before an agent starts, naming the step and the executor. `by:` on the step, or another default executor, lets it run. `writes: worktree` is the default and can be left out.
+A step that may only read code writes only the story's documents: its spec folder, `.agents/specs/<story>/` (the spec, the handoffs, the slice files, `pr.md`), the reports in the run folder's `out/` (`$NORN_OUT`), and files outside the repo. The worktree hooks hold that (below), so such a step runs only on an executor whose harness can refuse a tool call: on any other, the unit parks `stuck` (`agent.unguarded`) before an agent starts, naming the step and the executor. Another executor, bound to the role or the step, lets it run.
+
+A shell write gets past the hooks, so a step that may not keep code is also checked: before its agent starts norn notes what the agent could change (a snapshot, under a receipt), `norn done` refuses what its level does not allow, and before the report routes the next tick kills the run's processes, checks again and resets what a scratch run changed. A change it finds only then parks the unit for the person. What this catches and what it cannot is in [Reference › What an agent step may do](reference.md#what-an-agent-step-may-do); `exec:` and `tracker:` capabilities are the brief's word alone. The older form names no role and says `writes: docs` to keep a step to its documents.
 
 ### Signals
 
-A **signal** is a fact about the world outside a waiting step, which a tick reads: the base moved under the story (`stale`), the story branch holds commits its change lacks (`unpushed`), the step has waited too long (`timeout`). `outcomes:` says how a step ends by itself; a step's `on:` block says what may move it along while it waits, with the same route shape:
+A **signal** is a fact about the world outside a waiting step, which a tick reads: the base moved under the story (`vcs.stale`), the story branch holds commits its change lacks (`vcs.unpushed`), the step has waited too long (`norn.timeout`). `outcomes:` says how a step ends by itself; a step's `on:` block says what may move it along while it waits, with the same route shape:
 
 ```yaml
 ready:
-  gate: "Read the draft PR. Approve to wait for the merge, or reject with what to change."
+  by: person
+  do: "Read the draft PR. Approve to wait for the merge, or reject with what to change."
   outcomes:
     approve: merge
     reject:  { exit: rejected }
   on:
-    stale:    { exit: stale }
-    unpushed: open-pr
-    timeout:  { after: 48h, to: remind }
+    vcs.stale:    { exit: stale }
+    vcs.unpushed: open-pr
+    norn.timeout: { after: 48h, to: remind }
 ```
 
-- **Only waiting steps.** `on:` sits on a gate or a wait step kind (`await-merge`). A running agent or check is never moved by a signal, and `on:` on one is refused when the workflow loads.
-- **Only declared signals.** The host reports `stale` and `unpushed` (from the vcs) and `timeout` (from the clock) itself; a plugin may declare more. A name no source declares is refused, and so is one under both `outcomes:` and `on:`.
+A signal is named by its namespace as a step kind is. When `vcs.stale` fires is set once for the whole workflow, under `signals:` (`signals: { vcs.stale: { when: conflict, verify: test } }`), and `entries:` names the step `norn story update-branch` re-enters (`entries: { update-branch: update }`); the older form writes both as `base: { stale, verify, step }`.
+
+- **Only waiting steps.** `on:` sits on a person step or a wait step kind (`forge.await-merge`). A running agent or check is never moved by a signal, and `on:` on one is refused when the workflow loads.
+- **Only declared signals.** The host reports `vcs.stale` and `vcs.unpushed` (from the vcs) and `norn.timeout` (from the clock) itself; a plugin may declare more. A name no source declares is refused, and so is one under both `outcomes:` and `on:`.
 - **Only the story.** A tick asks a source only for the story's own unit at a waiting step, and only for the signals under that step's `on:`. Slices get none.
 - **Once per occurrence, per round.** Each signal names its occurrence with an id (the base commit for `stale`, the story head for `unpushed`, the step visit for `timeout`). One id moves the story once in a round; a new base move, a new push or a new visit is a new id. The first signal listed that is present wins, one per tick.
 - **Endings and the step's own answer come first.** A merged change, a closed item or a closed change is decided before any signal, and a wait step kind's own outcome on the same tick wins over one.
@@ -105,13 +111,15 @@ A signal may carry a small `detail` (a failed check, a review's comments); the n
 
 ## Who does what: attended steps, gates and modes
 
-- An **attended step** (`attended: true`) is an agent step done *with* a person in the agent's pane. A person always starts it.
-- A **gate** is a step with no agent: a person approves it (`norn story approve <story>`) or rejects it with what to change (`norn story reject <story> --reason "…"`), and the reason goes into the next attempt's brief.
+- An **attended step** (`attended: person`; `attended: true` in the older form) is an agent step done *with* a person in the agent's pane. A person always starts it, and it runs only in a runner with presence: on one without, it parks `stuck` (`agent.no_presence`) and never runs with nobody beside it. `attended: agent` names a supervisor beside the agent instead, and `none` (the default) nobody; each runs in the runner `runners:` gives it. A **supervisor** is an agent norn launches beside a step's run to stand in for the person, only where the person's own policy grants it: it answers the question an `attended: agent` step's agent asked, or hands it back, and its answer reaches the agent as the supervisor's, granting nothing. A question that names a merge, a push or a write past the repo, and any past the step's `limits.asks`, waits for the person in the mailbox, never in a stuck unit.
+- A **gate** is a step with no agent (`by: person`): a person approves it (`norn story approve <story>`) or rejects it with what to change (`norn story reject <story> --reason "…"`), and the reason goes into the next attempt's brief.
 - The **mode** says who starts the other agent steps. In **auto** mode norn starts the agent itself. In **manual** mode the step waits for a person, and `norn run start <unit>` starts it, for that step only. `norn init` picks auto with the headless runner, where nobody sits beside the agent, and manual with Herdr; a workflow's `mode` and `kernel.mode` in the config set it too.
 
 Checks and the git and forge steps always run on their own. Gates, attended steps and a waiting merge always wait for a person, in either mode.
 
-Some commands are a person's alone: deciding a gate (`norn story approve`, `reject`), answering a question (`norn story answer`), starting a round (`norn story round`), taking a story to this machine (`norn story take`), updating a finished story's branch (`norn story update-branch`), closing a story (`norn story close`), starting, stopping or rerunning a run (`norn run start`, `stop`, `rerun`) and `norn tidy`. norn refuses each of them inside an agent's session, the process tree every launch marks with `NORN_UNIT` and `NORN_RUN_ID`, whatever the harness or runner (`person_only`, exit 3). The agent asks instead (`norn ask "…"`). A person working in an attended step's pane types into that same session, so they run these from a shell of their own. No flag lifts the refusal.
+What a person stands on is theirs to set. The **policy** (`policy:`, granted in `~/.norn/config.yaml` alone; a repo file may only narrow it) names what may stand in for them: the gates a supervisor may decide (`stand_in.gates`) and the `attended: agent` steps whose questions it may answer (`stand_in.attended`); its `allow` caps what any step may be granted. A supervisor answers questions today; no granted gate is handed to one yet, since that waits on an OS sandbox around every agent and on bounds not built (what the steps after a delegated gate may do, who may author the story's item), so every gate still waits for the person. Every workflow already loads on a **floor**: a person's step no grant delegates stands on every path to a step whose kind reaches past the repo, spends money or writes to the forge (`forge.await-merge`, which marks the draft ready). And a repo workflow whose change touches a person's step, `attended:` or `allow:` is **held** until the person confirms it (`norn workflow confirm`): new rounds run the revision they last confirmed, or the pack's ([Workflow floor and confirmation](reference.md#workflow-floor-and-confirmation)).
+
+Some commands are a person's alone (a supervisor the person's policy grants stands in for the first two only through its own run's `norn done`, never through these commands): deciding a gate (`norn story approve`, `reject`), answering a question (`norn story answer`), starting a round (`norn story round`), taking a story to this machine (`norn story take`), updating a finished story's branch (`norn story update-branch`), closing a story (`norn story close`), starting, stopping or rerunning a run (`norn run start`, `stop`, `rerun`), confirming a held workflow (`norn workflow confirm`), setting the policy (`norn config set policy.…`) and `norn tidy`. norn refuses each of them inside an agent's session, the process tree every launch marks with `NORN_UNIT` and `NORN_RUN_ID`, whatever the harness or runner (`person_only`, exit 3). It reads the mark in the command's own env and in the env each process above it was started with, so an agent that clears the variables in its shell is still refused; what remains open is in [Limitations](limitations.md#limits-of-the-design). The agent asks instead (`norn ask "…"`). A person working in an attended step's pane types into that same session, so they run these from a shell of their own. No flag lifts the refusal.
 
 ## What needs you
 
@@ -139,9 +147,10 @@ Each unit works in its own git worktree, made by the vcs plugin in the machine d
 
 - **Skills.** The pack's skills go to `.agents/skills/<name>/`, linked from the harness's own folder (`.claude/skills/<name>`, `.pi/skills/<name>`), in every unit worktree before a launch and in the main checkout when `norn init` or `norn doctor` runs, so a person's own session finds the skills a person runs (`/norn-fsd`, `/norn-fsd-round`, `/norn-retro`, `/norn-triage`). They are ignored by git. A skill folder the repo commits, or a person keeps, under the same name is theirs and wins over the pack's.
 - **The spec and the handoff.** The story's spec is `.agents/specs/<story>/spec.md`, mirrored from the tracker item; each unit's **handoff** is `.agents/specs/<story>/handoffs/<unit>.md`, the unit's current state in prose (goal, proof, what is easy to miss, notes, the next action), rewritten by whoever works on it. The agent edits both in place; norn reads them back when it reports, and keeps them with the run data, never on the branch.
-- **Other inputs.** The last check's output, a rejection's findings and the like go to `.agents/inputs/`, rewritten for every run. A step lists the ones it reads under `inputs:`, by the names in [Reference › Inputs](reference.md#inputs).
+- **The run folder.** The last check's output, a rejection's findings and the like go to `.agents/run/in/`, rewritten for every run. A step lists the ones it reads under `reads:`, by the names in [Reference › Inputs](reference.md#inputs). The agent writes its reports (findings, a criteria report, evidence) to `.agents/run/out/`, which every launch empties, so `norn done` collects only what this run wrote. Both folders reach the agent's env as `$NORN_IN` and `$NORN_OUT`.
+- **Sources.** A workflow may name places its steps read that are neither norn's nor the code, such as design assets, under `sources:`; each machine binds one in its config (`sources.<name>`) unless the workflow gives it a path in the repo. The brief names where each is; a step that needs one nothing binds waits for a person ([Reference › Sources](reference.md#sources)).
 - **Produced files.** A file a step declares under `produces:` is written by its agent in the spec folder. norn reads it back with the spec and the handoff when the agent reports, and writes it into the worktree of a later step that lists its name, so a slice in its own worktree gets it too.
-- **Hooks.** The harness wires norn's hooks into the tool's local settings in that worktree (`.claude/settings.local.json` for Claude Code, an extension for pi). They feed norn the agent's events, keep it from ending a turn without a report, and refuse a file write outside the worktree or into norn's run state; on a `writes: docs` step, also one in the worktree outside the story's spec folder, with a reason telling the agent to hand back findings instead. The step's rule comes from the run's record; a docs-only run is also launched with `NORN_WRITES=docs`, which the hooks hold when the record cannot be read, so they never fall back to the worktree rule. They judge the agent tool's file writes (Claude Code's `Write`, `Edit`, `MultiEdit`, `NotebookEdit`; pi's `write`, `edit`), following a link to where a write really lands. A shell command is never judged, so `echo x > src/a.ts` or a formatter run from the shell gets through on any step: `writes: docs` keeps a review from editing code by mistake, not an agent set on it; the review skill asks the same of the agent in words.
+- **Hooks.** The harness wires norn's hooks into the tool's local settings in that worktree (`.claude/settings.local.json` for Claude Code, an extension for pi). They feed norn the agent's events, keep it from ending a turn without a report, and refuse a file write outside the worktree or into norn's run state; on a `writes: docs` step, also one in the worktree outside the story's spec folder and the run folder's `out/`, with a reason telling the agent to hand back findings instead. The step's rule comes from the run's record; a docs-only run is also launched with `NORN_WRITES=docs`, which the hooks hold when the record cannot be read, so they never fall back to the worktree rule. They judge the agent tool's file writes (Claude Code's `Write`, `Edit`, `MultiEdit`, `NotebookEdit`; pi's `write`, `edit`), following a link to where a write really lands. A shell command is never judged, so `echo x > src/a.ts` or a formatter run from the shell gets through on any step: `writes: docs` keeps a review from editing code by mistake, not an agent set on it; the review skill asks the same of the agent in words.
 
 The branch, and the PR, hold only the code.
 
@@ -170,7 +179,7 @@ Config comes in layers, each overriding the one before:
 3. `.agents/norn.local.yaml`: you, in this repository (kept out of git);
 4. `.agents/norn.yaml`: the team's, committed.
 
-The committed file wins over everyone's own, so a key it sets is the team's: `norn config set` still writes your file, but says when the committed file overrides what it wrote. With `--commit`, `norn init` leaves the mode out of the committed file and writes it to yours.
+The committed file wins over everyone's own, for every key but the policy, so a key it sets is the team's; the policy goes the other way, granted only in your own file and narrowed by a repo file, never widened ([Policy](reference.md#policy)): `norn config set` still writes your file, but says when the committed file overrides what it wrote. With `--commit`, `norn init` leaves the mode out of the committed file and writes it to yours.
 
 `norn init` writes `.agents/norn.local.yaml` (or `.agents/norn.yaml` with `--commit`) with every slot named: tracker, forge, store, the executors, the base branch and the mode, and the test command it detects from your build files as `checks.test`, which the shipped workflows' test steps run (default `bun test`): a JS repo's lockfile names its tool, and with none, bun when it is on PATH and a `package.json` script runs it, else npm, installing without writing a lockfile into the unit's worktree. `norn config show` prints the merged config and which file set each key, `norn config get <key>` one key and the file that set it, and `norn config set <key> <value>` changes one (in the local file, the committed one with `--commit`, the user file with `--user`). Each slot is `{use: <plugin name>, …}` with that plugin's own keys beside `use`; the plugin checks them. `norn doctor` checks the config, the plugins it picks, the workflows (a repo file that still routes `stale` or `unpushed` under a waiting step's `outcomes:` draws a warning naming the move to `on:`; a repo workflow naming a skill norn cannot find draws a warning, never a failure: a skill counts as found when the pack ships it or the repo keeps `<name>/SKILL.md` in `.agents/skills/` or a harness's skills folder, and a `plugin:skill` name is not looked for, since the harness may load either kind from outside the repo), the labels norn puts on items (defining any the tracker lacks), that each harness's hook line runs (outside a run, so not that a hook records its event), the pack's skills in the main checkout (written or brought up to date, those a newer pack dropped removed, a folder the repo keeps named), a shared store's run data against the remote's for every story this machine holds, the tools on PATH (git 2.38 or later, `gh` logged in for GitHub) and the git remotes a forge and the refs store push to, and says what to fix first; `norn watch` refuses an older git.
 
@@ -184,7 +193,7 @@ A config left by norn 0.35 or earlier is never read: its keys mean other things 
 | slice | A piece of a story with its own branch and worktree, merged back into the story. |
 | unit | A story or a slice: anything that runs a workflow and has its own run data and handoff. |
 | workflow | A YAML graph of steps, shipped in a pack or written in `.agents/workflows/`. |
-| step | One node of a workflow, named by its head key: `agent`, `check`, `gate`, `slices`, or a plugin's step kind. |
+| step | One node of a workflow; `by:` names who acts there: an agent role, `person`, `shell`, or a step kind as `<namespace>.<kind>`. |
 | run | One attempt at a step; it produces receipts. |
 | round | One run of a workflow over a story, from its first step to its end; a person starts the next with `norn story round`. |
 | outcome | How a step ended, spelled as its reporter types it (`done`, `approve`, `stuck`, …). |
@@ -206,8 +215,12 @@ A config left by norn 0.35 or earlier is never read: its keys mean other things 
 | slot | A kind of part a plugin provides: harness, tracker, forge, store, vcs, runner, step kind or pack. |
 | pack | Workflows, shared files and skills shipped together as one plugin. |
 | harness | The plugin for one agent tool (Claude Code, pi): its hooks, its launch, its events. |
-| runner | Where an agent process runs: headless or a Herdr pane. |
-| executor | A named harness in a runner, which an agent step runs on. |
+| runner | Where an agent process runs: headless or a Herdr pane, picked by the step's `attended:`. |
+| role | What an agent step's `by:` names: what its agent is for and the capabilities it may be granted, registered by the pack. |
+| grant | What an agent step may do: its role's capabilities, narrowed by its `allow:` and capped by the person's policy; its code level says whether the step keeps, resets or may not change the code. |
+| supervisor | An agent norn launches beside a step's run to stand in for the person where their own policy grants it: it answers an `attended: agent` step's question, or hands it back to the person; deciding a granted gate is not built yet. |
+| sandbox | An OS boundary a runner or harness declares around the agent (`sandbox`), keeping it from the store, git's refs, hooks and config, the main checkout and the network; no shipped one has it, and no gate is handed to a supervisor without it (nor yet with it). |
+| executor | A named harness and model on this machine, which the config binds to an agent step's role or the step itself. |
 | store | Where run data, claims and the mailbox live: the machine dir or git refs. |
 | trace | The per-tick record of facts and decisions, kept outside the repository. |
 | verdict | How one acceptance criterion fared in QA: `pass`, `fail`, `person` or `unverified`. |

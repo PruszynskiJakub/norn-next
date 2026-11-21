@@ -32,10 +32,20 @@ export function mergeLayers(layers: readonly unknown[]): Mapping {
   return out;
 }
 
+/** Maps whose keys may hold a dot themselves: a `bind:` key names a workflow's step as `<workflow>.<step>`. */
+const DOTTED_KEYS: readonly string[] = ["bind"];
+
+/** A dotted key's path (`tracker.intake.label`), the rest of the key kept whole under a map whose keys hold dots (`bind.story.review`). */
+export function keyPath(key: string): string[] {
+  const parts = key.split(".");
+  const head = parts[0] as string;
+  return DOTTED_KEYS.includes(head) && parts.length > 2 ? [head, parts.slice(1).join(".")] : parts;
+}
+
 /** The value at a dotted key (`tracker.intake.label`), or undefined. */
 export function getKey(config: unknown, key: string): unknown {
   let at: unknown = config;
-  for (const part of key.split(".")) {
+  for (const part of keyPath(key)) {
     if (!isMapping(at)) return undefined;
     at = at[part];
   }

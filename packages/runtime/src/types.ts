@@ -3,7 +3,7 @@
  * sessions through, and what one tick reports. The ports are interfaces here so the tick host is
  * tested with fakes; the runners and the hook ingestion that fill them live outside this package.
  */
-import type { BriefInputs, Decision, KernelConfig, SessionFacts } from "@norn/kernel";
+import type { BriefInputs, Decision, KernelConfig, SessionFacts, SupervisorSubject } from "@norn/kernel";
 import type { HostContext, IntakeQuery, NornPlugin, PluginResult, RunnerSplitRequest } from "@norn/plugin-api";
 import type { StepWrites } from "@norn/schema";
 import type { RepoWorkflows } from "./repo-workflows.ts";
@@ -57,6 +57,17 @@ export interface RuntimeConfig {
   traceRetainMs?: number | null;
   /** the commands a check step names as `{checks.<name>}`, over DEFAULT_CHECKS */
   checks?: Record<string, string>;
+  /**
+   * What the person's policy lets stand in for them, each a step as `<workflow>.<step>`: the gates a
+   * supervisor may decide and the `attended: agent` steps whose questions it may answer. A granted gate is no
+   * person's step to the floor a workflow is checked against. Absent: nothing is granted.
+   */
+  standIn?: StandIn;
+}
+
+export interface StandIn {
+  gates: readonly string[];
+  attended: readonly string[];
 }
 
 /** What the launcher needs to start one agent run; the brief is the kernel's inputs, rendered by the launcher. */
@@ -72,6 +83,8 @@ export interface AgentRunRequest {
   resume?: string;
   /** what the step lets the agent write; `docs` is held by the write guard alone, so it needs a harness that can deny a tool */
   writes?: StepWrites;
+  /** a supervisor's launch, beside the step's own run: briefed with what it stands in for, not with the step's brief */
+  supervisor?: { subject: SupervisorSubject; input_id?: string };
 }
 
 /** How this launcher can run an agent: with nobody watching (auto mode needs it), or where a person works beside it. */
@@ -88,6 +101,8 @@ export interface ExecutorModes extends LauncherModes {
   dialogKeys: boolean;
   /** the runner can bring a run's pane in front of a person */
   focus: boolean;
+  /** the runner keeps the agent inside an OS sandbox */
+  sandbox?: boolean;
 }
 
 export interface AnswerOptions {
@@ -170,6 +185,8 @@ export interface RuntimeDeps {
   tickId?: () => string;
   /** the repo's own workflow files, laid over the pack's (repo-workflows.ts); absent: the pack's alone */
   repoWorkflows?: RepoWorkflows;
+  /** the revisions the person confirmed, each one's text by workflow name (confirm.ts); absent: none */
+  confirmedWorkflows?: Readonly<Record<string, string>>;
 }
 
 /** How carrying out one decision went. A failure is recorded and the tick goes on with the next unit. */

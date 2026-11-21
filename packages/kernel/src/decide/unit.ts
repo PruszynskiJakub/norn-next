@@ -7,15 +7,15 @@
  */
 import type { Decision, DecisionOf } from "../model/actions.ts";
 import type { StoryFacts, UnitFacts } from "../model/facts.ts";
-import type { RunState } from "../model/run-state.ts";
+import { ASKED_PARK, type RunState } from "../model/run-state.ts";
 import type { DecideContext } from "./context.ts";
+import { checkDue } from "./check-due.ts";
 import { applyAction, markCorrupt } from "./record.ts";
+import { decideQuestion, GATE_PARK } from "./supervisor.ts";
 import { decideAgent } from "./unit-agent.ts";
 import { decideCheck, decideGate, decidePluginStep } from "./unit-steps.ts";
 import { applyDecision, noop, type UnitView } from "./unit-support.ts";
 
-/** The park of a gate waiting on its decision. */
-const GATE_PARK = "gate.park";
 
 /**
  * Parks the unit rules derive from facts each tick, by the rule that parks. A park with any other
@@ -27,6 +27,8 @@ export const DERIVED_PARKS: ReadonlySet<string> = new Set([
   "agent.ready.no_headless",
   "agent.no_executor",
   "agent.unguarded",
+  "agent.no_presence",
+  "source.unbound",
   "agent.asking.park",
   "agent.permission.park",
   "agent.no_events.park",
@@ -64,7 +66,9 @@ export function decideUnit(story: StoryFacts, unit: UnitFacts, ctx: DecideContex
   const parked = state.parked;
   const derived = parked !== undefined && DERIVED_PARKS.has(parked.reason);
   const view: UnitView = { story, unit, state: derived ? unparked(state) : state, graph, step, ctx };
-  // receipts always win over session and step facts
+  // receipts always win over session and step facts, once a report that may not keep code is checked
+  const check = checkDue(unit, view.state, step, ctx);
+  if (check) return check;
   if (unit.receipts.length) {
     const d = keepVisitPark(applyDecision(view, "receipts.apply", []), state);
     if (d.rejected.length === unit.receipts.length) return { ...d, rule: "receipts.reject" };
@@ -72,6 +76,10 @@ export function decideUnit(story: StoryFacts, unit: UnitFacts, ctx: DecideContex
     return undelivered.length > 0 ? { ...d, rule: "receipts.apply.undelivered", undelivered } : d;
   }
   if (state.ended) return noop(view, `unit.ended.${state.ended}`, state.ended_reason ?? state.ended);
+  if (parked?.reason === ASKED_PARK) {
+    const question = decideQuestion(view);
+    if (question) return question;
+  }
   if (parked && !derived) return noop(view, "unit.parked", parked.reason);
 
   const d = decideStep(view);

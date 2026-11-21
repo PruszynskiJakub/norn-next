@@ -99,8 +99,8 @@ export async function team(): Promise<Team> {
  */
 function localPack(): NornPlugin {
   const shared = { ...SDLC_PACK.shared };
-  const ship = parse(shared["ship.yaml"] as string) as { steps: { ci: { check: string } } };
-  ship.steps.ci.check = 'echo "no CI in this repo"';
+  const ship = parse(shared["ship.yaml"] as string) as { steps: { ci: { do: string } } };
+  ship.steps.ci.do = 'echo "no CI in this repo"';
   shared["ship.yaml"] = stringify(ship);
   return defineNornPlugin({ name: "test-pack", api: "^1.4", provides: { packs: { local: { workflows: { ...SDLC_PACK.workflows, ...WORKFLOWS }, shared, skills: {} } } } });
 }

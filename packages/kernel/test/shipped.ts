@@ -12,20 +12,23 @@ import { DEFAULT_KERNEL_CONFIG, type LoadedWorkflow, loadWorkflow, type StepKind
 const ROOT = join(import.meta.dir, "..", "..", "..");
 export const SHIPPED = join(ROOT, "packages", "pack-sdlc", "assets", "workflows");
 
-export const kind = (name: string, outcomes: string[], mode: "effect" | "wait" = "effect", configSchema: TSchema = Type.Object({}, { additionalProperties: false })): StepKindInfo => ({
-  name,
-  configSchema,
-  outcomes,
-  mode,
-});
+export const kind = (
+  name: string,
+  outcomes: string[],
+  mode: "effect" | "wait" = "effect",
+  configSchema: TSchema = Type.Object({}, { additionalProperties: false }),
+  slot?: StepKindInfo["slot"],
+): StepKindInfo => ({ name, configSchema, outcomes, mode, ...(slot && { slot }) });
+
+const NONE = Type.Object({}, { additionalProperties: false });
 
 /** The step kinds the shipped workflows use, as the plugins that provide them declare them. */
 export const STEP_KINDS: Record<string, StepKindInfo> = {
-  "update-branch": kind("update-branch", ["done", "conflict", "clean", "resolved"]),
-  integrate: kind("integrate", ["done", "conflict"]),
-  "open-pr": { ...kind("open-pr", ["done"]), reads: [{ name: "pr_body", fallback: "the body file an earlier pass left, else norn's footer alone" }] },
-  push: kind("push", ["done"]),
-  "await-merge": kind("await-merge", ["merged", "unpushed"], "wait"),
+  "update-branch": kind("update-branch", ["done", "conflict", "clean", "resolved"], "effect", NONE, "vcs"),
+  integrate: kind("integrate", ["done", "conflict"], "effect", NONE, "vcs"),
+  "open-pr": { ...kind("open-pr", ["done"], "effect", NONE, "forge"), reads: [{ name: "pr_body", fallback: "the body file an earlier pass left, else norn's footer alone" }] },
+  push: kind("push", ["done"], "effect", NONE, "vcs"),
+  "await-merge": { ...kind("await-merge", ["merged", "unpushed"], "wait", NONE, "forge"), effects: ["forge-write"] },
 };
 
 export const readShipped = (file: string): Record<string, unknown> => parse(readFileSync(join(SHIPPED, file), "utf8"));

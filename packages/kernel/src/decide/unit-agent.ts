@@ -11,11 +11,13 @@
  */
 import type { Mode } from "@norn/schema";
 import type { Decision } from "../model/actions.ts";
-import type { ExecutorCapabilities } from "../model/capabilities.ts";
+import { type ExecutorCapabilities, launchTarget } from "../model/capabilities.ts";
 import type { ClassifiedOutcome } from "../model/receipts.ts";
 import type { RunInfo } from "../model/run-state.ts";
 import type { SessionFacts } from "../session/view.ts";
+import { codeLevelOf, docsOnlyGrant, grantOf } from "../model/grant.ts";
 import type { AgentStepSpec } from "../workflow/graph.ts";
+import { stepCandidates } from "./supervisor.ts";
 import { ageMs, applyDecision, intentFor, noop, parkDecision, type UnitView } from "./unit-support.ts";
 
 /** The story's own mode, then the workflow's, then the config's. */
@@ -31,9 +33,49 @@ function personDrives(v: UnitView): boolean {
   return effectiveMode(v) === "manual" && v.state.requested === undefined;
 }
 
-/** The executor a step runs on: its `by:`, else the config's. */
-export function executorOf(v: UnitView, spec: AgentStepSpec): string {
-  return spec.executor ?? v.ctx.config.executor;
+function candidatesOf(v: UnitView, spec: AgentStepSpec): readonly string[] {
+  return stepCandidates(v.ctx.config, v.state.workflow.name, v.state.step, spec);
+}
+
+type Match = { ok: true; target: string; caps: ExecutorCapabilities } | { ok: false; rule: string; text: string };
+
+/**
+ * Whether `executor` can run the step, and under which name: in its own runner, else in the runner the
+ * step's attendance picks (`launchTarget`). A person beside the agent needs a runner with presence, and
+ * a docs-only step a harness that denies a tool: both are facts, so a binding that cannot hold the step
+ * parks it before any agent starts, never at the launcher.
+ */
+function matchExecutor(v: UnitView, spec: AgentStepSpec, executor: string): Match {
+  const byAttendance = launchTarget(executor, spec.attended);
+  const target = capsOf(v, byAttendance) ? byAttendance : executor;
+  const caps = capsOf(v, target);
+  const runsElsewhere = Object.keys(v.ctx.facts.capabilities.executors).some((k) => k.startsWith(`${executor}@`));
+  const fixPresence = `set runners.person to a runner with presence (norn config set runners.person herdr)`;
+  if (!caps && runsElsewhere && spec.attended === "person")
+    return { ok: false, rule: "agent.no_presence", text: `step '${v.state.step}' is attended: person, but no runner is set for it to run executor '${executor}' in: ${fixPresence}` };
+  if (!caps && runsElsewhere) return { ok: false, rule: "agent.no_executor", text: `executor '${executor}' has no runner for attended: ${spec.attended}: set runners.${spec.attended}` };
+  if (!caps) return { ok: false, rule: "agent.no_executor", text: `executor '${executor}' is not configured` };
+  if (spec.attended === "person" && !caps.attended)
+    return {
+      ok: false,
+      rule: "agent.no_presence",
+      text:
+        target === executor
+          ? `step '${v.state.step}' is attended: person, but executor '${executor}' runs in a runner without presence, where nobody could work beside its agent: give it one with presence (norn config set executors.${executor}.runner herdr), or bind the step to an executor that has one`
+          : `step '${v.state.step}' is attended: person, but runners.person runs executor '${executor}' without presence, where nobody could work beside its agent: ${fixPresence}`,
+    };
+  const guardless = unguardedText(v, spec, target, caps);
+  if (guardless) return { ok: false, rule: "agent.unguarded", text: guardless };
+  return { ok: true, target, caps };
+}
+
+/** The first candidate that can run the step; with none, the first one's rule and every one's reason. */
+function chooseExecutor(v: UnitView, spec: AgentStepSpec): Match {
+  const tried = candidatesOf(v, spec).map((e) => matchExecutor(v, spec, e));
+  const found = tried.find((m) => m.ok);
+  if (found) return found;
+  const failed = tried as Extract<Match, { ok: false }>[];
+  return { ok: false, rule: (failed[0] as Extract<Match, { ok: false }>).rule, text: failed.map((m) => m.text).join("; ") };
 }
 
 function capsOf(v: UnitView, executor: string): ExecutorCapabilities | null {
@@ -55,6 +97,7 @@ export function decideAgent(v: UnitView, spec: AgentStepSpec): Decision {
 }
 
 function briefOf(v: UnitView, spec: AgentStepSpec) {
+  const grant = grantOf(spec, v.ctx.config);
   return {
     workflow: v.state.workflow.name,
     hash: v.state.workflow.hash,
@@ -64,31 +107,55 @@ function briefOf(v: UnitView, spec: AgentStepSpec) {
     inputs: structuredClone(spec.inputs),
     ...(spec.model !== undefined && { model: spec.model }),
     ...(v.state.rework_from !== undefined && { rework_from: v.state.rework_from }),
+    ...(grant !== null && { grant }),
   };
 }
 
 /** A docs-only step is held by the write guard alone: on a harness that cannot deny a tool it would run unguarded, so no agent starts, fresh or retried. */
+function unguardedText(v: UnitView, spec: AgentStepSpec, executor: string, caps: ExecutorCapabilities): string | null {
+  if (caps.denyTool) return null;
+  if (spec.writes === "docs") return `step '${v.state.step}' is writes: docs, but executor '${executor}' cannot deny a tool, so its writes would go unguarded; run it on an executor whose harness can (by:)`;
+  const grant = grantOf(spec, v.ctx.config);
+  if (!docsOnlyGrant(grant)) return null;
+  return `step '${v.state.step}' may change no code (code:${codeLevelOf(grant)}), but executor '${executor}' cannot deny a tool, so its writes would go unguarded; bind the step to an executor whose harness can (bind:)`;
+}
+
 function unguarded(v: UnitView, spec: AgentStepSpec, executor: string, caps: ExecutorCapabilities): Decision | null {
-  if (spec.writes !== "docs" || caps.denyTool) return null;
-  return parkDecision(v, "agent.unguarded", "stuck", { text: `step '${v.state.step}' is writes: docs, but executor '${executor}' cannot deny a tool, so its writes would go unguarded; run it on an executor whose harness can (by:)` });
+  const text = unguardedText(v, spec, executor, caps);
+  return text === null ? null : parkDecision(v, "agent.unguarded", "stuck", { text });
+}
+
+/**
+ * A source the step reads that nothing binds, the workflow by its `path:` or this machine's config:
+ * the agent would read a place that is not there, so no agent starts, fresh or retried, until a person
+ * binds it. Derived each tick, so the binding alone lifts the park.
+ */
+function unboundSource(v: UnitView, spec: AgentStepSpec): Decision | null {
+  const unbound = (spec.sources ?? []).find((s) => v.graph.sources?.[s]?.path === undefined && v.ctx.config.sources?.[s] === undefined);
+  if (unbound === undefined) return null;
+  return parkDecision(v, "source.unbound", "stuck", {
+    text: `step '${v.state.step}' reads the source \`${unbound}\`, which nothing binds on this machine: bind it with \`norn config set sources.${unbound} <path>\`, or give it a path: in the workflow`,
+  });
 }
 
 function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
+  const unbound = unboundSource(v, spec);
+  if (unbound) return unbound;
+  // matched before an attended step waits, so a person is never asked to start what cannot run beside them
+  const match = chooseExecutor(v, spec);
+  if (!match.ok) return parkDecision(v, match.rule, "stuck", { text: match.text });
+  const { target: executor, caps } = match;
   // an attended step waits for the person who works beside it to start it (`run.requested`), in either mode
-  if (spec.attended && v.state.requested === undefined) return parkDecision(v, "agent.ready.attended", "attended", { text: spec.instructions });
-  const executor = executorOf(v, spec);
-  const caps = capsOf(v, executor);
-  if (!caps) return parkDecision(v, "agent.no_executor", "stuck", { text: `executor '${executor}' is not configured` });
-  const guardless = unguarded(v, spec, executor, caps);
-  if (guardless) return guardless;
+  if (spec.attended === "person" && v.state.requested === undefined) return parkDecision(v, "agent.ready.attended", "attended", { text: spec.instructions });
   // a person's `run.requested` starts this visit's agent once; manual mode still holds the next step
   if (personDrives(v)) return parkDecision(v, "agent.ready.manual", "manual", { text: spec.instructions });
   // a run a person started may open where they watch it (a pane); one nobody started must run headless
   const personStarted = v.state.requested !== undefined && caps.attended;
   if (!caps.headless && !personStarted) return parkDecision(v, "agent.ready.no_headless", "manual", { text: `auto mode, but executor '${executor}' cannot run headless` });
   const run_id = v.ctx.nextId();
-  // attended only where the person can sit beside it (a pane); started headless, it is retried and nudged as an auto run
-  const attended = spec.attended === true && personStarted;
+  // the match gave a person beside the step a runner with presence, and their start is on the record
+  const attended = spec.attended === "person";
+  const code = codeLevelOf(grantOf(spec, v.ctx.config));
   return {
     kind: "start_run",
     unit: v.unit.id,
@@ -97,7 +164,7 @@ function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
     executor,
     attended,
     brief: briefOf(v, spec),
-    intent: intentFor(v, { kind: "run.started", run_id, run_kind: "agent", executor, attended }),
+    intent: intentFor(v, { kind: "run.started", run_id, run_kind: "agent", executor, attended, ...(code !== "write" && { code }) }),
   };
 }
 
@@ -262,6 +329,8 @@ function quiet(v: UnitView, spec: AgentStepSpec, run: RunInfo, base: string): De
 function retry(v: UnitView, spec: AgentStepSpec, run: RunInfo, rule: string): Decision {
   const caps = capsOf(v, run.executor);
   if (!caps?.headless) return parkDecision(v, "agent.retry.no_headless", "stuck", { text: `run ${run.id} needs a fresh session; executor '${run.executor}' cannot run headless` });
+  const unbound = unboundSource(v, spec);
+  if (unbound) return unbound;
   const guardless = unguarded(v, spec, run.executor, caps);
   if (guardless) return guardless;
   const run_id = v.ctx.nextId();
@@ -274,6 +343,6 @@ function retry(v: UnitView, spec: AgentStepSpec, run: RunInfo, rule: string): De
     executor: run.executor,
     attended: false,
     brief: briefOf(v, spec),
-    intent: intentFor(v, { kind: "run.started", run_id, run_kind: "agent", executor: run.executor, attended: false, retry_of: run.id }),
+    intent: intentFor(v, { kind: "run.started", run_id, run_kind: "agent", executor: run.executor, attended: false, retry_of: run.id, ...(run.code !== undefined && { code: run.code }) }),
   };
 }

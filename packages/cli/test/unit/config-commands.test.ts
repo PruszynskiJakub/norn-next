@@ -72,6 +72,20 @@ describe("norn config set", () => {
     expect(json((await runCli(["config", "set", "kernel.mode", "auto", "--user", "--json"], m.io)).stdout).overridden).toMatchObject({ layer: "repo" });
   });
 
+  test("a policy set in a repo file that names more than the user's file grants is written, and the answer says only the user's file grants it", async () => {
+    const m = machine({ seed: { [PATHS.local]: LOCAL_CONFIG, [PATHS.user]: "format: 1\npolicy: { stand_in: { gates: [story.ready] } }\n" } });
+    const r = await runCli(["config", "set", "policy.stand_in.gates", "[story.ready, story.merge]", "--commit", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(json(r.stdout)).toMatchObject({ layer: "repo", narrowed: { value: ["story.ready"] } });
+    expect(json(r.stdout).overridden).toBeUndefined();
+    const md = await runCli(["config", "set", "policy.stand_in.gates", "[story.ready, story.merge]"], m.io);
+    expect(md.stdout).toContain('the merged value stays ["story.ready"]');
+    expect(md.stdout).toContain("norn config set policy.stand_in.gates [story.ready, story.merge] --user");
+    expect(json((await runCli(["config", "set", "policy.stand_in.gates", "[story.ready]", "--commit", "--json"], m.io)).stdout).narrowed).toBeUndefined();
+    // a narrower repo file never overrides the user's grant: it is the user's file the set widens
+    expect(json((await runCli(["config", "set", "policy.stand_in.gates", "[story.ready, story.merge]", "--user", "--json"], m.io)).stdout)).toMatchObject({ layer: "user", narrowed: { value: ["story.ready"] } });
+  });
+
   test("a key this norn no longer reads is refused as a set and removed by --unset", async () => {
     const m = machine({ seed: { [PATHS.local]: `${LOCAL_CONFIG}kernel:\n  max_agents: 4\n` } });
     const r = await runCli(["config", "set", "kernel.max_agents", "3", "--json"], m.io);

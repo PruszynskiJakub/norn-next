@@ -53,5 +53,6 @@ export const integrate: StepKindDefinition<typeof IntegrateConfig> = {
   configSchema: IntegrateConfig,
   outcomes: ["done", "conflict"],
   mode: "effect",
+  slot: "vcs",
   run,
 };

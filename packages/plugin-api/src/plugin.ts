@@ -55,6 +55,13 @@ export interface NornPlugin {
 
 const HARNESS_METHODS = ["install", "uninstall", "launch", "normalize", "respond"] as const;
 
+/**
+ * Names that lead a workflow's surface names (`norn.each`, `vcs.update-branch`), so a plugin named so
+ * would make `<plugin>.<kind>` mean two things.
+ */
+export const PLUGIN_NAMESPACES_RESERVED = ["norn", "vcs", "forge", "tracker", "store", "harness", "runner", "pack"] as const;
+const RESERVED_NAMES: readonly string[] = PLUGIN_NAMESPACES_RESERVED;
+
 function refuse(plugin: string, why: string): never {
   throw new Error(`norn plugin ${plugin || "(unnamed)"}: ${why}`);
 }
@@ -96,7 +103,8 @@ function freezePack(p: Pack): Pack {
   const copy = (r: Record<string, string>) => Object.freeze({ ...r });
   const skills: Record<string, Readonly<Record<string, string>>> = {};
   for (const [name, files] of Object.entries(p.skills)) skills[name] = copy(files);
-  return Object.freeze({ workflows: copy(p.workflows), shared: copy(p.shared), skills: Object.freeze(skills) });
+  const roles = p.roles && Object.freeze(Object.fromEntries(Object.entries(p.roles).map(([n, r]) => [n, Object.freeze({ ...r, allow: Object.freeze([...r.allow]) })])));
+  return Object.freeze({ workflows: copy(p.workflows), shared: copy(p.shared), skills: Object.freeze(skills), ...(roles && { roles }) });
 }
 
 function slot<T>(plugin: string, name: string, given: Record<string, T> | undefined, checkOne: (plugin: string, key: string, v: T) => void): Readonly<Record<string, T>> | undefined {
@@ -117,6 +125,7 @@ function slot<T>(plugin: string, name: string, given: Record<string, T> | undefi
 export function defineNornPlugin(spec: NornPluginSpec): NornPlugin {
   const name = typeof spec?.name === "string" ? spec.name.trim() : "";
   if (!name) refuse(name, "needs a non-empty name");
+  if (RESERVED_NAMES.includes(name)) refuse(name, `is named like the ${name === "norn" ? "core" : "slot"} ${name}, which leads a surface name`);
   if (typeof spec.api !== "string" || !apiSatisfies(spec.api))
     refuse(name, `wants plugin API ${JSON.stringify(spec.api)}, but this norn implements ${PLUGIN_API_VERSION}`);
   const harness = slot(name, "harness", spec.provides?.harness, checkHarness);

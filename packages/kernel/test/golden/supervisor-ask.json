@@ -1,0 +1,1004 @@
+{
+  "name": "supervisor-ask",
+  "description": "Questions from an attended: agent step the person's policy grants a stand-in: a fresh one starts the supervisor; one naming a merge, or past the step's limits.asks, waits for the person; a supervisor at work is waited on, and one gone quiet or dead hands the question back.",
+  "step_kinds": {
+    "update-branch": {
+      "outcomes": [
+        "done",
+        "conflict",
+        "clean",
+        "resolved"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "integrate": {
+      "outcomes": [
+        "done",
+        "conflict"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "open-pr": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "push": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "await-merge": {
+      "outcomes": [
+        "merged",
+        "unpushed"
+      ],
+      "mode": "wait",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "supervised": {
+        "name": "supervised",
+        "description": "A build step a supervisor stays beside, then a person's gate.",
+        "start": "build",
+        "steps": {
+          "build": {
+            "by": "builder",
+            "do": "Build it.",
+            "attended": "agent",
+            "limits": {
+              "asks": 1
+            },
+            "outcomes": {
+              "done": "ready"
+            }
+          },
+          "ready": {
+            "by": "person",
+            "do": "Ship it?",
+            "outcomes": {
+              "approve": "$done",
+              "reject": "build"
+            }
+          }
+        }
+      }
+    },
+    "pinned": []
+  },
+  "config": {
+    "counterDefaults": {
+      "checkFail": 5,
+      "gateReject": 2,
+      "conflict": 2,
+      "stale": 10,
+      "agentBack": 3
+    },
+    "silentAfterMs": 900000,
+    "maxNudges": 2,
+    "maxRetries": 1,
+    "deadlineMs": 3600000,
+    "mode": "auto",
+    "executor": "claude",
+    "workflow": "supervised",
+    "intakeWorkflowLabelPrefix": "norn:wf:",
+    "sliceWorkflow": "slice",
+    "base": "main",
+    "claimTtlMs": 600000,
+    "claimRenewBeforeMs": 400000,
+    "standIn": {
+      "attended": [
+        "supervised.build"
+      ],
+      "gates": []
+    }
+  },
+  "facts": {
+    "tick_id": "01JD5G00000MR9XA8KKK8P87K1",
+    "now": "2026-11-17T09:00:00.000Z",
+    "holder": "machine-a",
+    "capabilities": {
+      "tracker": {
+        "assign": true,
+        "labels": true,
+        "comment": true,
+        "create": true,
+        "close": true
+      },
+      "forge": {
+        "draft": true,
+        "checks": true,
+        "raw_urls": true
+      },
+      "store": {
+        "shared": false,
+        "claims": "local",
+        "mailbox": true,
+        "artifacts": true
+      },
+      "executors": {
+        "claude": {
+          "blockStop": true,
+          "denyTool": true,
+          "injectContext": true,
+          "subagents": true,
+          "limits": true,
+          "paneInput": false,
+          "headless": true,
+          "attended": true
+        }
+      }
+    },
+    "stories": [
+      {
+        "key": "gh-160",
+        "item": {
+          "id": 160,
+          "key": "gh-160",
+          "title": "Story 160",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-160",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-160",
+            "state": {
+              "format": 1,
+              "unit": "gh-160",
+              "story": "gh-160",
+              "workflow": {
+                "name": "supervised",
+                "hash": "1a08ff22db16ad4c93fae04cb57ec20ae0c00cdbeef2120f22369d26d321a647",
+                "doc": {
+                  "name": "supervised",
+                  "description": "A build step a supervisor stays beside, then a person's gate.",
+                  "start": "build",
+                  "steps": {
+                    "build": {
+                      "outcomes": {
+                        "done": "ready"
+                      },
+                      "role": "builder",
+                      "agent": "Build it.",
+                      "attended": "agent",
+                      "asks": 1
+                    },
+                    "ready": {
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": {
+                          "to": "build",
+                          "counter": "ready.reject"
+                        }
+                      },
+                      "gate": "Ship it?"
+                    }
+                  },
+                  "counters": {
+                    "ready.reject": {
+                      "max": 2
+                    }
+                  }
+                }
+              },
+              "step": "build",
+              "attempt": 1,
+              "counters": {
+                "ready.reject": 0
+              },
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-160-1",
+                "step": "build",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "build": 1
+              },
+              "parked": {
+                "reason": "agent.asked",
+                "since": "2026-11-17T08:59:00.000Z",
+                "text": "Which database should the cache use?",
+                "input_id": "q-gh-160"
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": null
+          }
+        ],
+        "mailbox": []
+      },
+      {
+        "key": "gh-161",
+        "item": {
+          "id": 161,
+          "key": "gh-161",
+          "title": "Story 161",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-161",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-161",
+            "state": {
+              "format": 1,
+              "unit": "gh-161",
+              "story": "gh-161",
+              "workflow": {
+                "name": "supervised",
+                "hash": "1a08ff22db16ad4c93fae04cb57ec20ae0c00cdbeef2120f22369d26d321a647",
+                "doc": {
+                  "name": "supervised",
+                  "description": "A build step a supervisor stays beside, then a person's gate.",
+                  "start": "build",
+                  "steps": {
+                    "build": {
+                      "outcomes": {
+                        "done": "ready"
+                      },
+                      "role": "builder",
+                      "agent": "Build it.",
+                      "attended": "agent",
+                      "asks": 1
+                    },
+                    "ready": {
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": {
+                          "to": "build",
+                          "counter": "ready.reject"
+                        }
+                      },
+                      "gate": "Ship it?"
+                    }
+                  },
+                  "counters": {
+                    "ready.reject": {
+                      "max": 2
+                    }
+                  }
+                }
+              },
+              "step": "build",
+              "attempt": 1,
+              "counters": {
+                "ready.reject": 0
+              },
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-161-1",
+                "step": "build",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "build": 1
+              },
+              "parked": {
+                "reason": "agent.asked",
+                "since": "2026-11-17T08:59:00.000Z",
+                "text": "Which database should the cache use?",
+                "input_id": "q-gh-161"
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": null,
+            "question_reserved": [
+              "merge"
+            ]
+          }
+        ],
+        "mailbox": []
+      },
+      {
+        "key": "gh-162",
+        "item": {
+          "id": 162,
+          "key": "gh-162",
+          "title": "Story 162",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-162",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-162",
+            "state": {
+              "format": 1,
+              "unit": "gh-162",
+              "story": "gh-162",
+              "workflow": {
+                "name": "supervised",
+                "hash": "1a08ff22db16ad4c93fae04cb57ec20ae0c00cdbeef2120f22369d26d321a647",
+                "doc": {
+                  "name": "supervised",
+                  "description": "A build step a supervisor stays beside, then a person's gate.",
+                  "start": "build",
+                  "steps": {
+                    "build": {
+                      "outcomes": {
+                        "done": "ready"
+                      },
+                      "role": "builder",
+                      "agent": "Build it.",
+                      "attended": "agent",
+                      "asks": 1
+                    },
+                    "ready": {
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": {
+                          "to": "build",
+                          "counter": "ready.reject"
+                        }
+                      },
+                      "gate": "Ship it?"
+                    }
+                  },
+                  "counters": {
+                    "ready.reject": {
+                      "max": 2
+                    }
+                  }
+                }
+              },
+              "step": "build",
+              "attempt": 1,
+              "counters": {
+                "ready.reject": 0
+              },
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-162-1",
+                "step": "build",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "build": 1
+              },
+              "parked": {
+                "reason": "agent.asked",
+                "since": "2026-11-17T08:59:00.000Z",
+                "text": "Which database should the cache use?",
+                "input_id": "q-gh-162"
+              },
+              "supervised": {
+                "answered": 1
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": null
+          }
+        ],
+        "mailbox": []
+      },
+      {
+        "key": "gh-163",
+        "item": {
+          "id": 163,
+          "key": "gh-163",
+          "title": "Story 163",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-163",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-163",
+            "state": {
+              "format": 1,
+              "unit": "gh-163",
+              "story": "gh-163",
+              "workflow": {
+                "name": "supervised",
+                "hash": "1a08ff22db16ad4c93fae04cb57ec20ae0c00cdbeef2120f22369d26d321a647",
+                "doc": {
+                  "name": "supervised",
+                  "description": "A build step a supervisor stays beside, then a person's gate.",
+                  "start": "build",
+                  "steps": {
+                    "build": {
+                      "outcomes": {
+                        "done": "ready"
+                      },
+                      "role": "builder",
+                      "agent": "Build it.",
+                      "attended": "agent",
+                      "asks": 1
+                    },
+                    "ready": {
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": {
+                          "to": "build",
+                          "counter": "ready.reject"
+                        }
+                      },
+                      "gate": "Ship it?"
+                    }
+                  },
+                  "counters": {
+                    "ready.reject": {
+                      "max": 2
+                    }
+                  }
+                }
+              },
+              "step": "build",
+              "attempt": 1,
+              "counters": {
+                "ready.reject": 0
+              },
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-163-1",
+                "step": "build",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "build": 1
+              },
+              "parked": {
+                "reason": "agent.asked",
+                "since": "2026-11-17T08:59:00.000Z",
+                "text": "Which database should the cache use?",
+                "input_id": "q-gh-163"
+              },
+              "supervisor": {
+                "id": "sup-gh-163",
+                "subject": "ask",
+                "input_id": "q-gh-163",
+                "executor": "claude",
+                "started_at": "2026-11-17T08:58:00.000Z",
+                "session": "h-sup-gh-163"
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": null
+          }
+        ],
+        "mailbox": []
+      },
+      {
+        "key": "gh-164",
+        "item": {
+          "id": 164,
+          "key": "gh-164",
+          "title": "Story 164",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-164",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-164",
+            "state": {
+              "format": 1,
+              "unit": "gh-164",
+              "story": "gh-164",
+              "workflow": {
+                "name": "supervised",
+                "hash": "1a08ff22db16ad4c93fae04cb57ec20ae0c00cdbeef2120f22369d26d321a647",
+                "doc": {
+                  "name": "supervised",
+                  "description": "A build step a supervisor stays beside, then a person's gate.",
+                  "start": "build",
+                  "steps": {
+                    "build": {
+                      "outcomes": {
+                        "done": "ready"
+                      },
+                      "role": "builder",
+                      "agent": "Build it.",
+                      "attended": "agent",
+                      "asks": 1
+                    },
+                    "ready": {
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": {
+                          "to": "build",
+                          "counter": "ready.reject"
+                        }
+                      },
+                      "gate": "Ship it?"
+                    }
+                  },
+                  "counters": {
+                    "ready.reject": {
+                      "max": 2
+                    }
+                  }
+                }
+              },
+              "step": "build",
+              "attempt": 1,
+              "counters": {
+                "ready.reject": 0
+              },
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-164-1",
+                "step": "build",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "build": 1
+              },
+              "parked": {
+                "reason": "agent.asked",
+                "since": "2026-11-17T08:59:00.000Z",
+                "text": "Which database should the cache use?",
+                "input_id": "q-gh-164"
+              },
+              "supervisor": {
+                "id": "sup-gh-164",
+                "subject": "ask",
+                "input_id": "q-gh-164",
+                "executor": "claude",
+                "started_at": "2026-11-17T08:40:00.000Z",
+                "session": "h-sup-gh-164"
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": null
+          }
+        ],
+        "mailbox": []
+      },
+      {
+        "key": "gh-165",
+        "item": {
+          "id": 165,
+          "key": "gh-165",
+          "title": "Story 165",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-165",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-165",
+            "state": {
+              "format": 1,
+              "unit": "gh-165",
+              "story": "gh-165",
+              "workflow": {
+                "name": "supervised",
+                "hash": "1a08ff22db16ad4c93fae04cb57ec20ae0c00cdbeef2120f22369d26d321a647",
+                "doc": {
+                  "name": "supervised",
+                  "description": "A build step a supervisor stays beside, then a person's gate.",
+                  "start": "build",
+                  "steps": {
+                    "build": {
+                      "outcomes": {
+                        "done": "ready"
+                      },
+                      "role": "builder",
+                      "agent": "Build it.",
+                      "attended": "agent",
+                      "asks": 1
+                    },
+                    "ready": {
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": {
+                          "to": "build",
+                          "counter": "ready.reject"
+                        }
+                      },
+                      "gate": "Ship it?"
+                    }
+                  },
+                  "counters": {
+                    "ready.reject": {
+                      "max": 2
+                    }
+                  }
+                }
+              },
+              "step": "build",
+              "attempt": 1,
+              "counters": {
+                "ready.reject": 0
+              },
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-165-1",
+                "step": "build",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "build": 1
+              },
+              "parked": {
+                "reason": "agent.asked",
+                "since": "2026-11-17T08:59:00.000Z",
+                "text": "Which database should the cache use?",
+                "input_id": "q-gh-165"
+              },
+              "supervisor": {
+                "id": "sup-gh-165",
+                "subject": "ask",
+                "input_id": "q-gh-165",
+                "executor": "claude",
+                "started_at": "2026-11-17T08:58:00.000Z",
+                "session": "h-sup-gh-165"
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": null,
+            "supervisor_alive": false
+          }
+        ],
+        "mailbox": []
+      }
+    ],
+    "intake": []
+  },
+  "decisions": [
+    {
+      "kind": "start_supervisor",
+      "unit": "gh-160",
+      "rule": "supervisor.ask",
+      "run_id": "01JD5G0000C73G79TPA9EMCVD5",
+      "executor": "claude",
+      "subject": "ask",
+      "input_id": "q-gh-160",
+      "intent": {
+        "id": "01JD5G0000FWPMF8ZZQPVMTVA7",
+        "data": {
+          "kind": "supervisor.started",
+          "run_id": "01JD5G0000C73G79TPA9EMCVD5",
+          "executor": "claude",
+          "subject": "ask",
+          "input_id": "q-gh-160",
+          "step": "build",
+          "attempt": 1
+        }
+      }
+    },
+    {
+      "kind": "noop",
+      "unit": "gh-161",
+      "rule": "supervisor.reserved",
+      "reason": "the question names merge, which only the person grants, so it waits for them"
+    },
+    {
+      "kind": "noop",
+      "unit": "gh-162",
+      "rule": "supervisor.asks_spent",
+      "reason": "the supervisor answered 1 of the step's 1 (limits.asks) this visit, so the question waits for the person in the mailbox"
+    },
+    {
+      "kind": "noop",
+      "unit": "gh-163",
+      "rule": "supervisor.working",
+      "reason": "supervisor sup-gh-163 is at work on the ask"
+    },
+    {
+      "kind": "apply_receipts",
+      "unit": "gh-164",
+      "rule": "supervisor.silent",
+      "receipts": [
+        {
+          "id": "01JD5G0000DXAZ7T4XPG82QXGC",
+          "data": {
+            "kind": "supervisor.escalated",
+            "run_id": "sup-gh-164",
+            "reason": "the supervisor gave no answer within 15 minutes",
+            "step": "build",
+            "attempt": 1
+          }
+        }
+      ],
+      "state": {
+        "format": 1,
+        "unit": "gh-164",
+        "story": "gh-164",
+        "workflow": {
+          "name": "supervised",
+          "hash": "1a08ff22db16ad4c93fae04cb57ec20ae0c00cdbeef2120f22369d26d321a647",
+          "doc": {
+            "name": "supervised",
+            "description": "A build step a supervisor stays beside, then a person's gate.",
+            "start": "build",
+            "steps": {
+              "build": {
+                "outcomes": {
+                  "done": "ready"
+                },
+                "role": "builder",
+                "agent": "Build it.",
+                "attended": "agent",
+                "asks": 1
+              },
+              "ready": {
+                "outcomes": {
+                  "approve": "$done",
+                  "reject": {
+                    "to": "build",
+                    "counter": "ready.reject"
+                  }
+                },
+                "gate": "Ship it?"
+              }
+            },
+            "counters": {
+              "ready.reject": {
+                "max": 2
+              }
+            }
+          }
+        },
+        "step": "build",
+        "attempt": 1,
+        "counters": {
+          "ready.reject": 0
+        },
+        "retries_used": 0,
+        "run": {
+          "id": "run-gh-164-1",
+          "step": "build",
+          "attempt": 1,
+          "started_at": "2026-11-17T08:55:00.000Z",
+          "executor": "claude",
+          "attended": false,
+          "nudges": 0
+        },
+        "applied_through": 2,
+        "visits": {
+          "build": 1
+        },
+        "parked": {
+          "reason": "agent.asked",
+          "since": "2026-11-17T08:59:00.000Z",
+          "text": "Which database should the cache use?",
+          "input_id": "q-gh-164"
+        },
+        "supervised": {
+          "answered": 0,
+          "escalated": [
+            {
+              "input": "q-gh-164",
+              "reason": "the supervisor gave no answer within 15 minutes"
+            }
+          ]
+        }
+      },
+      "expect_version": 2,
+      "rejected": []
+    },
+    {
+      "kind": "apply_receipts",
+      "unit": "gh-165",
+      "rule": "supervisor.died",
+      "receipts": [
+        {
+          "id": "01JD5G0000G5CYANXJR76YS26J",
+          "data": {
+            "kind": "supervisor.escalated",
+            "run_id": "sup-gh-165",
+            "reason": "the supervisor ended without an answer",
+            "step": "build",
+            "attempt": 1
+          }
+        }
+      ],
+      "state": {
+        "format": 1,
+        "unit": "gh-165",
+        "story": "gh-165",
+        "workflow": {
+          "name": "supervised",
+          "hash": "1a08ff22db16ad4c93fae04cb57ec20ae0c00cdbeef2120f22369d26d321a647",
+          "doc": {
+            "name": "supervised",
+            "description": "A build step a supervisor stays beside, then a person's gate.",
+            "start": "build",
+            "steps": {
+              "build": {
+                "outcomes": {
+                  "done": "ready"
+                },
+                "role": "builder",
+                "agent": "Build it.",
+                "attended": "agent",
+                "asks": 1
+              },
+              "ready": {
+                "outcomes": {
+                  "approve": "$done",
+                  "reject": {
+                    "to": "build",
+                    "counter": "ready.reject"
+                  }
+                },
+                "gate": "Ship it?"
+              }
+            },
+            "counters": {
+              "ready.reject": {
+                "max": 2
+              }
+            }
+          }
+        },
+        "step": "build",
+        "attempt": 1,
+        "counters": {
+          "ready.reject": 0
+        },
+        "retries_used": 0,
+        "run": {
+          "id": "run-gh-165-1",
+          "step": "build",
+          "attempt": 1,
+          "started_at": "2026-11-17T08:55:00.000Z",
+          "executor": "claude",
+          "attended": false,
+          "nudges": 0
+        },
+        "applied_through": 2,
+        "visits": {
+          "build": 1
+        },
+        "parked": {
+          "reason": "agent.asked",
+          "since": "2026-11-17T08:59:00.000Z",
+          "text": "Which database should the cache use?",
+          "input_id": "q-gh-165"
+        },
+        "supervised": {
+          "answered": 0,
+          "escalated": [
+            {
+              "input": "q-gh-165",
+              "reason": "the supervisor ended without an answer"
+            }
+          ]
+        }
+      },
+      "expect_version": 2,
+      "rejected": []
+    }
+  ]
+}

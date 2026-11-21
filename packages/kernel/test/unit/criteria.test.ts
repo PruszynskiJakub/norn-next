@@ -38,7 +38,7 @@ describe("checkCriteriaReport", () => {
   test("each outcome takes only the report whose worst verdict it is gated by", () => {
     const report = [v("AC1", "pass"), v("AC2", "person")];
     expect(check({ outcome: "partial", report })).toEqual({ ok: true, worst: "person", coverage: "unchecked" });
-    expect(check({ outcome: "pass", report })).toMatchObject({ ok: false, refusal: { code: "outcome_contradicts_verdicts", do_instead: "norn done partial --criteria <file>" } });
+    expect(check({ outcome: "pass", report })).toMatchObject({ ok: false, refusal: { code: "outcome_contradicts_verdicts", do_instead: "norn done partial" } });
     expect(check({ outcome: "unverified", report: [v("AC1", "unverified"), v("AC2", "person")] })).toMatchObject({ ok: true, worst: "unverified" });
   });
 

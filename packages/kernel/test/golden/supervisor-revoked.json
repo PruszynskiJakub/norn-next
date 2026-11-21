@@ -1,0 +1,358 @@
+{
+  "name": "supervisor-revoked",
+  "description": "A supervisor at work on a question after the person's policy stopped granting the step: it hands the question back.",
+  "step_kinds": {
+    "update-branch": {
+      "outcomes": [
+        "done",
+        "conflict",
+        "clean",
+        "resolved"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "integrate": {
+      "outcomes": [
+        "done",
+        "conflict"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "open-pr": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "push": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "await-merge": {
+      "outcomes": [
+        "merged",
+        "unpushed"
+      ],
+      "mode": "wait",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "supervised": {
+        "name": "supervised",
+        "description": "A build step a supervisor stays beside, then a person's gate.",
+        "start": "build",
+        "steps": {
+          "build": {
+            "by": "builder",
+            "do": "Build it.",
+            "attended": "agent",
+            "limits": {
+              "asks": 1
+            },
+            "outcomes": {
+              "done": "ready"
+            }
+          },
+          "ready": {
+            "by": "person",
+            "do": "Ship it?",
+            "outcomes": {
+              "approve": "$done",
+              "reject": "build"
+            }
+          }
+        }
+      }
+    },
+    "pinned": []
+  },
+  "config": {
+    "counterDefaults": {
+      "checkFail": 5,
+      "gateReject": 2,
+      "conflict": 2,
+      "stale": 10,
+      "agentBack": 3
+    },
+    "silentAfterMs": 900000,
+    "maxNudges": 2,
+    "maxRetries": 1,
+    "deadlineMs": 3600000,
+    "mode": "auto",
+    "executor": "claude",
+    "workflow": "supervised",
+    "intakeWorkflowLabelPrefix": "norn:wf:",
+    "sliceWorkflow": "slice",
+    "base": "main",
+    "claimTtlMs": 600000,
+    "claimRenewBeforeMs": 400000
+  },
+  "facts": {
+    "tick_id": "01JD5G00000MR9XA8KKK8P87K1",
+    "now": "2026-11-17T09:00:00.000Z",
+    "holder": "machine-a",
+    "capabilities": {
+      "tracker": {
+        "assign": true,
+        "labels": true,
+        "comment": true,
+        "create": true,
+        "close": true
+      },
+      "forge": {
+        "draft": true,
+        "checks": true,
+        "raw_urls": true
+      },
+      "store": {
+        "shared": false,
+        "claims": "local",
+        "mailbox": true,
+        "artifacts": true
+      },
+      "executors": {
+        "claude": {
+          "blockStop": true,
+          "denyTool": true,
+          "injectContext": true,
+          "subagents": true,
+          "limits": true,
+          "paneInput": false,
+          "headless": true,
+          "attended": true
+        }
+      }
+    },
+    "stories": [
+      {
+        "key": "gh-167",
+        "item": {
+          "id": 167,
+          "key": "gh-167",
+          "title": "Story 167",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-167",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-167",
+            "state": {
+              "format": 1,
+              "unit": "gh-167",
+              "story": "gh-167",
+              "workflow": {
+                "name": "supervised",
+                "hash": "1a08ff22db16ad4c93fae04cb57ec20ae0c00cdbeef2120f22369d26d321a647",
+                "doc": {
+                  "name": "supervised",
+                  "description": "A build step a supervisor stays beside, then a person's gate.",
+                  "start": "build",
+                  "steps": {
+                    "build": {
+                      "outcomes": {
+                        "done": "ready"
+                      },
+                      "role": "builder",
+                      "agent": "Build it.",
+                      "attended": "agent",
+                      "asks": 1
+                    },
+                    "ready": {
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": {
+                          "to": "build",
+                          "counter": "ready.reject"
+                        }
+                      },
+                      "gate": "Ship it?"
+                    }
+                  },
+                  "counters": {
+                    "ready.reject": {
+                      "max": 2
+                    }
+                  }
+                }
+              },
+              "step": "build",
+              "attempt": 1,
+              "counters": {
+                "ready.reject": 0
+              },
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-167-1",
+                "step": "build",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "build": 1
+              },
+              "parked": {
+                "reason": "agent.asked",
+                "since": "2026-11-17T08:59:00.000Z",
+                "text": "Which database should the cache use?",
+                "input_id": "q-gh-167"
+              },
+              "supervisor": {
+                "id": "sup-gh-167",
+                "subject": "ask",
+                "input_id": "q-gh-167",
+                "executor": "claude",
+                "started_at": "2026-11-17T08:58:00.000Z",
+                "session": "h-sup-gh-167"
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": null
+          }
+        ],
+        "mailbox": []
+      }
+    ],
+    "intake": []
+  },
+  "decisions": [
+    {
+      "kind": "apply_receipts",
+      "unit": "gh-167",
+      "rule": "supervisor.revoked",
+      "receipts": [
+        {
+          "id": "01JD5G0000C73G79TPA9EMCVD5",
+          "data": {
+            "kind": "supervisor.escalated",
+            "run_id": "sup-gh-167",
+            "reason": "the person's policy no longer grants a stand-in for this step",
+            "step": "build",
+            "attempt": 1
+          }
+        }
+      ],
+      "state": {
+        "format": 1,
+        "unit": "gh-167",
+        "story": "gh-167",
+        "workflow": {
+          "name": "supervised",
+          "hash": "1a08ff22db16ad4c93fae04cb57ec20ae0c00cdbeef2120f22369d26d321a647",
+          "doc": {
+            "name": "supervised",
+            "description": "A build step a supervisor stays beside, then a person's gate.",
+            "start": "build",
+            "steps": {
+              "build": {
+                "outcomes": {
+                  "done": "ready"
+                },
+                "role": "builder",
+                "agent": "Build it.",
+                "attended": "agent",
+                "asks": 1
+              },
+              "ready": {
+                "outcomes": {
+                  "approve": "$done",
+                  "reject": {
+                    "to": "build",
+                    "counter": "ready.reject"
+                  }
+                },
+                "gate": "Ship it?"
+              }
+            },
+            "counters": {
+              "ready.reject": {
+                "max": 2
+              }
+            }
+          }
+        },
+        "step": "build",
+        "attempt": 1,
+        "counters": {
+          "ready.reject": 0
+        },
+        "retries_used": 0,
+        "run": {
+          "id": "run-gh-167-1",
+          "step": "build",
+          "attempt": 1,
+          "started_at": "2026-11-17T08:55:00.000Z",
+          "executor": "claude",
+          "attended": false,
+          "nudges": 0
+        },
+        "applied_through": 2,
+        "visits": {
+          "build": 1
+        },
+        "parked": {
+          "reason": "agent.asked",
+          "since": "2026-11-17T08:59:00.000Z",
+          "text": "Which database should the cache use?",
+          "input_id": "q-gh-167"
+        },
+        "supervised": {
+          "answered": 0,
+          "escalated": [
+            {
+              "input": "q-gh-167",
+              "reason": "the person's policy no longer grants a stand-in for this step"
+            }
+          ]
+        }
+      },
+      "expect_version": 2,
+      "rejected": []
+    }
+  ]
+}

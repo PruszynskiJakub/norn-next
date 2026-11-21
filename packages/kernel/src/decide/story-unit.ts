@@ -8,7 +8,8 @@ import type { Decision, InboxKind } from "../model/actions.ts";
 import type { StoryFacts, UnitFacts } from "../model/facts.ts";
 import type { KernelReceipt, ReceiptData, RejectedReceipt } from "../model/receipts.ts";
 import type { RunInfo, RunState } from "../model/run-state.ts";
-import type { LoadedWorkflow, WorkflowLoad } from "../workflow/graph.ts";
+import type { LoadedWorkflow, WorkflowGraph, WorkflowLoad } from "../workflow/graph.ts";
+import { checkDue } from "./check-due.ts";
 import type { DecideContext } from "./context.ts";
 import { applyAction, lastSeq, markCorrupt, parkWith } from "./record.ts";
 import { changeLanded, storyFinished } from "./story-claim.ts";
@@ -122,8 +123,7 @@ export function roundRule(u: UnitFacts, state: RunState, ctx: DecideContext): De
   const current = ctx.workflows.byHash[state.workflow.hash];
   if (at > 0) {
     if (!current) return markCorrupt(u, "unit.workflow_missing", `pinned workflow ${state.workflow.name} is not loaded`, ctx);
-    const res = applyReceipts(state, u.receipts.slice(0, at), current.graph);
-    return applyAction(u.id, u, "receipts.apply", [], res.state, res.rejected, ctx);
+    return applyBefore(u, state, at, current.graph, ctx);
   }
   const r = u.receipts[0] as KernelReceipt;
   if (r.data.kind !== "round.started") return null;
@@ -136,6 +136,19 @@ export function roundRule(u: UnitFacts, state: RunState, ctx: DecideContext): De
   if (!loaded) return refuse("round.workflow_invalid", `workflow ${pinned.name} (${pinned.hash.slice(0, 12)}) is not loaded`);
   const res = applyReceipts(state, [r], loaded.graph);
   return applyAction(u.id, u, "round.start", [], res.state, res.rejected, ctx);
+}
+
+/**
+ * The receipts before a person's round or move, applied against the round they were made for. A
+ * report among them that may not keep code is checked first, as the unit rules would: applied
+ * unchecked it would route, and a scratch run's changes would stay for the next step to keep.
+ */
+function applyBefore(u: UnitFacts, state: RunState, at: number, graph: WorkflowGraph, ctx: DecideContext): Decision {
+  const step = graph.steps[state.step];
+  const check = step && !state.ended ? checkDue(u, state, step, ctx, at) : null;
+  if (check) return check;
+  const res = applyReceipts(state, u.receipts, graph, (u.receipts[at - 1] as KernelReceipt).seq);
+  return applyAction(u.id, u, "receipts.apply", [], res.state, res.rejected, ctx);
 }
 
 /**
@@ -164,10 +177,7 @@ export function moveRule(story: StoryFacts, u: UnitFacts, state: RunState, ctx: 
   const loaded = ctx.workflows.byHash[state.workflow.hash];
   const refuseAll = (reason: string): Decision => applyAction(u.id, u, "receipts.reject", [], { ...state, applied_through: lastSeq(u) }, rejectAll(u.receipts, reason), ctx);
   if (!loaded) return refuseAll(`pinned workflow ${state.workflow.name} (${state.workflow.hash.slice(0, 12)}) is not loaded`);
-  if (at > 0) {
-    const res = applyReceipts(state, u.receipts.slice(0, at), loaded.graph);
-    return applyAction(u.id, u, "receipts.apply", [], res.state, res.rejected, ctx);
-  }
+  if (at > 0) return applyBefore(u, state, at, loaded.graph, ctx);
   const r = u.receipts[0] as KernelReceipt;
   const refuse = (reason: string): Decision => applyAction(u.id, u, "receipts.reject", [], { ...state, applied_through: r.seq }, [{ seq: r.seq, reason }], ctx);
   if (storyFinished(story, ctx.config.base)) return refuse(changeLanded(story, ctx.config.base) ? "the story's change merged" : "the story's item closed");

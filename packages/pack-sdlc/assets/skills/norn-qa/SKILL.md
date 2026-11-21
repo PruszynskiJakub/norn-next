@@ -37,9 +37,9 @@ A criterion that passed as written but that a person may read differently stays 
 
 ## Files
 
-Write everything to one directory **outside the repository** (e.g. under `$TMPDIR`) unless told where: `norn done` is refused while the worktree holds uncommitted work, and QA files do not belong in the branch.
+Write the reports to the run's out folder, `$NORN_OUT` (the brief names it, and where each report goes), unless told where: norn collects them from there when you report, and the folder is ignored by git, so QA files never reach the branch. Evidence goes in `$NORN_OUT/evidence/`, and a verdict's `evidence` names its file there.
 
-- `criteria.json`, the criteria report, one entry per criterion. Required: `evidence` for `pass`, `repro` for `fail`, `how` for `person`, `reason` and `how` for `unverified`; `evidence` and `note` (for a person) may go on any.
+- `$NORN_OUT/criteria.json`, the criteria report, one entry per criterion. Required: `evidence` for `pass`, `repro` for `fail`, `how` for `person`, `reason` and `how` for `unverified`; `evidence` and `note` (for a person) may go on any.
 
   ```json
   [
@@ -72,7 +72,7 @@ Write everything to one directory **outside the repository** (e.g. under `$TMPDI
 
 ## Report
 
-The worst verdict decides what you may report: fail > unverified > person > pass; a report that contradicts it is refused. Report with the criteria file: `norn done <outcome> --criteria <dir>/criteria.json` (or the report command your instructions name). A step that requires criteria refuses a report without it, and one that does not cover exactly the frontmatter `criteria` ids. On a `fail`, hand `findings.json` back with the report (`--findings <dir>/findings.json`): rework reads it. Put anything else the next step must know in `--note`, and name the evidence directory there. A verdict's `note` reaches the person at the story's gate, never the next step.
+The worst verdict decides what you may report: fail > unverified > person > pass; a report that contradicts it is refused. Report with `norn done <outcome>` (or the report command your instructions name): it collects `$NORN_OUT/criteria.json`. A step that requires criteria refuses a report without it, and one that does not cover exactly the frontmatter `criteria` ids. On a `fail`, write `$NORN_OUT/findings.json` too: rework reads it. Put anything else the next step must know in `--note`, and name the evidence there when it is not under `$NORN_OUT/evidence/`. A verdict's `note` reaches the person at the story's gate, never the next step.
 
 ## Rules
 

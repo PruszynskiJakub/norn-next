@@ -19,6 +19,9 @@ export { type AnsweredAsk, type BriefCommands, type BriefInputView, type BriefPr
 export * from "./model/actions.ts";
 export * from "./model/capabilities.ts";
 export * from "./model/config.ts";
+export * from "./model/grant.ts";
+export { launchedRun, launchedSupervisor } from "./model/launched.ts";
+export * from "./model/detect.ts";
 export * from "./model/facts.ts";
 export * from "./model/receipts.ts";
 export * from "./model/run-state.ts";
@@ -28,6 +31,7 @@ export * from "./workflow/document.ts";
 export * from "./workflow/graph.ts";
 export { type LoadWorkflowOptions, loadWorkflow, type StepKindInfo } from "./workflow/load.ts";
 export { type Produced, producedFiles, producedOn, producesOn } from "./workflow/produces.ts";
+export { guardChanges } from "./workflow/guard.ts";
 export { type CountedStep, type DerivedCounters, deriveCounters, type ExitLeft } from "./workflow/counters.ts";
 export { type ApplyResult, applyReceipts, type NewRunStateInput, newRunState, type RouteTaken } from "./journal/apply.ts";
 export { type ActOutcome, type ActPlan, Journal, outcomeReceiptId, type UnitJournal } from "./journal/journal.ts";
@@ -35,6 +39,7 @@ export { readRunState, RUN_STATE_UPGRADES, type RunStateRead, type RunStateUpgra
 export { type DecideContext, decideContext, Decisions } from "./decide/context.ts";
 export { decide } from "./decide/index.ts";
 export { decideUnit } from "./decide/unit.ts";
+export { DEFAULT_SUPERVISOR_ASKS, SUPERVISOR_ROLE } from "./decide/supervisor.ts";
 export { changeClosedReason, decideIntake, decideStory, decideStoryTail, ITEM_CLOSED_REASON, isChangeClosedReason, unsyncedReason } from "./decide/story.ts";
 export { loadProblem } from "./decide/story-unit.ts";
 export { RULE_IDS } from "./decide/rules.ts";

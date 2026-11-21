@@ -4,7 +4,8 @@
  * harness-neutral, so every harness gets the same text and the CLI's `brief` prints exactly what a
  * launch sent.
  */
-import type { HandBack, Verdict } from "@norn/schema";
+import type { Capability } from "@norn/plugin-api";
+import { type HandBack, OUT_ENV, type ReportName, REPORT_TYPES, reportPath, type Verdict } from "@norn/schema";
 import type { BriefInputs } from "../model/actions.ts";
 
 /** The most a handoff may hold, in bytes once trimmed: past it, the current state has turned into a log every later brief carries. */
@@ -80,6 +81,8 @@ export interface BriefRenderInput {
   handBack?: Readonly<Record<string, HandBack>>;
   /** the files the step produces for later steps: each one's name, path relative to the worktree, and the outcomes it is due on */
   produced?: readonly BriefProduced[];
+  /** the run folder's `out/`, relative to the worktree, shown beside `$NORN_OUT` */
+  outDir?: string;
   /** a person works in the session: questions go to them, and `done` waits for their agreement */
   attended?: boolean;
   /** answers given to earlier sessions of this step, which a fresh session would otherwise never see */
@@ -127,14 +130,63 @@ export function renderStepReminder(input: ReportHintInput): string {
   return `norn: this session works step ${input.step} of ${input.unit}. Report exactly once: ${reportWays(input, c)}. Run \`${c.brief}\` for the rest.`;
 }
 
+const NO_REMOTE = "Never `git push`, never switch branches or worktrees, and never change the remote (a pull request, an issue, a comment): only norn does, under a receipt.";
+const GRANTED_REMOTE = "Never `git push`, never switch branches or worktrees, and change nothing on the remote beyond what your grant names: the rest only norn does, under a receipt.";
+
 const RULES: readonly string[] = [
   "Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes.",
-  "Never `git push`, never switch branches or worktrees, and never change the remote (a pull request, an issue, a comment): only norn does, under a receipt.",
+  NO_REMOTE,
   "Never edit norn's run state (its data folder outside the worktree): a hand-edited file fails validation and makes the unit corrupt.",
   "Of the norn commands, run only the four this brief names; every other one is the person's.",
   "A subagent you start works under these rules though it never sees this brief: tell it the ones its work can break.",
   "A usage limit is not a reason to report stuck: it resets on its own, and the session continues after it.",
 ];
+
+/** What each capability lets a step do, as its Rules say it. */
+const CAPABILITY_RULES: Readonly<Record<Capability, string>> = {
+  "code:read":
+    "read the code and change none of it. norn notes the worktree, its commits and refs, the git config and hooks and the remote story branch when the run starts, and checks them again once you report: a tracked change, a commit, a moved ref or remote branch, or a changed git config or hook refuses `norn done`.",
+  "code:scratch":
+    "change the code only to try things out: norn resets it to where the run started once you report. A lockfile it resets without a word; any other tracked change or a commit refuses an outcome that passes the step, so nothing you stubbed can pass behind the reset.",
+  "code:write": "change the code the step needs, and commit it: only commits reach the next step.",
+  "docs:write": "write the story's documents in its spec folder and the handoff.",
+  "exec:checks": "run the repo's checks (tests, type checks, lints) and commands that only read; nothing that installs, publishes or reaches the network for anything else.",
+  "exec:any": "run any command the step needs, in this worktree.",
+  "out:criteria": `write the criteria report to \`$${OUT_ENV}\`.`,
+  "out:findings": `write findings to \`$${OUT_ENV}\`.`,
+  "out:evidence": `write evidence files to \`$${OUT_ENV}\`.`,
+  "tracker:comment": "comment on the story's item.",
+  "tracker:label": "label the story's item.",
+  "read:any": "read anything the story holds.",
+  answer: "answer the step agent's questions on the person's behalf, labelled as yours.",
+  "decide:granted": "decide the gates the person's policy grants you, citing the criteria you checked.",
+  escalate: "hand anything outside your grant to the person.",
+};
+
+/** The capabilities that change something on the remote, which lift the rule that only norn does. */
+const REMOTE_CAPABILITIES: readonly Capability[] = ["tracker:comment", "tracker:label"];
+
+function namedList(items: readonly string[]): string {
+  const named = items.map((s) => `\`${s}\``);
+  return named.length <= 1 ? (named[0] ?? "") : `${named.slice(0, -1).join(", ")} and ${named.at(-1)}`;
+}
+
+/** The Rules: a grant's own lines first, then the generic rules with the remote rule fitted to it. */
+function ruleLines(grant: readonly Capability[] | undefined): string[] {
+  if (grant === undefined) return [...RULES];
+  const named = grant.length === 0 ? "This step is granted nothing: it may only read." : `This step is granted ${namedList(grant)}, and nothing else.`;
+  const remote = grant.some((c) => REMOTE_CAPABILITIES.includes(c));
+  return [named, ...grant.map((c) => `\`${c}\`: ${CAPABILITY_RULES[c]}`), ...RULES.map((r) => (r === NO_REMOTE && remote ? GRANTED_REMOTE : r))];
+}
+
+/** The closing line on what becomes of the code, by what the grant lets the step keep. */
+function keepLine(grant: readonly Capability[] | undefined, c: BriefCommands): string {
+  if (grant === undefined || grant.includes("code:write"))
+    return `Commit your work before \`${c.done}\`: a done is refused while \`git status\` shows changes outside norn's own files, as only commits reach the next step.`;
+  if (grant.includes("code:scratch"))
+    return `Nothing you change in the code is kept: norn resets the worktree once you report, and \`${c.done}\` with an outcome that passes the step is refused while a tracked file other than a lockfile differs or a commit was made.`;
+  return `Leave the code as the run found it: \`${c.done}\` is refused while a tracked file outside norn's own differs, or a commit was made, since the run started.`;
+}
 
 function inputLine(input: BriefInputs["inputs"][number]): string {
   if (typeof input === "string") return `- \`${input}\``;
@@ -169,32 +221,58 @@ function answeredLines(answered: readonly AnsweredAsk[]): string[] {
   return answered.map((a) => (a.question ? `- Asked: ${indent(a.question)}\n  Answered: ${indent(a.answer)}` : `- Answered: ${indent(a.answer)}`));
 }
 
-const CRITERIA_FLAG = "--criteria <file>";
-const FINDINGS_FLAG = "--findings <file>";
+function before(c: BriefCommands, outcomes: readonly string[]): string {
+  return `before ${outcomes.map((o) => `\`${c.done} ${o}\``).join(" or ")}`;
+}
 
-const FINDINGS_LINE = `- \`${FINDINGS_FLAG}\` is a JSON file, \`{"findings": [...]}\` or an array, each finding with a \`title\` and a \`severity\` (\`blocking\`, \`major\`, \`minor\`, \`nit\`), and where it can \`file\`, \`line\`, \`criterion\`, \`detail\` and \`repro\`; the step the work goes back to reads them. An outcome named with it needs findings, a \`--note\` saying what to rework, or a criteria report with a verdict short of \`pass\`: without one of them it is refused.`;
+/** Where a report goes: `$NORN_OUT/<path>`, and its path in the worktree when the host named the folder. */
+function reportAt(input: BriefRenderInput, name: ReportName): string {
+  const rel = REPORT_TYPES[name].path;
+  return `\`${reportPath(name)}\`${input.outDir ? ` (\`${input.outDir}/${rel}\`)` : ""}`;
+}
 
-function criteriaLine(criteria: NonNullable<BriefRenderInput["criteria"]>): string {
+function criteriaLines(input: BriefRenderInput, c: BriefCommands): string[] {
+  const criteria = input.criteria;
+  if (!criteria) return [];
+  const due = input.outcomes.filter((o) => criteria.required || criteria.verdict[o] !== undefined);
+  if (due.length === 0) return [];
   const gated = Object.entries(criteria.verdict).map(([o, v]) => `\`${o}\` only when it is \`${v}\``);
   const rule = gated.length > 0 ? ` The worst verdict decides the outcome (fail > unverified > person > pass): ${gated.join(", ")}.` : "";
-  const need = criteria.required ? "This step requires" : "An outcome gated by a verdict requires";
-  return `- ${need} \`${CRITERIA_FLAG}\`: a JSON array with one entry per acceptance criterion, \`{"id", "verdict", ...}\` (\`pass\` needs \`evidence\`, \`fail\` \`repro\`, \`person\` \`how\`, \`unverified\` \`reason\` and \`how\`), covering exactly the unit's frontmatter \`criteria\`.${rule} A report without it, or that contradicts it, is refused.`;
+  return [
+    `- \`criteria\` → ${reportAt(input, "criteria")}, ${before(c, due)}: ${REPORT_TYPES.criteria.shape}, covering exactly the unit's frontmatter \`criteria\`.${rule} A report without it, or that contradicts it, is refused.`,
+    `- \`evidence\` → ${reportAt(input, "evidence")}: ${REPORT_TYPES.evidence.shape}; norn keeps the criteria report that names them, not the files.`,
+  ];
+}
+
+function findingsLines(input: BriefRenderInput, c: BriefCommands): string[] {
+  const due = input.outcomes.filter((o) => input.handBack?.[o] === "findings");
+  if (due.length === 0) return [];
+  return [
+    `- \`findings\` → ${reportAt(input, "findings")}, ${before(c, due)}: ${REPORT_TYPES.findings.shape}; the step the work goes back to reads them. Such an outcome needs findings, a \`--note\` saying what to rework, or a criteria report with a verdict short of \`pass\`: without one of them it is refused.`,
+  ];
+}
+
+/** Every product of the step per outcome, where it goes and what it holds; the handoff and a gate's rejection need no listing in a workflow. */
+function outputLines(input: BriefRenderInput, c: BriefCommands): string[] {
+  const reports = [...criteriaLines(input, c), ...findingsLines(input, c)];
+  const files = (input.produced ?? []).flatMap((p) => {
+    const due = p.outcomes.filter((o) => input.outcomes.includes(o));
+    return due.length > 0 ? [`- \`${p.name}\` → \`${p.path}\`, ${before(c, due)}: a report without it, or with it empty, is refused.`] : [];
+  });
+  const out: string[] = [];
+  if (reports.length > 0) out.push(`\`${c.done}\` collects the reports from \`$${OUT_ENV}\`, which holds only what this run wrote, and refuses one that does not validate, saying why.`, "");
+  out.push(...reports, ...files);
+  if (input.handoff) out.push(`- \`handoff\` → \`${input.handoff}\`, with every outcome: this unit's current state, kept current (see Handoff).`);
+  if (out.length > 0) out.push("");
+  out.push("A person's rejection at a gate needs no report from you: its reason reaches the step it sends the work back to as findings.");
+  return out;
 }
 
 function finishLines(input: BriefRenderInput, c: BriefCommands): string[] {
   const out: string[] = [];
-  const criteria = input.criteria;
   for (const o of input.outcomes) {
     const means = input.means?.[o];
-    const flag = criteria && (criteria.required || criteria.verdict[o] !== undefined) ? ` ${CRITERIA_FLAG}` : "";
-    const findings = input.handBack?.[o] === "findings" ? ` ${FINDINGS_FLAG}` : "";
-    out.push(`- \`${c.done} ${o}${flag}${findings}\`${means ? ` — ${means}` : ""}`);
-  }
-  if (criteria) out.push(criteriaLine(criteria));
-  if (input.outcomes.some((o) => input.handBack?.[o] === "findings")) out.push(FINDINGS_LINE);
-  for (const p of input.produced ?? []) {
-    const due = p.outcomes.filter((o) => input.outcomes.includes(o));
-    if (due.length > 0) out.push(`- Before ${due.map((o) => `\`${c.done} ${o}\``).join(" or ")}, write \`${p.name}\` to \`${p.path}\`: a report without it, or with it empty, is refused.`);
+    out.push(`- \`${c.done} ${o}\`${means ? ` — ${means}` : ""}`);
   }
   if (input.outcomes.length === 0) out.push(`- \`${c.done}\` — the step's work is finished`);
   if (input.attended) out.push("- A question goes to the person in this session, never through `" + c.ask + "`.");
@@ -261,16 +339,17 @@ export function renderBrief(input: BriefRenderInput): string {
     out.push(
       "## Handoff",
       "",
-      `\`${input.handoff}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary, and refresh it right before you report. \`${c.done}\` refuses one over ${HANDOFF_MAX_BYTES / 1024} KB: long repros and logs go in the findings \`${c.done} --findings\` hands back, or in a file of their own in the spec folder above it, named there.`,
+      `\`${input.handoff}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary, and refresh it right before you report. \`${c.done}\` refuses one over ${HANDOFF_MAX_BYTES / 1024} KB: long repros and logs go in the findings (\`${reportPath("findings")}\`), or in a file of their own in the spec folder above it, named there.`,
       "",
     );
+  out.push("## Outputs", "", ...outputLines(input, c), "");
   if (input.history && input.history.length > 0) out.push("## History", "", "What this unit's steps did this round, oldest first:", "", ...input.history.map((l) => `- ${l}`), "");
-  out.push("## Rules", "", ...RULES.map((r) => `- ${r}`), "");
+  out.push("## Rules", "", ...ruleLines(b.grant).map((r) => `- ${r}`), "");
   out.push("## Finish with exactly one of", "", ...finishLines(input, c), "");
   out.push(
     "Report exactly once, from the worktree root, with the outcome whose meaning is true. A refused report says what to do instead: do exactly that, then report again. After a report succeeds, end your turn.",
     "",
-    `Commit your work before \`${c.done}\`: a done is refused while \`git status\` shows changes outside norn's own files, as only commits reach the next step.`,
+    keepLine(b.grant, c),
     "",
     `After a long session or a lost thread, run \`${c.brief}\` again: it is rendered from the unit's record each time.`,
     "",

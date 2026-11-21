@@ -7,9 +7,11 @@
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { nodeExec } from "@norn/host-node";
+import { nodeAncestry, nodeExec } from "@norn/host-node";
 import { RUN_ENV } from "@norn/plugin-api";
 import { WRITES_ENV } from "@norn/runtime";
+import { findCommand } from "../../src/commands/index.ts";
+import { personOnlyRefusal } from "../../src/person-only.ts";
 
 export const MAIN = join(import.meta.dir, "..", "..", "src", "main.ts");
 export const TEST_PLUGIN = join(import.meta.dir, "fixtures", "test-harness");
@@ -48,13 +50,35 @@ export async function sh(cwd: string, ...argv: string[]): Promise<string> {
 /** The test harness agent's plans (fixtures/test-harness/agent.ts names what each does). */
 export type AgentPlan = "work" | "ask" | "ask-then-stuck" | "hang" | "protocol" | "findings" | "attended" | "permission" | "trust" | "logged-out" | "report" | "resolve" | "resolve-ask" | "slicer" | "slice-work" | "slice-ask";
 
+let belowAgent: Promise<string | null> | undefined;
+
+/**
+ * Why this test process cannot make a person's calls, or null. Every norn call of the tier runs
+ * below this process, so a launch's mark on it or on any process above it (an agent's session
+ * running the tier) has the CLI refuse each person-only command; asking the CLI's own rule, for a
+ * real person-only command, keeps the two from drifting apart.
+ */
+function personOnlyBlocked(): Promise<string | null> {
+  belowAgent ??= (async () => {
+    const approve = findCommand("story approve");
+    if (!approve?.personOnly) throw new Error("world: `story approve` is no longer a person-only command; name one that is");
+    const refused = await personOnlyRefusal(approve, { env: process.env, ancestry: nodeAncestry });
+    return refused ? `${refused.body.error} (${refused.body.code})` : null;
+  })();
+  return belowAgent;
+}
+
 /**
  * A fresh clone of an empty bare remote with one commit on main, and a norn home beside it. The
  * env empties HERDR_ENV, so a person's running herdr is never probed, and the launch env (RUN_ENV,
- * WRITES_ENV), so a run from inside an agent's session is not one: its person-only commands would be
- * refused. It names a git identity, so the agent's commits and the person's merge need no global config.
+ * WRITES_ENV) the norn calls would otherwise inherit. That cannot hide an agent's process above
+ * this one, which the CLI reads too, so below an agent's session it throws before building anything:
+ * there the tier's person-only calls would all be refused. It names a git identity, so the agent's
+ * commits and the person's merge need no global config.
  */
 export async function world(plan: AgentPlan = "work"): Promise<World> {
+  const blocked = await personOnlyBlocked();
+  if (blocked) throw new Error(`the cli integration tier cannot run below an agent's session: its person-only norn calls are refused there. Run it from a shell of your own, or leave it to CI. ${blocked}`);
   // realpath: macOS hands out /var under /private, and git names the canonical path
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "norn-e2e-")));
   const remote = join(dir, "remote.git");
@@ -124,6 +148,23 @@ export async function norn(w: World, args: string[], env: Record<string, string>
   return { code: r.code, body, stdout: r.stdout, stderr: r.stderr };
 }
 
+/**
+ * One norn call as an agent forging a person's command would make it: below a process started with
+ * `mark` as a launch starts the agent, through `env -u` clearing the launch env for the call itself.
+ */
+export async function nornBelowAgent(w: World, args: string[], mark: Record<string, string>): Promise<NornOut> {
+  const argv = ["env", "-u", "NORN_UNIT", "-u", "NORN_RUN_ID", "bun", MAIN, ...args];
+  const parent = `const p = Bun.spawn(${JSON.stringify(argv)}, { stdout: "inherit", stderr: "inherit" });\nprocess.exit(await p.exited);\n`;
+  const r = await nodeExec(["bun", "-e", parent], { cwd: w.root, env: { ...w.env, ...mark }, timeoutMs: NORN_TIMEOUT_MS });
+  let body: Record<string, unknown> = {};
+  try {
+    body = JSON.parse(r.stdout) as Record<string, unknown>;
+  } catch {
+    // markdown or nothing: the caller reads stdout
+  }
+  return { code: r.code, body, stdout: r.stdout, stderr: r.stderr };
+}
+
 export interface SetUpOptions {
   /** how stories run (default auto) */
   mode?: "auto" | "manual";
@@ -161,7 +202,28 @@ export async function setUp(w: World, opts: SetUpOptions = {}): Promise<{ added:
     const set = await norn(w, ["config", "set", key, value, "--json"]);
     if (set.code !== 0) throw new Error(`config set ${key}: ${set.stdout}${set.stderr}`);
   }
+  await confirmWorkflows(w);
   return { added, init };
+}
+
+/**
+ * The person confirms every repo workflow in `.agents/workflows/`, as a person who wrote or edited
+ * them would, so a change to a person's step, `attended:` or `allow:` is not held. One that does not
+ * load, or that nothing holds, has nothing to confirm; a test that reads that refusal makes the call
+ * itself. Confirmation lives in the machine dir, so `env` names the machine (a `USER`) when it differs.
+ */
+export async function confirmWorkflows(w: World, env: Record<string, string> = {}): Promise<void> {
+  const dir = join(w.root, ".agents", "workflows");
+  if (!existsSync(dir)) return;
+  for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml")).sort()) await norn(w, ["workflow", "confirm", file.slice(0, -".yaml".length), "--json"], env);
+}
+
+/** A repo workflow file written as a person writes it (`name` may be `shared/<file>`), then confirmed by them. */
+export async function writeWorkflow(w: World, name: string, text: string, env: Record<string, string> = {}): Promise<void> {
+  const file = join(w.root, ".agents", "workflows", `${name}.yaml`);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, text);
+  await confirmWorkflows(w, env);
 }
 
 export interface UnitShown {

@@ -10,7 +10,7 @@ import { type Static, type TSchema, Type } from "@sinclair/typebox";
 import type { ChangeRequest } from "./forge.ts";
 import type { HostContext } from "./host.ts";
 import type { PluginResult } from "./result.ts";
-import { type StepKindBase, type StepKindSlots, WAITING_OUTCOME } from "./step-kind.ts";
+import { type KindSlot, slotProblem, type StepKindBase, type StepKindSlots, WAITING_OUTCOME } from "./step-kind.ts";
 
 /** The story a source is asked about, waiting at a step that routes the source's signal. */
 export interface SignalReadInput {
@@ -33,6 +33,8 @@ export interface SignalReadInput {
 export interface SignalSourceDefinition<P extends TSchema = TSchema> {
   /** what an `on:` entry for the signal may carry beside its route; none when absent */
   params?: P;
+  /** the slot the signal is a fact of (plugin API 1.21): an `on:` block names it `<slot>.<name>`; absent, `<plugin>.<name>` */
+  slot?: KindSlot;
   /**
    * The signal as it stands now: a signal, `null` when nothing happened, or a failure when the source
    * could not tell, which the host leaves out of the facts so decide reads it as nothing happened.
@@ -46,6 +48,8 @@ export interface SignalDeclaration {
   name: string;
   /** who reports it: `vcs`, `clock`, or the plugin's name */
   source: string;
+  /** what leads its name in a workflow file (`vcs` in `vcs.stale`): a slot, `norn` for the core's, or the plugin's name; absent, the file cannot name it */
+  namespace?: string;
   params?: TSchema;
 }
 
@@ -55,9 +59,9 @@ export interface SignalDeclaration {
  * clock once the visit is older than its `after:`. A plugin may not provide a signal by these names.
  */
 export const BUILTIN_SIGNALS: Readonly<Record<string, SignalDeclaration>> = Object.freeze({
-  stale: { name: "stale", source: "vcs" },
-  unpushed: { name: "unpushed", source: "vcs" },
-  timeout: { name: "timeout", source: "clock", params: Type.Object({ after: Duration }, { additionalProperties: false }) },
+  stale: { name: "stale", source: "vcs", namespace: "vcs" },
+  unpushed: { name: "unpushed", source: "vcs", namespace: "vcs" },
+  timeout: { name: "timeout", source: "clock", namespace: "norn", params: Type.Object({ after: Duration }, { additionalProperties: false }) },
 });
 
 const NAME_RE = new RegExp(OUTCOME_NAME_PATTERN);
@@ -78,5 +82,7 @@ export function signalSourceProblems(key: string, value: unknown): string[] {
   else if (RESERVED_OUTCOMES.has(key)) out.push("is an outcome the kernel reserves");
   if (typeof v.read !== "function") out.push("lacks read");
   if (v.params !== undefined && (v.params === null || typeof v.params !== "object")) out.push("params must be a schema");
+  const slot = slotProblem(v.slot);
+  if (slot) out.push(slot);
   return out;
 }

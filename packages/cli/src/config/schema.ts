@@ -3,7 +3,8 @@
  * setting silently ignored; a slot's own keys (beside `use`) belong to the plugin that fills it, and
  * that plugin's factory validates them.
  */
-import { Mode, NonEmpty, PosInt } from "@norn/schema";
+import { CAPABILITIES } from "@norn/plugin-api";
+import { Mode, NonEmpty, OUTCOME_NAME_PATTERN, PosInt } from "@norn/schema";
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
 
 const closed = { additionalProperties: false } as const;
@@ -34,7 +35,25 @@ export const TrackerSlot = Type.Object({ use: Name, intake: Intake }, open);
 export const RunnerChoice = Type.Union([Name, Slot]);
 /** the agent's extra arguments; they replace the harness's defaults whole (claude's are `--permission-mode auto`) */
 const AgentArgs = Type.Array(NonEmpty);
-export const Executor = Type.Object({ harness: Name, runner: RunnerChoice, model: Type.Optional(NonEmpty), args: Type.Optional(AgentArgs) }, closed);
+/**
+ * An executor: a harness and the model it runs, on this machine and its accounts. Its runner is the one
+ * `runners` picks for each step's attendance, unless it names one of its own, which then runs every step.
+ */
+export const Executor = Type.Object({ harness: Name, runner: Type.Optional(RunnerChoice), model: Type.Optional(NonEmpty), args: Type.Optional(AgentArgs) }, closed);
+
+/**
+ * The runner an executor without one of its own runs in, by who stays beside the step's agent: the
+ * person (a runner with presence, such as herdr), a supervisor, or nobody. Absent: headless for agent and
+ * none, and none for person, so an attended step parks until one is set.
+ */
+export const Runners = Type.Object({ person: Type.Optional(RunnerChoice), agent: Type.Optional(RunnerChoice), none: Type.Optional(RunnerChoice) }, closed);
+export const DEFAULT_RUNNERS = { agent: "headless", none: "headless" } as const;
+
+/**
+ * An agent role, or a workflow's step as `<workflow>.<step>`, to the executor it runs on, or a list
+ * tried in order: the first that can run the step does. A step's binding outranks its role's.
+ */
+export const Bind = Type.Record(Name, Type.Union([Name, Type.Array(Name, { minItems: 1, uniqueItems: true })]), closed);
 
 export const Counters = Type.Object(
   {
@@ -69,6 +88,34 @@ export const KernelKnobs = Type.Object(
 /** A check's command by the name a workflow's check step spells as `{checks.<name>}`. */
 export const Checks = Type.Record(Name, NonEmpty, closed);
 
+/**
+ * Where this machine keeps each workflow source, by the name the workflow gives it: an absolute path,
+ * or one relative to the repo's root. The key takes the workflow's own pattern for a source name, so
+ * every source a workflow may name can be bound.
+ */
+export const Sources = Type.Record(Type.String({ pattern: OUTCOME_NAME_PATTERN }), NonEmpty, closed);
+
+/** A workflow's step, as `<workflow>.<step>`: the workflow's name and the step's. */
+const StepRef = Type.String({ pattern: "^[a-z0-9][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$" });
+const StepRefs = Type.Array(StepRef, { uniqueItems: true });
+
+/**
+ * What the person lets stand in for them: the `attended: agent` steps whose questions a supervisor may
+ * answer (`attended`) and the gates a supervisor may decide (`gates`). Granted in the user's own file only: a
+ * repo file, which an agent in its step can change, may narrow a list and never widen it.
+ */
+export const Policy = Type.Object(
+  {
+    stand_in: Type.Optional(Type.Object({ attended: Type.Optional(StepRefs), gates: Type.Optional(StepRefs) }, closed)),
+    /** the capabilities any step may be granted, which caps every role's; absent: every one */
+    allow: Type.Optional(Type.Array(Type.Union(CAPABILITIES.map((c) => Type.Literal(c)), { title: "capability" }), { uniqueItems: true })),
+  },
+  closed,
+);
+export type Policy = Static<typeof Policy>;
+/** The keys a repo file can only narrow, and the user's file alone grants. */
+export const POLICY_KEY = "policy";
+
 export const CONFIG_FORMAT = 1;
 
 /** The merged config every command runs on. */
@@ -80,8 +127,12 @@ export const NornConfig = Type.Object(
     store: Slot,
     vcs: Slot,
     executors: Type.Record(Name, Executor, { minProperties: 1 }),
-    /** the executor an agent step runs on when it names none; absent: the only executor */
+    /** the executor an agent step runs on when it names none and `bind` binds neither its step nor its role; absent: the only executor */
     executor: Type.Optional(Name),
+    /** the runner each attendance picks for an executor without its own */
+    runners: Type.Optional(Runners),
+    /** which executors each agent role, or one workflow's step, runs on */
+    bind: Type.Optional(Bind),
     /** the workflows' pack; one for now, as the runtime loads a single pack */
     packs: Type.Array(Name, { minItems: 1, maxItems: 1 }),
     /** non-bundled plugins by name: the spec `norn plugin add` installs */
@@ -95,6 +146,10 @@ export const NornConfig = Type.Object(
     trace: Type.Optional(TraceKnobs),
     /** the commands a workflow's check step names as `{checks.<name>}`; the shipped test steps name `test` */
     checks: Type.Optional(Checks),
+    /** where this machine keeps the sources a workflow names, which win over a workflow's own `path:` */
+    sources: Type.Optional(Sources),
+    /** what the person lets stand in for them; the user's file grants it, a repo file only narrows it */
+    policy: Type.Optional(Policy),
   },
   { ...closed, title: "NornConfig" },
 );
@@ -124,6 +179,10 @@ export const ConfigLayer = Type.Object(
       ),
     ),
     executor: Type.Optional(Name),
+    runners: Type.Optional(
+      Type.Object({ person: Type.Optional(Type.Union([Name, partial(Slot, "open")])), agent: Type.Optional(Type.Union([Name, partial(Slot, "open")])), none: Type.Optional(Type.Union([Name, partial(Slot, "open")])) }, closed),
+    ),
+    bind: Type.Optional(Bind),
     packs: Type.Optional(Type.Array(Name, { minItems: 1, maxItems: 1 })),
     plugins: Type.Optional(Type.Record(Name, NonEmpty)),
     base: Type.Optional(NonEmpty),
@@ -132,6 +191,8 @@ export const ConfigLayer = Type.Object(
     kernel: Type.Optional(KernelKnobs),
     trace: Type.Optional(TraceKnobs),
     checks: Type.Optional(Checks),
+    sources: Type.Optional(Sources),
+    policy: Type.Optional(Policy),
   },
   { ...closed, title: "NornConfigLayer" },
 );

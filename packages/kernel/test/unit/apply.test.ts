@@ -24,7 +24,7 @@ const spec = (over: Partial<AgentStepSpec> = {}): AgentStepSpec => ({
   skills: [],
   inputs: [],
   executor: null,
-  attended: false,
+  attended: "none",
   criteria: false,
   hand_back: {},
   writes: "worktree",
@@ -282,9 +282,10 @@ describe("applyReceipts: refusals", () => {
     expect(res.state).toMatchObject({ step: "ready", applied_through: 2 });
   });
 
-  test("a delegated decision is a person's and routes", () => {
-    const res = apply({ ...fresh(), step: "ready" }, journal(1, { kind: "gate.decided", outcome: "approve", by: "supervisor", delegated: true }));
-    expect(res.state.step).toBe("slices");
+  test("a delegated decision no supervisor norn launched for the gate's visit made is refused, and the gate waits on", () => {
+    const res = apply({ ...fresh(), step: "ready" }, journal(1, { kind: "gate.decided", outcome: "approve", by: "supervisor", delegated: true, step: "ready", attempt: 1 }));
+    expect(res.rejected[0]?.reason).toContain("supervisor norn launched for this gate's visit");
+    expect(res.state.step).toBe("ready");
   });
 
   test("a report from a replaced run, or one written for another step or attempt, moves nothing", () => {
@@ -381,7 +382,7 @@ describe("applyReceipts: runs, nudges and classified outcomes", () => {
 
   test("an ask with no ask route parks the unit under a reason code, the question beside it; an answer lifts the park and keeps the run", () => {
     const parked = apply(fresh(), journal(1, started("a1"), { kind: "run.reported", run_id: "a1", verb: "ask", text: "which base?" })).state;
-    expect(parked.parked).toEqual({ reason: ASKED_PARK, since: iso(2), text: "which base?" });
+    expect(parked.parked).toEqual({ reason: ASKED_PARK, since: iso(2), text: "which base?", input_id: "r2" });
     const res = apply(parked, journal(3, { kind: "answer.sent", input_id: "q1", text: "main", by: "a-person" }));
     expect(res.state.parked).toBeUndefined();
     expect(res.state.run?.id).toBe("a1");
@@ -572,5 +573,26 @@ describe("readRunState: formats", () => {
     }
     expect(readRunState({ ...state, format: RUN_STATE_FORMAT - 1 }).ok).toBe(false);
     expect(readRunState("{}")).toEqual({ ok: false, reason: "the run state is not an object" });
+  });
+});
+
+describe("applyReceipts: detection of a run that may not keep code", () => {
+  const SNAP = { head: "a".repeat(40), tree: "b".repeat(40), refs: "r", config: "c", hooks: "h", remote: null };
+
+  test("a run started under a code level keeps it, and its snapshot changes nothing", () => {
+    const res = apply(fresh(), journal(1, started("a1", { code: "read" }), { kind: "run.snapshot", run_id: "a1", snapshot: SNAP }));
+    expect(res.rejected).toEqual([]);
+    expect(res.state.run?.code).toBe("read");
+    expect(res.state.parked).toBeUndefined();
+  });
+
+  test("a snapshot that could not be taken parks the unit stuck, saying why; it never passes", () => {
+    const res = apply(fresh(), journal(1, started("a1", { code: "scratch" }), { kind: "run.snapshot", run_id: "a1", failed: "git stash: fatal: index file corrupt" }));
+    expect(res.state.parked).toEqual({ reason: "run.snapshot.failed", since: iso(2), text: "the snapshot run a1 is checked against could not be taken: git stash: fatal: index file corrupt" });
+  });
+
+  test("a snapshot of another run is refused", () => {
+    const res = apply(fresh(), journal(1, started("a1", { code: "read" }), { kind: "run.snapshot", run_id: "zz", snapshot: SNAP }));
+    expect(res.rejected.map((r) => r.seq)).toEqual([2]);
   });
 });

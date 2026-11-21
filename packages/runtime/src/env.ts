@@ -4,6 +4,7 @@
  */
 import type { Journal, KernelFacts, KernelWorkflows } from "@norn/kernel";
 import type { HostContext } from "@norn/plugin-api";
+import type { HeldWorkflow } from "./confirm.ts";
 import type { RepoWorkflows } from "./repo-workflows.ts";
 import type { ResolvedSlots } from "./resolve.ts";
 import type { AgentLauncher, RuntimeConfig, SessionSource } from "./types.ts";
@@ -21,6 +22,8 @@ export interface RuntimeEnv {
   workflows: KernelWorkflows["byName"];
   /** the repo files the workflows were laid over with, so a failure names the repo's file rather than the pack's */
   repoWorkflows: RepoWorkflows;
+  /** the repo's workflows held for the person's confirmation, by name; `workflows` holds what new rounds run instead */
+  held: Readonly<Record<string, HeldWorkflow>>;
 }
 
 /** One tick as act sees it: the facts decide read, so an act checks the record against what was decided from. */

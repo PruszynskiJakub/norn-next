@@ -27,9 +27,17 @@ export const BUILTIN_STEP_KINDS = ["agent", "check", "gate", "slices"] as const;
 export type BuiltinStepKind = (typeof BUILTIN_STEP_KINDS)[number];
 
 /**
- * Every other key a workflow step may hold. A step kind's name or config key may not be one of these,
- * or the loader could not tell which key of a step is its head. A keyword added here refuses a plugin
- * that used its name, so it takes a minor bump of the plugin API.
+ * The keys a workflow file writes a step with (plugin API 1.21). The set is closed: what a step's
+ * actor needs beyond them goes under `with:`, and a step kind is named by value (`by: forge.open-pr`),
+ * so no plugin can collide with a key and no feature needs a new one.
+ */
+export const STEP_KEYS = ["by", "do", "with", "reads", "produces", "allow", "attended", "limits", "outcomes", "on", "description", "use", "like"] as const;
+
+/**
+ * Every key a step may hold beside a head key: the step keys, the older form's keys, which a pinned
+ * document holds for good, and the keys only a pinned document holds (`role`, plugin API 1.23; `asks`, 1.26). A step
+ * kind's name or config key may not be one of these, or the loader could not tell which key of a
+ * pinned step is its head. It grows only with the pinned document, never with what a file writes.
  */
 export const STEP_KEYWORDS = [
   "use",
@@ -53,7 +61,23 @@ export const STEP_KEYWORDS = [
   "timeout",
   "exits",
   "on",
+  "do",
+  "with",
+  "reads",
+  "allow",
+  "limits",
+  "role",
+  "asks",
 ] as const;
+
+/** The slots a step kind or signal source may work over; a workflow names it `<slot>.<name>`, so a workflow moves between providers unchanged. */
+export const KIND_SLOTS = ["vcs", "forge", "tracker"] as const;
+export type KindSlot = (typeof KIND_SLOTS)[number];
+
+/** What is wrong with a declared `slot`; null when it is absent or one of `KIND_SLOTS`. */
+export function slotProblem(slot: unknown): string | null {
+  return slot === undefined || (KIND_SLOTS as readonly unknown[]).includes(slot) ? null : `slot must be ${KIND_SLOTS.map((s) => `"${s}"`).join(", ").replace(/, ([^,]*)$/, " or $1")}`;
+}
 
 /** The outcome a `wait` kind answers while what it waits for has not happened; never routed. */
 export const WAITING_OUTCOME = "waiting";
@@ -89,6 +113,12 @@ export interface StepKindInput<C = Record<string, unknown>> {
    */
   reads?: Record<string, string>;
   /**
+   * Each name the kind `produces` → its file, relative to the worktree (plugin API 1.22). The kind
+   * writes it there; the host reads it back into the story's documents once the kind answers, so a
+   * later step, in this worktree or another, reads it.
+   */
+  produces?: Record<string, string>;
+  /**
    * The receipt the host wrote before running the kind (the run's intent); the idempotence key of
    * every effect the kind asks a provider for, so a run the host repeats after a crash replays it.
    */
@@ -118,6 +148,56 @@ export type StepKindRead = string | { name: string; fallback: string };
 /** The name a read declares, bare or optional. */
 export const readName = (read: StepKindRead): string => (typeof read === "string" ? read : read.name);
 
+/**
+ * A file a step kind writes for the steps after it (plugin API 1.22), under the rule an agent step's
+ * produced file follows: `name` is what a later step reads it by, and `file` is relative to the
+ * story's spec folder. It is due on every outcome the kind answers.
+ */
+/**
+ * Whether a path stays inside the folder it is relative to on every host: not absolute, no `..`
+ * segment, no backslash (a separator on Windows, a plain character elsewhere) and no drive letter.
+ * The one rule for a produced file, whether an agent step or a step kind declares it.
+ */
+export const staysInside = (file: string): boolean => !file.startsWith("/") && !file.includes("\\") && !/^[A-Za-z]:/.test(file) && !file.split("/").includes("..");
+
+/** Why a produced file breaks the path rule, worded for whoever declared it. */
+export const LEAVES_SPEC_FOLDER = "leaves the story's spec folder: name a path inside it, without `..`, with `/` between folders and no drive letter";
+
+/**
+ * What a step kind does that a person must stand before (plugin API 1.24), since no one can take it
+ * back once others act on it: `outward` reaches past the repo and its story branch (a deploy, a
+ * release, a post others act on), `cost` spends money, `forge-write` changes what a forge lets others
+ * merge or act on (marking a pull request ready, merging). A workflow loads only when a person's step
+ * no policy grant delegates stands on every path to a step of such a kind.
+ */
+export const KIND_EFFECTS = ["outward", "cost", "forge-write"] as const;
+export type KindEffect = (typeof KIND_EFFECTS)[number];
+
+/**
+ * The effects of the kinds over a slot, fixed by the core whichever plugin provides them (plugin API
+ * 1.25): a workflow moves between providers unchanged, so a provider that left an effect out would
+ * move the person's floor with it.
+ */
+export const SLOT_KIND_EFFECTS: Readonly<Record<string, readonly KindEffect[]>> = Object.freeze({
+  "forge.await-merge": ["forge-write"],
+  "forge.open-pr": [],
+  "vcs.update-branch": [],
+  "vcs.integrate": [],
+  "vcs.push": [],
+  "vcs.verify-base": [],
+});
+
+/** The effects a kind has: the core's for a kind over a slot it names, else those its plugin declares. */
+export function kindEffects(namespace: string | undefined, name: string, declared: readonly KindEffect[] | undefined): readonly KindEffect[] {
+  const fixed = namespace === undefined ? undefined : SLOT_KIND_EFFECTS[`${namespace}.${name}`];
+  return fixed ?? declared ?? [];
+}
+
+export interface StepKindProduct {
+  name: string;
+  file: string;
+}
+
 export interface StepKindDefinition<S extends TSchema = TSchema> {
   /** the head key, the same as the key the plugin provides it under */
   name: string;
@@ -128,6 +208,15 @@ export interface StepKindDefinition<S extends TSchema = TSchema> {
   mode: StepKindMode;
   /** what the kind reads that an earlier step produces; absent: nothing */
   reads?: StepKindRead[];
+  /** the files the kind writes for later steps; absent: none */
+  produces?: StepKindProduct[];
+  /**
+   * The slot the kind works over (plugin API 1.21): a workflow names it `<slot>.<name>`
+   * (`vcs.update-branch`). Absent, it is named after the plugin that provides it (`vercel.preview`).
+   */
+  slot?: KindSlot;
+  /** the effects a person must stand before (`KIND_EFFECTS`); absent: none */
+  effects?: readonly KindEffect[];
   run(input: StepKindInput<Static<S>>, ctx: HostContext): Promise<PluginResult<StepKindOutcome>>;
 }
 
@@ -162,7 +251,16 @@ export function stepKindProblems(key: string, value: unknown): string[] {
     if (outcomes.includes(WAITING_OUTCOME)) out.push(`outcome ${WAITING_OUTCOME} is implied for a wait kind and never declared`);
   }
   if (v.reads !== undefined) out.push(...readsProblems(v.reads));
+  if (v.produces !== undefined) out.push(...producesProblems(v.produces));
+  const slot = slotProblem(v.slot);
+  if (slot) out.push(slot);
+  if (v.effects !== undefined) out.push(...effectsProblems(v.effects));
   return out;
+}
+
+function effectsProblems(effects: unknown): string[] {
+  if (!Array.isArray(effects) || !effects.every((e) => (KIND_EFFECTS as readonly unknown[]).includes(e))) return [`effects must be a list of ${KIND_EFFECTS.map((e) => `"${e}"`).join(", ").replace(/, ([^,]*)$/, " or $1")}`];
+  return new Set(effects).size === effects.length ? [] : ["effects repeat"];
 }
 
 function readsProblems(reads: unknown): string[] {
@@ -174,6 +272,19 @@ function readsProblems(reads: unknown): string[] {
   const bad = names.filter((n) => !OUTCOME_RE.test(n));
   if (bad.length > 0) out.push(`reads ${bad.map((n) => JSON.stringify(n)).join(", ")} are not input names`);
   if (new Set(names).size !== names.length) out.push("reads repeat");
+  return out;
+}
+
+function producesProblems(produces: unknown): string[] {
+  if (!Array.isArray(produces)) return ["produces must be a list"];
+  const shaped = produces.every((p) => p !== null && typeof p === "object" && typeof p.name === "string" && typeof p.file === "string" && p.file.trim() !== "");
+  if (!shaped) return ["a product is {name, file}: the name later steps read it by and its file in the story's spec folder"];
+  const names = (produces as StepKindProduct[]).map((p) => p.name);
+  const out: string[] = [];
+  const bad = names.filter((n) => !OUTCOME_RE.test(n));
+  if (bad.length > 0) out.push(`produces ${bad.map((n) => JSON.stringify(n)).join(", ")} ${bad.length === 1 ? "is not an input name" : "are not input names"}`);
+  if (new Set(names).size !== names.length) out.push("produces repeat");
+  for (const p of produces as StepKindProduct[]) if (!staysInside(p.file)) out.push(`produces ${p.name} names ${JSON.stringify(p.file)}, which ${LEAVES_SPEC_FOLDER}`);
   return out;
 }
 

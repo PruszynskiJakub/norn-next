@@ -5,12 +5,14 @@
  * never launches again; between the launch and it, the launcher's idempotence by run id keeps a replay
  * to the one session.
  */
-import type { DecisionOf, ReceiptData, ReceiptIntent, RunInfo } from "@norn/kernel";
+import { type DecisionOf, docsOnlyGrant, type ReceiptData, type ReceiptIntent, type RunInfo } from "@norn/kernel";
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import { ensureWorktree } from "./branches.ts";
 import { stopDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
 import { appendEvents } from "./events/log.ts";
+import { hookDigest, noteSnapshot } from "./detect.ts";
+import { clearOut } from "./inputs.ts";
 import { nudgePromptId } from "./launcher.ts";
 import { unitInFacts } from "./record.ts";
 import { readStepRun } from "./step-runs.ts";
@@ -37,10 +39,10 @@ function runOnRecord(t: TickContext, unit: string, runId: string): RunInfo | nul
   return run?.id === runId ? run : null;
 }
 
-/** The launch's own receipt: the intent again, now naming the session, so a replay finds the launch done. */
-function launched(intent: ReceiptIntent, handle: string): ReceiptData {
+/** The launch's own receipt: the intent again, now naming the session and pinning its hook config, so a replay finds the launch done. */
+function launched(intent: ReceiptIntent, handle: string, hooks: string | null): ReceiptData {
   if (intent.data.kind !== "run.started") throw new Error(`a launch goes under run.started, not ${intent.data.kind}`);
-  return { ...intent.data, session: handle };
+  return { ...intent.data, session: handle, ...(hooks !== null && { hooks }) };
 }
 
 /**
@@ -61,7 +63,8 @@ async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"r
   const unit = unitOf(d);
   const worktree = await ensureWorktree(t.env, unit);
   if (!worktree.ok) return worktree;
-  const writes = unitInFacts(t.facts, unit)?.state?.workflow.doc.steps[d.brief.step]?.writes;
+  // a grant that may change no code is guarded as a docs-only step is, whatever its pin says
+  const writes = docsOnlyGrant(d.brief.grant ?? null) ? "docs" : unitInFacts(t.facts, unit)?.state?.workflow.doc.steps[d.brief.step]?.writes;
   const request = {
     unit,
     run_id: d.run_id,
@@ -76,11 +79,20 @@ async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"r
   const acted = await t.env.journal.act(unit, {
     intent: d.intent,
     perform: async () => {
+      // noted before the agent starts, so nothing it does can land before what it is checked against
+      if (d.intent.data.kind === "run.started" && d.intent.data.code !== undefined) {
+        const noted = await noteSnapshot(t.env, unit, worktree.value, d.intent);
+        if (!noted.ok) return noted;
+      }
+      await clearOut(t.env.ctx.files, worktree.value);
       const started = await t.env.launcher.start(request);
-      if (!started.ok) await endUnlaunched(t, unit, d.run_id, started.failure.message);
-      return started;
+      if (!started.ok) {
+        await endUnlaunched(t, unit, d.run_id, started.failure.message);
+        return started;
+      }
+      return ok({ handle: started.value.handle, hooks: await hookDigest(t.env, d.executor, worktree.value) });
     },
-    outcome: (v) => launched(d.intent, v.handle),
+    outcome: (v) => launched(d.intent, v.handle, v.hooks),
     next: () => null,
   });
   if (!acted.ok) return acted;

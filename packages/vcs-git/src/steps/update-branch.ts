@@ -73,5 +73,6 @@ export const updateBranch: StepKindDefinition<typeof UpdateBranchConfig> = {
   configSchema: UpdateBranchConfig,
   outcomes: ["done", "conflict", "clean", "resolved"],
   mode: "effect",
+  slot: "vcs",
   run,
 };

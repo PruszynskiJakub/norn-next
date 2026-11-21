@@ -8,7 +8,7 @@ import { EndReason, ReportVerb } from "@norn/plugin-api";
 import { CriterionVerdict, Finding, IsoTime, Mode, NonEmpty, Note, OutcomeName, PosInt, SignalRef, StepName, TaggedUnion } from "@norn/schema";
 import { type Static, type TProperties, Type } from "@sinclair/typebox";
 import { GraphCounterName, PinnedWorkflow } from "../workflow/graph.ts";
-import { Ended } from "./run-state.ts";
+import { Ended, GuardedCode, SupervisorSubject } from "./run-state.ts";
 
 const closed = { additionalProperties: false } as const;
 const Id = Type.String({ minLength: 1 });
@@ -19,6 +19,23 @@ const HEADER = { step: Type.Optional(StepName), attempt: Type.Optional(PosInt) }
 function kind<K extends string, P extends TProperties>(name: K, props: P) {
   return Type.Object({ kind: Type.Literal(name), ...HEADER, ...props }, closed);
 }
+
+/**
+ * What an agent could change, as the vcs noted it (`VcsSnapshot`) with the remote's copy of the unit's
+ * branch: HEAD and the remote head are commits, the tree a tree object, the rest opaque digests.
+ */
+export const RunSnapshot = Type.Object(
+  {
+    head: Type.Union([NonEmpty, Type.Null()]),
+    tree: NonEmpty,
+    refs: NonEmpty,
+    config: NonEmpty,
+    hooks: NonEmpty,
+    remote: Type.Union([NonEmpty, Type.Null()]),
+  },
+  { ...closed, title: "RunSnapshot" },
+);
+export type RunSnapshot = Static<typeof RunSnapshot>;
 
 /** How a run is carried out: an agent session, a check command, or a plugin step kind. */
 export const RunKind = Type.Union([Type.Literal("agent"), Type.Literal("check"), Type.Literal("step")]);
@@ -53,6 +70,31 @@ const KINDS = [
     retry_of: Type.Optional(Id),
     /** the harness session, once the host knows it */
     session: Type.Optional(NonEmpty),
+    /** the agent may not keep code, so the host notes what it could change before it starts (`run.snapshot`) */
+    code: Type.Optional(GuardedCode),
+    /** a digest of the agent's hook config as the launch left it, which `norn done` holds the run to */
+    hooks: Type.Optional(Type.String({ pattern: "^[0-9a-f]{64}$" })),
+  }),
+  /**
+   * what the agent of a run that may not keep code could change, noted after its intent and before it
+   * starts: the visit's first snapshot, which a retry is checked against too; or why it could not be
+   * taken, which parks the unit stuck and never lets the run start
+   */
+  kind("run.snapshot", { run_id: Id, snapshot: Type.Optional(RunSnapshot), failed: Type.Optional(NonEmpty) }),
+  /** the host is about to check a reported run that may not keep code: kill its processes, compare, reset; written before any of it */
+  kind("run.checking", { run_id: Id }),
+  /**
+   * how the check went: `clean`, `reset` (the paths put back as the snapshot held them, and HEAD with
+   * `head`), `refused` (the report may not stand) or `failed` (it could not be told); the last two park
+   * the unit stuck and refuse the report they follow
+   */
+  kind("run.checked", {
+    run_id: Id,
+    verdict: Type.Union([Type.Literal("clean"), Type.Literal("reset"), Type.Literal("refused"), Type.Literal("failed")]),
+    reset: Type.Optional(Type.Array(NonEmpty)),
+    head: Type.Optional(Type.Boolean()),
+    /** what the check found, for a person: why it refused or failed, and anything it only notes */
+    detail: Type.Optional(NonEmpty),
   }),
   kind("run.reported", {
     run_id: Id,
@@ -88,10 +130,13 @@ const KINDS = [
     outcome: GateOutcome,
     by: NonEmpty,
     /**
-     * Decided by someone acting for a person (a supervising agent). No command sets it now; kept so
-     * a receipt written with it still validates, and its history still says so.
+     * Decided by the supervisor on the person's behalf, under their policy's grant of this gate. It
+     * stands only with `supervisor_run` naming the supervisor norn launched for this gate's visit, and
+     * with the visit (`step`, `attempt`) on the receipt; any other is refused.
      */
     delegated: Type.Optional(Type.Boolean()),
+    /** the supervisor run a delegated decision comes from */
+    supervisor_run: Type.Optional(Id),
     reason: Type.Optional(Type.String()),
     /** set when the decision came through a run: a unit's own step agent may never decide its gate */
     run_id: Type.Optional(Id),
@@ -100,7 +145,18 @@ const KINDS = [
    * `to: dialog`: the answer chooses an option in a dialog the agent's pane shows (a permission or
    * trust prompt), so it goes in as keys, never as a prompt typed to the agent
    */
-  kind("answer.sent", { input_id: Id, text: Type.String(), by: NonEmpty, to: Type.Optional(Type.Literal("dialog")) }),
+  /**
+   * `supervisor_run`: the answer is the supervisor's, standing only from the supervisor norn launched
+   * for this question; absent, a person's
+   */
+  kind("answer.sent", { input_id: Id, text: Type.String(), by: NonEmpty, to: Type.Optional(Type.Literal("dialog")), supervisor_run: Type.Optional(Id) }),
+  /**
+   * norn starts a supervisor for this visit's question (`input_id`) or gate, beside the step's own run:
+   * written before the launch, then again naming the session the launcher answered
+   */
+  kind("supervisor.started", { run_id: Id, executor: NonEmpty, subject: SupervisorSubject, input_id: Type.Optional(Id), session: Type.Optional(NonEmpty) }),
+  /** the supervisor handed what it stood in for back to the person, or went quiet or died, which hands it back too */
+  kind("supervisor.escalated", { run_id: Id, reason: NonEmpty }),
   kind("nudge.sent", { run_id: Id, reason: NonEmpty }),
   /** a check or effect step run again under its run, after it was cut short or its plugin failed; counted against the retries */
   kind("run.resumed", { run_id: Id, reason: Type.Optional(Type.String()) }),

@@ -160,8 +160,8 @@ describe("the shipped workflows", () => {
     expect(w.graph.steps["approve-slices"]?.outcomes).toEqual(["approve", "reject"]);
     expect(w.graph.steps["human-qa"]).toMatchObject({ outcomes: ["approve", "reject"], signals: [{ name: "stale" }] });
     expect(w.graph.steps.qa?.agent).toMatchObject({ criteria: true, hand_back: { fail: "findings" }, nudges: CONFIG.maxNudges, deadline_ms: CONFIG.deadlineMs });
-    // a review never edits code, and QA may write its evidence
-    expect([w.graph.steps.review?.agent?.writes, w.graph.steps["resolution-review"]?.agent?.writes, w.graph.steps.qa?.agent?.writes]).toEqual(["docs", "docs", "worktree"]);
+    // a review never edits code, as its role grants only code:read, and QA's role changes code for the run alone
+    expect([w.graph.steps.review?.agent?.role, w.graph.steps["resolution-review"]?.agent?.role, w.graph.steps.qa?.agent?.role]).toEqual(["reviewer", "reviewer", "qa"]);
     expect(w.graph.base).toEqual({ stale: "conflict", step: "update", verify: "test" });
   });
 });

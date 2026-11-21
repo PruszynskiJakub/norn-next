@@ -3,6 +3,7 @@
  * A harness translates and renders; it never classifies a session or decides an answer, so every
  * harness gets the same classification from the kernel.
  */
+import { OUT_ENV } from "@norn/schema";
 import type { HarnessEvent } from "./events.ts";
 import type { RunnerKey } from "./runner.ts";
 
@@ -32,6 +33,13 @@ export interface HarnessCapabilities {
    * such a delivery is refused rather than given to an agent that never saw the question.
    */
   resume?: boolean;
+  /**
+   * The agent runs inside an OS sandbox that keeps it from the store, `.git/refs`, `.git/hooks`,
+   * `.git/config`, the main checkout and the network (plugin API 1.26). Only then may a person's policy
+   * hand a gate to a supervisor: without one, an agent's shell could write that decision itself, so a
+   * host treats an absent flag as no sandbox.
+   */
+  sandbox?: boolean;
 }
 
 /**
@@ -39,6 +47,13 @@ export interface HarnessCapabilities {
  * without asking anything (plugin API 1.5). A harness passes the launch env through untouched.
  */
 export const RUN_ENV = Object.freeze({ unit: "NORN_UNIT", run: "NORN_RUN_ID" } as const);
+
+/**
+ * Set by the host on every launch beside `RUN_ENV` (plugin API 1.22): the absolute folders in the
+ * worktree where the run reads the inputs norn rewrote for it (`in`) and writes the reports `norn
+ * done` collects (`out`), so a skill names a report's place without knowing the layout.
+ */
+export const RUN_DIRS_ENV = Object.freeze({ in: "NORN_IN", out: OUT_ENV } as const);
 
 /** The kernel's ruling on a tool call about to run. */
 export type GuardAnswer = { kind: "allow" } | { kind: "deny"; reason: string };
@@ -145,4 +160,11 @@ export interface Harness {
    * agent's pane by a person, never by norn.
    */
   dialogKeys?(answer: string, dialog?: string): readonly RunnerKey[] | null;
+  /**
+   * What decides the agent's hooks in `worktree`, as text that changes when anyone changes them and
+   * only then: norn's hooks and any setting that turns hooks off (plugin API 1.25). A host pins it when
+   * a run starts and refuses `norn done` once it differs, as an agent that changed its own hooks ran
+   * unguarded. Null when nothing is installed. Absent: a host cannot tell a run's hooks changed.
+   */
+  hookConfig?(worktree: string): Promise<string | null>;
 }

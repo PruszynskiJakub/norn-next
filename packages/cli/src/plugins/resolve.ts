@@ -5,6 +5,7 @@
  */
 import type { WorkflowLoad } from "@norn/kernel";
 import type { NornPlugin } from "@norn/plugin-api";
+import { runnerPicks } from "../config/derive.ts";
 import type { NornConfig } from "../config/schema.ts";
 import { type CliFailure, refuse } from "../output.ts";
 import type { InstalledLoad } from "./installed.ts";
@@ -20,10 +21,8 @@ export function picks(config: NornConfig): Array<{ slot: ProvidesKey; noun: stri
     { slot: "store", noun: "store", name: config.store.use, at: "store.use" },
     { slot: "vcs", noun: "vcs", name: config.vcs.use, at: "vcs.use" },
   ];
-  for (const [name, e] of Object.entries(config.executors)) {
-    out.push({ slot: "harness", noun: "harness", name: e.harness, at: `executors.${name}.harness` });
-    out.push({ slot: "runners", noun: "runner", name: typeof e.runner === "string" ? e.runner : e.runner.use, at: `executors.${name}.runner` });
-  }
+  for (const [name, e] of Object.entries(config.executors)) out.push({ slot: "harness", noun: "harness", name: e.harness, at: `executors.${name}.harness` });
+  for (const r of runnerPicks(config)) out.push({ slot: "runners", noun: "runner", ...r });
   for (const pack of config.packs) out.push({ slot: "packs", noun: "pack", name: pack, at: "packs" });
   return out;
 }

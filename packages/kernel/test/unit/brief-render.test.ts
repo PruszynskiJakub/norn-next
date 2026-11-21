@@ -26,18 +26,43 @@ describe("renderBrief", () => {
     expect(md).toContain('`norn stuck "<reason>"`');
   });
 
-  test("a step that needs a criteria report puts --criteria on the outcomes that need it and says what the report holds", () => {
-    const required = renderBrief(input({ outcomes: ["pass", "fail"], means: {}, criteria: { required: true, verdict: { pass: "pass", fail: "fail" } } }));
-    expect(required).toContain("- `norn done pass --criteria <file>`");
-    expect(required).toContain("- `norn done fail --criteria <file>`");
-    expect(required).toContain("This step requires `--criteria <file>`");
-    expect(required).toContain("`pass` only when it is `pass`, `fail` only when it is `fail`");
+  const outputs = (md: string) => md.slice(md.indexOf("## Outputs"), md.indexOf("## Finish with exactly one of"));
+
+  test("a step that needs a criteria report names under Outputs where it goes, what it holds and the outcomes that need it; done takes no file", () => {
+    const required = renderBrief(input({ outcomes: ["pass", "fail"], means: {}, criteria: { required: true, verdict: { pass: "pass", fail: "fail" } }, outDir: ".agents/run/out" }));
+    expect(required).toContain("- `norn done pass`\n");
+    expect(required).toContain("- `norn done fail`\n");
+    const out = outputs(required);
+    expect(out).toContain("- `criteria` → `$NORN_OUT/criteria.json` (`.agents/run/out/criteria.json`), before `norn done pass` or `norn done fail`: a JSON array with one verdict per acceptance criterion");
+    expect(out).toContain("covering exactly the unit's frontmatter `criteria`");
+    expect(out).toContain("`pass` only when it is `pass`, `fail` only when it is `fail`");
+    expect(out).toContain("- `evidence` → `$NORN_OUT/evidence/` (`.agents/run/out/evidence/`): the files a criteria verdict's evidence names");
     // only an outcome gated by a verdict needs the report when the step does not require one
-    const gated = renderBrief(input({ outcomes: ["done", "unsure"], means: {}, criteria: { required: false, verdict: { unsure: "unverified" } } }));
-    expect(gated).toContain("- `norn done done`\n");
-    expect(gated).toContain("- `norn done unsure --criteria <file>`");
-    expect(gated).toContain("An outcome gated by a verdict requires `--criteria <file>`");
+    const gated = outputs(renderBrief(input({ outcomes: ["done", "unsure"], means: {}, criteria: { required: false, verdict: { unsure: "unverified" } } })));
+    expect(gated).toContain("- `criteria` → `$NORN_OUT/criteria.json`, before `norn done unsure`:");
+    expect(renderBrief(input())).not.toContain("criteria.json");
     expect(renderBrief(input())).not.toContain("--criteria");
+  });
+
+  test("an outcome that hands back findings names them under Outputs with their place and shape, and what else may carry the rework", () => {
+    const md = renderBrief(input({ outcomes: ["approve", "changes_requested"], means: {}, handBack: { changes_requested: "findings" } }));
+    expect(md).toContain("- `norn done changes_requested`\n");
+    expect(outputs(md)).toContain(
+      '- `findings` → `$NORN_OUT/findings.json`, before `norn done changes_requested`: {"findings": [...]} or the array alone, each finding with a "title" and a "severity"',
+    );
+    expect(outputs(md)).toContain("a `--note` saying what to rework");
+    expect(md).not.toContain("--findings");
+  });
+
+  test("a produced file is named under Outputs with its path and the outcomes it is due on", () => {
+    const md = renderBrief(input({ produced: [{ name: "pr_body", path: ".agents/specs/gh-12/pr.md", outcomes: ["done"] }] }));
+    expect(outputs(md)).toContain("- `pr_body` → `.agents/specs/gh-12/pr.md`, before `norn done done`: a report without it, or with it empty, is refused.");
+  });
+
+  test("Outputs say once that the handoff is every agent step's and that a person's rejection reaches the step it sends back as findings", () => {
+    const out = outputs(renderBrief(input()));
+    expect(out).toContain("- `handoff` → `handoffs/03.md`, with every outcome: this unit's current state, kept current (see Handoff).");
+    expect(out).toContain("A person's rejection at a gate needs no report from you: its reason reaches the step it sends the work back to as findings.");
   });
 
   test("says to commit the work before reporting done, as a done over uncommitted changes is refused", () => {
@@ -90,15 +115,15 @@ describe("renderBrief", () => {
         story: { key: "gh-12", title: "Sign in with a passkey", url: "https://forge.example/12" },
         inputs: [
           { name: "spec", label: "the story's spec", path: ".agents/specs/gh-1/spec.md" },
-          { name: "last_check", label: "the last check's result", path: ".agents/inputs/last_check.md", text: "Check `test` exited 1.\n\n```\nFAIL a.test.ts\n```" },
+          { name: "last_check", label: "the last check's result", path: ".agents/run/in/last_check.md", text: "Check `test` exited 1.\n\n```\nFAIL a.test.ts\n```" },
           { name: "diff", note: "run `git diff main...HEAD`" },
         ],
-        inputsNote: "`.agents/inputs/` is ignored by git.",
+        inputsNote: "`.agents/run/in/` is ignored by git.",
       }),
     );
     expect(md).toContain("## Story\n\n`gh-12`: Sign in with a passkey (https://forge.example/12)\n\n## Your work");
-    expect(md).toContain("- `spec` — the story's spec: `.agents/specs/gh-1/spec.md`\n- `last_check` — the last check's result: `.agents/inputs/last_check.md`\n  ````\n  Check `test` exited 1.\n\n  ```\n  FAIL a.test.ts\n  ```\n  ````\n- `diff` — run `git diff main...HEAD`");
-    expect(md).toContain("`.agents/inputs/` is ignored by git.");
+    expect(md).toContain("- `spec` — the story's spec: `.agents/specs/gh-1/spec.md`\n- `last_check` — the last check's result: `.agents/run/in/last_check.md`\n  ````\n  Check `test` exited 1.\n\n  ```\n  FAIL a.test.ts\n  ```\n  ````\n- `diff` — run `git diff main...HEAD`");
+    expect(md).toContain("`.agents/run/in/` is ignored by git.");
     expect(md).not.toContain("- `handoff`\n");
   });
 
@@ -127,5 +152,37 @@ describe("report hints", () => {
     const text = renderStepReminder({ unit: "gh-12", step: "build", outcomes: ["done"], attended: true });
     expect(text).toContain("once the person agrees");
     expect(text).not.toContain("norn ask");
+  });
+});
+
+describe("the brief's Rules render the step's effective grant", () => {
+  const rules = (md: string) => md.slice(md.indexOf("## Rules"), md.indexOf("## Finish with exactly one of"));
+  const finish = (md: string) => md.slice(md.indexOf("## Finish with exactly one of"));
+  const granted = (grant: NonNullable<BriefRenderInput["brief"]["grant"]>) => renderBrief(input({ brief: { ...input().brief, grant } }));
+
+  test("a grant is named whole, each capability says what it lets the step do, and anything else is not the step's", () => {
+    const r = rules(granted(["code:read", "docs:write", "exec:checks", "out:findings"]));
+    expect(r).toContain("- This step is granted `code:read`, `docs:write`, `exec:checks` and `out:findings`, and nothing else.");
+    expect(r).toContain("- `code:read`: read the code and change none of it.");
+    expect(r).toContain("a tracked change, a commit, a moved ref or remote branch, or a changed git config or hook refuses `norn done`");
+    expect(r).toContain("- `exec:checks`: run the repo's checks");
+    expect(r).toContain("- `out:findings`: write findings");
+  });
+
+  test("a step that may not keep code is told to leave it as it was, not to commit it", () => {
+    expect(finish(granted(["code:read"]))).toContain("Leave the code as the run found it");
+    expect(finish(granted(["code:read"]))).not.toContain("Commit your work before");
+    const scratch = granted(["code:scratch", "exec:any"]);
+    expect(rules(scratch)).toContain("- `code:scratch`: change the code only to try things out: norn resets it to where the run started once you report.");
+    expect(finish(scratch)).toContain("Nothing you change in the code is kept");
+    expect(finish(granted(["code:write"]))).toContain("Commit your work before `norn done`");
+    expect(finish(renderBrief(input()))).toContain("Commit your work before `norn done`");
+  });
+
+  test("a grant to post on the story's item lifts the rule that only norn changes the remote, for that alone", () => {
+    const r = rules(granted(["code:scratch", "tracker:comment", "tracker:label"]));
+    expect(r).toContain("- `tracker:comment`: comment on the story's item.");
+    expect(r).toContain("Never `git push`, never switch branches or worktrees, and change nothing on the remote beyond what your grant names");
+    expect(rules(granted(["code:read"]))).toContain("never change the remote (a pull request, an issue, a comment)");
   });
 });

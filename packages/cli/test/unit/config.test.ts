@@ -206,6 +206,37 @@ describe("the runtime config derived from the person's", () => {
     expect(found.map((p) => `${p.layer} ${p.path}`)).toEqual(["repo /executors/claude/args"]);
   });
 
+  test("an executor without a runner of its own runs under one name per attendance, in the runner runners: picks, headless for agent and none unless set", async () => {
+    const BARE = LOCAL_CONFIG.replace("claude: { harness: claude, runner: headless }", "deep: { harness: claude, model: opus }");
+    const plain = runtimeConfigOf(await loaded({ local: BARE }), "me@box");
+    expect(plain.executors).toEqual({
+      "deep@agent": { name: "claude", runner: { name: "headless" }, model: "opus" },
+      "deep@none": { name: "claude", runner: { name: "headless" }, model: "opus" },
+    });
+    expect(plain.kernel.executor).toBe("deep");
+    const panes = runtimeConfigOf(await loaded({ local: `${BARE}runners: { person: herdr, none: { use: headless, kill_grace_ms: 500 } }\n` }), "me@box");
+    expect(panes.executors).toEqual({
+      "deep@person": { name: "claude", runner: { name: "herdr" }, model: "opus" },
+      "deep@agent": { name: "claude", runner: { name: "headless" }, model: "opus" },
+      "deep@none": { name: "claude", runner: { name: "headless", config: { kill_grace_ms: 500 } }, model: "opus" },
+    });
+    // an executor that names its runner keeps it, whatever runners: says
+    const own = runtimeConfigOf(await loaded({ local: `${LOCAL_CONFIG}runners: { person: herdr }\n` }), "me@box");
+    expect(own.executors).toEqual({ claude: { name: "claude", runner: { name: "headless" } } });
+    expect((await problems({ local: `${BARE}runners: { everyone: herdr }\n` })).map((p) => `${p.path} ${p.message}`)).toEqual(["/runners unknown property 'everyone'"]);
+  });
+
+  test("bind: maps an agent role or a workflow's step to an executor or a fallback list, each one configured", async () => {
+    const two = `${LOCAL_CONFIG}  other: { harness: pi, runner: headless }\nexecutor: claude\n`;
+    const c = await loaded({ local: `${two}bind: { builder: [other, claude], reviewer: other, story.review: claude }\n` });
+    expect(runtimeConfigOf(c, "me@box").kernel.bind).toEqual({ builder: ["other", "claude"], reviewer: ["other"], "story.review": ["claude"] });
+    expect(runtimeConfigOf(await loaded({ local: two }), "me@box").kernel.bind).toBeUndefined();
+    expect((await problems({ local: `${two}bind: { builder: [other, codex] }\n` })).map((p) => `${p.layer} ${p.path} ${p.message}`)).toEqual([
+      "merged /bind/builder names codex, which is not under `executors` (claude, other)",
+    ]);
+    expect([...new Set((await problems({ local: `${two}bind: { builder: [] }\n` })).map((p) => p.path))]).toEqual(["/bind/builder"]);
+  });
+
   test("an executor key no harness reads is a config error rather than a setting ignored", async () => {
     const found = await problems({ user: LOCAL_CONFIG, repo: "executors: { claude: { effort: high } }\n" });
     expect(found.map((p) => `${p.layer} ${p.path} ${p.message}`)).toEqual(["repo /executors/claude unknown property 'effort'"]);
@@ -274,9 +305,69 @@ describe("the runtime config derived from the person's", () => {
     expect(planSet(c, LOCAL_CONFIG, "local", "checks.Test", "x").ok).toBe(false);
   });
 
+  test("sources: each binding of a workflow source reaches the kernel, the local file's over the user's; a name or an empty path it refuses", async () => {
+    const r = runtimeConfigOf(await loaded({ user: "sources: { brand: /assets/brand, adr: /old/adr }\n", local: `${LOCAL_CONFIG}sources: { adr: docs/decisions }\n` }), "me@box");
+    expect(r.kernel.sources).toEqual({ brand: "/assets/brand", adr: "docs/decisions" });
+    expect("sources" in runtimeConfigOf(await loaded({ local: LOCAL_CONFIG }), "me@box").kernel).toBe(false);
+    const c = await loaded({ local: LOCAL_CONFIG });
+    expect(planSet(c, LOCAL_CONFIG, "local", "sources.brand", "/assets/brand").ok).toBe(true);
+    expect(planSet(c, LOCAL_CONFIG, "local", "sources.brand", "").ok).toBe(false);
+    expect(planSet(c, LOCAL_CONFIG, "local", "sources.Brand", "x").ok).toBe(false);
+  });
+
   test("durations", () => {
     expect([durationMs("250ms"), durationMs("30s"), durationMs("15m"), durationMs("2h"), durationMs("7d")]).toEqual([250, 30_000, 900_000, 7_200_000, 604_800_000]);
     expect(() => durationMs("15 m")).toThrow();
+  });
+});
+
+describe("policy: granted in the user's file only; a repo file may narrow it, never widen it", () => {
+  const USER_POLICY = "policy: { stand_in: { gates: [story.ready, story.human-qa], attended: [refinement.refine] } }\n";
+
+  test("a list the user's file grants is cut to what a repo file also names, and a list no repo file names stays the user's", async () => {
+    const c = await loaded({ user: USER_POLICY, local: LOCAL_CONFIG, repo: "policy: { stand_in: { gates: [story.ready, quick.ready] } }\n" });
+    expect(c.config.policy).toEqual({ stand_in: { gates: ["story.ready"], attended: ["refinement.refine"] } });
+  });
+
+  test("a grant only a repo file makes is no grant: the committed file and the repo-local one each narrow", async () => {
+    expect((await loaded({ local: `${LOCAL_CONFIG}policy: { stand_in: { gates: [story.ready] } }\n` })).config.policy).toEqual({ stand_in: { gates: [] } });
+    const both = await loaded({ user: USER_POLICY, local: `${LOCAL_CONFIG}policy: { stand_in: { attended: [] } }\n`, repo: "policy: { stand_in: { gates: [story.human-qa] } }\n" });
+    expect(both.config.policy).toEqual({ stand_in: { gates: ["story.human-qa"], attended: [] } });
+  });
+
+  test("a set in a repo file that names more than the user's grants still loads, and the merged policy keeps only the user's", async () => {
+    const c = await loaded({ user: USER_POLICY, local: LOCAL_CONFIG });
+    const r = planSet(c, null, "repo", "policy.stand_in.gates", ["story.ready", "story.merge"]);
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    expect(getKey(r.next.config, "policy.stand_in.gates")).toEqual(["story.ready"]);
+  });
+
+  test("a grant names a workflow's step as <workflow>.<step>, once; anything else is refused", async () => {
+    expect(await problems({ user: "policy: { stand_in: { gates: [ready] } }\n", local: LOCAL_CONFIG })).toMatchObject([{ layer: "user", path: "/policy/stand_in/gates/0" }]);
+    expect((await problems({ user: "policy: { stand_in: { gates: [story.ready, story.ready] } }\n", local: LOCAL_CONFIG }))[0]).toMatchObject({ layer: "user", path: "/policy/stand_in/gates" });
+    expect((await problems({ user: "policy: { stand_out: {} }\n", local: LOCAL_CONFIG }))[0]).toMatchObject({ layer: "user", path: "/policy" });
+  });
+
+  test("capabilities caps every step's grant: the user's list, cut by a repo file's; a repo file alone narrows every capability, and none set caps nothing", async () => {
+    expect((await loaded({ user: "policy: { allow: [code:read, docs:write] }\n", local: LOCAL_CONFIG })).config.policy).toEqual({ allow: ["code:read", "docs:write"] });
+    expect((await loaded({ user: "policy: { allow: [code:read, docs:write] }\n", local: `${LOCAL_CONFIG}policy: { allow: [docs:write, exec:any] }\n` })).config.policy).toEqual({ allow: ["docs:write"] });
+    expect((await loaded({ local: `${LOCAL_CONFIG}policy: { allow: [code:write, code:write2] }\n` }).catch(() => null))).toBeNull();
+    expect((await loaded({ local: `${LOCAL_CONFIG}policy: { allow: [docs:write, exec:any] }\n` })).config.policy).toEqual({ allow: ["docs:write", "exec:any"] });
+    expect(runtimeConfigOf(await loaded({ user: "policy: { allow: [code:read] }\n", local: LOCAL_CONFIG }), "me@box").kernel.capabilities).toEqual(["code:read"]);
+    expect("capabilities" in runtimeConfigOf(await loaded({ local: LOCAL_CONFIG }), "me@box").kernel).toBe(false);
+  });
+
+  test("the policy reaches the runtime as the stand-in grants, empty lists when no file grants any", async () => {
+    expect(runtimeConfigOf(await loaded({ user: USER_POLICY, local: LOCAL_CONFIG }), "me@box").standIn).toEqual({ gates: ["story.ready", "story.human-qa"], attended: ["refinement.refine"] });
+    expect(runtimeConfigOf(await loaded({ local: LOCAL_CONFIG }), "me@box").standIn).toEqual({ gates: [], attended: [] });
+  });
+
+  test("the kernel decides on the user's stand-in grants as a repo file narrows them, and on none when no file grants any", async () => {
+    const user = "policy: { stand_in: { attended: [supervised.build, story.build], gates: [supervised.ready] } }\n";
+    expect(runtimeConfigOf(await loaded({ user, local: LOCAL_CONFIG }), "me@box").kernel.standIn).toEqual({ attended: ["supervised.build", "story.build"], gates: ["supervised.ready"] });
+    const narrowed = await loaded({ user, local: LOCAL_CONFIG, repo: "policy: { stand_in: { attended: [supervised.build, quick.build] } }\n" });
+    expect(runtimeConfigOf(narrowed, "me@box").kernel.standIn).toEqual({ attended: ["supervised.build"], gates: ["supervised.ready"] });
+    expect(runtimeConfigOf(await loaded({ local: `${LOCAL_CONFIG}policy: { stand_in: { attended: [supervised.build] } }\n` }), "me@box").kernel.standIn?.attended ?? []).toEqual([]);
   });
 });
 
@@ -309,6 +400,16 @@ describe("writing a config file", () => {
     expect(setKeyInText(text, "kernel.mode", "auto")).toBe("# mine\nformat: 1\nbase: main # trunk soon\nkernel:\n  mode: auto\n");
     expect(setKeyInText(null, "base", "dev")).toBe("format: 1\nbase: dev\n");
     expect(setKeyInText("format: 1\nbase: dev\n", "base", undefined)).toBe("format: 1\n");
+  });
+
+  test("a bind: key names a workflow's step with a dot, which a dotted key keeps whole", async () => {
+    expect(setKeyInText("format: 1\n", "bind.story.review", "deep")).toBe("format: 1\nbind:\n  story.review: deep\n");
+    const c = await loaded({ local: LOCAL_CONFIG });
+    const r = planSet(c, LOCAL_CONFIG, "local", "bind.story.review", "claude");
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    expect(getKey(r.next.config, "bind.story.review")).toBe("claude");
+    const bad = planSet(c, LOCAL_CONFIG, "local", "bind.story.review", "codex");
+    expect(bad.ok ? [] : bad.problems.map((p) => p.path)).toEqual(["/bind/story.review"]);
   });
 
   test("a set that would break the config is refused before anything is written", async () => {

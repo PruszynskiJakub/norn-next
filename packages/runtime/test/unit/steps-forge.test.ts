@@ -82,6 +82,10 @@ describe("norn-steps-forge", () => {
   test("provides open-pr and await-merge", () => {
     expect(Object.keys(stepsForgePlugin.provides.stepKinds ?? {}).sort()).toEqual(["await-merge", "open-pr"]);
   });
+
+  test("both work over the forge slot, so a workflow names them forge.open-pr and forge.await-merge", () => {
+    expect(Object.values(stepsForgePlugin.provides.stepKinds ?? {}).map((k) => k.slot)).toEqual(["forge", "forge"]);
+  });
 });
 
 describe("open-pr", () => {

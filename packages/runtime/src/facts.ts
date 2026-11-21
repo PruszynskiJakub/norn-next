@@ -57,7 +57,7 @@ const message = (e: unknown): string => (e instanceof Error ? e.message : String
 function capabilitiesOf(env: RuntimeEnv): KernelCapabilities {
   const executors: Record<string, ExecutorCapabilities> = {};
   for (const [name, harness] of Object.entries(env.slots.executors)) {
-    const { blockStop, denyTool, injectContext, subagents, limits, paneInput, promptMarks, resume } = harness.capabilities;
+    const { blockStop, denyTool, injectContext, subagents, limits, paneInput, promptMarks, resume, sandbox } = harness.capabilities;
     const own = env.launcher.modesOf?.(name) ?? null;
     executors[name] = {
       blockStop,
@@ -73,6 +73,8 @@ function capabilitiesOf(env: RuntimeEnv): KernelCapabilities {
       headless: own?.headless ?? env.launcher.modes.headless,
       attended: own?.attended ?? env.launcher.modes.attended,
       ...(own?.dialogKeys === true && { dialogKeys: true }),
+      // either one holding the agent in a sandbox is enough; nothing declared is no sandbox
+      ...((sandbox === true || own?.sandbox === true) && { sandbox: true }),
     };
   }
   return { tracker: { ...env.slots.tracker.capabilities }, forge: { ...env.slots.forge.capabilities }, store: { ...env.slots.store.capabilities }, executors };

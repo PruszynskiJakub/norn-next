@@ -17,6 +17,11 @@ const GITIGNORE = "# norn-owned: the pi extension norn installs stays out of git
 
 const isNorns = (text: string | null): boolean => text !== null && text.startsWith(EXTENSION_MARKER);
 
+/** norn's extension is the agent's hooks whole, so its text is what a run pins. */
+export async function hookConfig(worktree: string): Promise<string | null> {
+  return readText(extensionPath(worktree));
+}
+
 /** A file there that norn did not write is a person's extension: refused, never overwritten. */
 function ownedOrAbsent(path: string, text: string | null, owned: boolean): void {
   if (text !== null && !owned) throw new Error(`${path} exists and is not norn's; move it out of .pi/extensions/norn`);

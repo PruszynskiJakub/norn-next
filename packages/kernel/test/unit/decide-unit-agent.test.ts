@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { Capability } from "@norn/plugin-api";
 import { caps, decideCase, graph, agentSpec, kindOf, loaded, minutesAgo, minutesAhead, receipt, run, session, stateAt, NOW } from "./decide-unit-fixtures.ts";
 
 describe("a ready agent step", () => {
@@ -40,6 +41,40 @@ describe("a ready agent step", () => {
     expect(d.inbox?.text).toContain("writes: docs");
   });
 
+  test("a step that reads a source nothing binds parks stuck with how to bind it, fresh or retried", () => {
+    const wf = loaded({ ...graph({ build: { agent: agentSpec({ inputs: ["spec", "brand"], sources: ["brand"] }) } }), sources: { brand: { type: "folder" } } });
+    const d = kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf] }), "park");
+    expect(d.rule).toBe("source.unbound");
+    expect(d.intent.data).toMatchObject({ kind: "unit.parked", reason: "source.unbound" });
+    expect(d.inbox?.kind).toBe("stuck");
+    expect(d.inbox?.text).toBe("step 'build' reads the source `brand`, which nothing binds on this machine: bind it with `norn config set sources.brand <path>`, or give it a path: in the workflow");
+    const retried = kindOf(decideCase({ state: stateAt("build", { run: run() }, wf), workflows: [wf], session: session("ended") }), "park");
+    expect(retried.rule).toBe("source.unbound");
+  });
+
+  test("a source the workflow gives a path, or the config binds, starts the step; an optional read of one never holds it", () => {
+    const pathed = loaded({ ...graph({ build: { agent: agentSpec({ inputs: ["brand"], sources: ["brand"] }) } }), sources: { brand: { type: "folder", path: "assets/brand" } } });
+    expect(decideCase({ state: stateAt("build", {}, pathed), workflows: [pathed] })?.rule).toBe("agent.start");
+    const bound = loaded({ ...graph({ build: { agent: agentSpec({ inputs: ["brand"], sources: ["brand"] }) } }), sources: { brand: { type: "folder" } } });
+    expect(decideCase({ state: stateAt("build", {}, bound), workflows: [bound], config: { sources: { brand: "/assets/brand" } } })?.rule).toBe("agent.start");
+    const optional = loaded({ ...graph({ build: { agent: agentSpec({ inputs: ["brand?"] }) } }), sources: { brand: { type: "folder" } } });
+    expect(decideCase({ state: stateAt("build", {}, optional), workflows: [optional] })?.rule).toBe("agent.start");
+  });
+
+  test("a park on an unbound source lifts once the config binds it or the workflow gives it a path, and the step starts next", () => {
+    const parked = { reason: "source.unbound", since: minutesAgo(30) };
+    const step = graph({ build: { agent: agentSpec({ inputs: ["brand"], sources: ["brand"] }) } });
+    const unbound = loaded({ ...step, sources: { brand: { type: "folder" } } });
+    expect(decideCase({ state: stateAt("build", { parked }, unbound), workflows: [unbound] })?.rule).toBe("unit.parked");
+    const bound = { sources: { brand: "/assets/brand" } };
+    const lifted = kindOf(decideCase({ state: stateAt("build", { parked }, unbound), workflows: [unbound], config: bound }), "apply_receipts");
+    expect(lifted.rule).toBe("unit.unpark");
+    expect(lifted.state.parked).toBeUndefined();
+    expect(decideCase({ state: lifted.state, workflows: [unbound], config: bound })?.rule).toBe("agent.start");
+    const pathed = loaded({ ...step, sources: { brand: { type: "folder", path: "assets/brand" } } });
+    expect(decideCase({ state: stateAt("build", { parked }, pathed), workflows: [pathed] })?.rule).toBe("unit.unpark");
+  });
+
   test("a docs-only step starts where the harness denies a tool, and a step that writes its worktree starts either way", () => {
     const docs = loaded(graph({ build: { agent: agentSpec({ writes: "docs" }) } }));
     expect(decideCase({ state: stateAt("build", {}, docs), workflows: [docs] })?.rule).toBe("agent.start");
@@ -64,18 +99,30 @@ describe("a ready agent step", () => {
   });
 
   test("an attended step waits for a person even in auto mode", () => {
-    const wf = loaded(graph({ build: { agent: agentSpec({ attended: true }) } }));
+    const wf = loaded(graph({ build: { agent: agentSpec({ attended: "person" }) } }));
     const d = kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf] }), "park");
     expect(d).toMatchObject({ rule: "agent.ready.attended", inbox: { kind: "attended" } });
   });
 
-  test("a person's start lifts an attended step's park: in a pane the run is attended, headless it runs as an auto run", () => {
-    const wf = loaded(graph({ build: { agent: agentSpec({ attended: true }) } }));
+  test("a person's start lifts an attended step's park, and its run is attended in the pane", () => {
+    const wf = loaded(graph({ build: { agent: agentSpec({ attended: "person" }) } }));
     const requested = { by: "ann", at: NOW };
     const pane = kindOf(decideCase({ state: stateAt("build", { requested }, wf), workflows: [wf], executors: { claude: caps({ headless: true, attended: true }) } }), "start_run");
     expect([pane.rule, pane.attended, pane.intent.data]).toMatchObject(["agent.start", true, { kind: "run.started", attended: true }]);
-    const headless = kindOf(decideCase({ state: stateAt("build", { requested }, wf), workflows: [wf], executors: { claude: caps({ headless: true, attended: false }) } }), "start_run");
-    expect([headless.rule, headless.attended]).toEqual(["agent.start", false]);
+  });
+
+  test("an attended step on a runner without presence parks stuck naming the fix, started or not, and never runs as an auto run", () => {
+    const wf = loaded(graph({ build: { agent: agentSpec({ attended: "person" }) } }));
+    const headless = { claude: caps({ headless: true, attended: false }) };
+    for (const requested of [undefined, { by: "ann", at: NOW }]) {
+      const d = kindOf(decideCase({ state: stateAt("build", requested ? { requested } : {}, wf), workflows: [wf], executors: headless }), "park");
+      expect(d).toMatchObject({ rule: "agent.no_presence", inbox: { kind: "stuck" } });
+      expect(d.inbox?.text).toContain("norn config set executors.claude.runner herdr");
+    }
+    // an executor that runs in the runner runners.person picks is fixed there
+    const bound = loaded(graph({ build: { agent: agentSpec({ attended: "person", role: "builder" }) } }));
+    const d = kindOf(decideCase({ state: stateAt("build", {}, bound), workflows: [bound], executors: { "deep@person": caps({ attended: false }) }, config: { bind: { builder: ["deep"] } } }), "park");
+    expect(d.inbox?.text).toContain("norn config set runners.person herdr");
   });
 
   test("auto mode on an executor that cannot run headless waits for a person", () => {
@@ -104,6 +151,73 @@ describe("a ready agent step", () => {
   test("a park a receipt put there holds", () => {
     const parked = { reason: "build: the agent asks a question", since: minutesAgo(3) };
     expect(decideCase({ state: stateAt("build", { parked }) })).toMatchObject({ kind: "noop", rule: "unit.parked" });
+  });
+});
+
+describe("the executor and runner a step runs on", () => {
+  const roleWf = (over: Partial<Parameters<typeof agentSpec>[0]> = {}) => loaded(graph({ build: { agent: agentSpec({ role: "builder", ...over }) } }));
+  const startOn = (c: Parameters<typeof decideCase>[0]) => kindOf(decideCase(c), "start_run").executor;
+
+  test("the config's bind: maps the step's role to an executor, and a binding of the workflow's step outranks the role's", () => {
+    const wf = roleWf();
+    const executors = { claude: caps(), deep: caps(), other: caps() };
+    expect(startOn({ state: stateAt("build", {}, wf), workflows: [wf], executors, config: { bind: { builder: ["deep"] } } })).toBe("deep");
+    expect(startOn({ state: stateAt("build", {}, wf), workflows: [wf], executors, config: { bind: { builder: ["deep"], "story.build": ["other"] } } })).toBe("other");
+    // a binding of another workflow's step, or of another role, leaves the config's executor
+    expect(startOn({ state: stateAt("build", {}, wf), workflows: [wf], executors, config: { bind: { reviewer: ["deep"], "slice.build": ["other"] } } })).toBe("claude");
+    // an older step's by: names its executor, which no binding moves
+    const named = roleWf({ executor: "other" });
+    expect(startOn({ state: stateAt("build", {}, named), workflows: [named], executors, config: { bind: { builder: ["deep"] } } })).toBe("other");
+  });
+
+  test("a fallback list runs the first executor that matches the step: configured, with presence for a person beside it, and a harness that denies a tool for a docs-only step", () => {
+    const requested = { by: "ann", at: NOW };
+    const executors = { headless: caps({ attended: false }), loose: caps({ denyTool: false }), deep: caps() };
+    const bind = { builder: ["gone", "headless", "loose", "deep"] };
+    const attended = roleWf({ attended: "person" });
+    expect(startOn({ state: stateAt("build", { requested }, attended), workflows: [attended], executors, config: { bind } })).toBe("loose");
+    const docs = roleWf({ attended: "person", writes: "docs" });
+    expect(startOn({ state: stateAt("build", { requested }, docs), workflows: [docs], executors, config: { bind } })).toBe("deep");
+    const plain = roleWf();
+    expect(startOn({ state: stateAt("build", {}, plain), workflows: [plain], executors, config: { bind } })).toBe("headless");
+  });
+
+  test("when no executor of the list matches, the unit parks with the first one's rule and every one's reason", () => {
+    const wf = roleWf({ attended: "person", writes: "docs" });
+    const d = kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf], executors: { headless: caps({ attended: false }), loose: caps({ denyTool: false }) }, config: { bind: { builder: ["headless", "loose", "gone"] } } }), "park");
+    expect(d.rule).toBe("agent.no_presence");
+    for (const name of ["headless", "loose", "gone"]) expect(d.inbox?.text).toContain(`'${name}'`);
+  });
+
+  test("an executor without a runner of its own runs in the runner the step's attendance picks", () => {
+    const executors = { "deep@person": caps({ headless: false, attended: true }), "deep@agent": caps({ attended: false }), "deep@none": caps({ attended: false }) };
+    const config = { bind: { builder: ["deep"] } };
+    const requested = { by: "ann", at: NOW };
+    for (const [attended, target] of [["none", "deep@none"], ["agent", "deep@agent"], ["person", "deep@person"]] as const) {
+      const wf = roleWf({ attended });
+      const d = kindOf(decideCase({ state: stateAt("build", { requested }, wf), workflows: [wf], executors, config }), "start_run");
+      expect([attended, d.executor, d.attended]).toEqual([attended, target, attended === "person"]);
+    }
+  });
+
+  test("an executor whose runner for the step's attendance is not set parks: without presence for a person, unconfigured otherwise", () => {
+    const executors = { "deep@none": caps({ attended: false }) };
+    const config = { bind: { builder: ["deep"] } };
+    const person = roleWf({ attended: "person" });
+    const p = kindOf(decideCase({ state: stateAt("build", {}, person), workflows: [person], executors, config }), "park");
+    expect(p.rule).toBe("agent.no_presence");
+    expect(p.inbox?.text).toContain("runners.person");
+    const agent = roleWf({ attended: "agent" });
+    const a = kindOf(decideCase({ state: stateAt("build", {}, agent), workflows: [agent], executors, config }), "park");
+    expect(a.rule).toBe("agent.no_executor");
+    expect(a.inbox?.text).toContain("runners.agent");
+  });
+
+  test("a retry stays on the executor and runner its run started on", () => {
+    const wf = roleWf();
+    const executors = { "deep@none": caps(), other: caps() };
+    const d = kindOf(decideCase({ state: stateAt("build", { run: run({ executor: "deep@none" }) }, wf), workflows: [wf], session: session("ended"), executors, config: { bind: { builder: ["other"] } } }), "retry_run");
+    expect(d.executor).toBe("deep@none");
   });
 });
 
@@ -467,5 +581,116 @@ describe("an answer to a session that cannot take it", () => {
       const d = kindOf(decideCase({ ...c, receipts: answered }), "apply_receipts");
       expect([d.rule, d.undelivered]).toEqual(["receipts.apply", undefined]);
     }
+  });
+});
+
+describe("the effective grant", () => {
+  const roles: Record<string, Capability[]> = { builder: ["code:write", "docs:write", "exec:any"], reviewer: ["code:read", "docs:write", "exec:checks", "out:findings"], qa: ["code:scratch", "exec:any"] };
+  const roleStep = (role: string, over: Parameters<typeof agentSpec>[0] = {}) => loaded(graph({ build: { agent: agentSpec({ role, ...over }) } }));
+
+  test("a step that names a role is briefed and launched with its role's capabilities, narrowed by allow: and capped by the policy", () => {
+    const wf = roleStep("builder", { allow: ["code:write", "exec:any"] });
+    const d = kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf], config: { roles, capabilities: ["code:write", "docs:write"] } }), "start_run");
+    expect(d.brief.grant).toEqual(["code:write"]);
+    const retry = kindOf(decideCase({ state: stateAt("build", { run: run() }, wf), workflows: [wf], session: session("ended"), config: { roles } }), "retry_run");
+    expect(retry.brief.grant).toEqual(["code:write", "exec:any"]);
+  });
+
+  test("a step in the older form, or a host with no role registry, is briefed with no grant", () => {
+    expect(kindOf(decideCase({ state: stateAt("build"), config: { roles } }), "start_run").brief.grant).toBeUndefined();
+    const wf = roleStep("builder");
+    expect(kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf] }), "start_run").brief.grant).toBeUndefined();
+  });
+
+  test("a grant that may only read code is held by the write guard, so a harness that cannot deny a tool parks it", () => {
+    const wf = roleStep("reviewer");
+    const d = kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf], executors: { claude: caps({ denyTool: false }) }, config: { roles } }), "park");
+    expect(d.rule).toBe("agent.unguarded");
+    expect(d.inbox?.text).toContain("may change no code (code:read)");
+    const scratch = roleStep("qa");
+    expect(decideCase({ state: stateAt("build", {}, scratch), workflows: [scratch], executors: { claude: caps({ denyTool: false }) }, config: { roles } })?.rule).toBe("agent.start");
+  });
+});
+
+describe("the code level a run starts under", () => {
+  const roles: Record<string, Capability[]> = { builder: ["code:write"], reviewer: ["code:read", "docs:write"], qa: ["code:scratch"] };
+  const at = (role: string) => {
+    const wf = loaded(graph({ build: { agent: agentSpec({ role }) } }));
+    return { wf, state: stateAt("build", {}, wf) };
+  };
+
+  test("is recorded on run.started when the grant may not keep code, so the host notes what the agent could change before it starts", () => {
+    for (const [role, code] of [["reviewer", "read"], ["qa", "scratch"]] as const) {
+      const { wf, state } = at(role);
+      const d = kindOf(decideCase({ state, workflows: [wf], config: { roles } }), "start_run");
+      expect(d.intent.data).toMatchObject({ kind: "run.started", code });
+    }
+    const { wf, state } = at("builder");
+    expect(kindOf(decideCase({ state, workflows: [wf], config: { roles } }), "start_run").intent.data).not.toHaveProperty("code");
+  });
+
+  test("a retry runs under the level its run started with", () => {
+    const { wf } = at("reviewer");
+    const d = kindOf(decideCase({ state: stateAt("build", { run: run({ code: "read" }) }, wf), workflows: [wf], session: session("ended"), config: { roles } }), "retry_run");
+    expect(d.intent.data).toMatchObject({ kind: "run.started", code: "read", retry_of: "run-1" });
+  });
+});
+
+describe("the check of a run that may not keep code, once it reports", () => {
+  const done = (seq: number, over: Record<string, unknown> = {}) => receipt(seq, { kind: "run.reported", run_id: "run-1", verb: "done", outcome: "done", step: "build", attempt: 1, ...over } as never);
+  const checking = (seq: number) => receipt(seq, { kind: "run.checking", run_id: "run-1", step: "build", attempt: 1 });
+  const checked = (seq: number, verdict: "clean" | "reset" | "refused" | "failed", detail?: string) =>
+    receipt(seq, { kind: "run.checked", run_id: "run-1", verdict, step: "build", attempt: 1, ...(detail && { detail }) });
+  const guarded = (over = {}) => stateAt("build", { run: run({ code: "read", session: "s-1", ...over }) });
+
+  test("a done is checked before it is applied: the host kills the run's processes, compares and resets under a receipt", () => {
+    const d = kindOf(decideCase({ state: guarded(), receipts: [done(1)] }), "check_run");
+    expect(d).toMatchObject({ rule: "agent.check", run_id: "run-1", code: "read", passes: false });
+    expect(d.intent.data).toEqual({ kind: "run.checking", run_id: "run-1", step: "build", attempt: 1 });
+  });
+
+  test("an outcome whose verdict is pass is checked as passing the step", () => {
+    const wf = loaded(graph({ build: { agent: agentSpec({ verdict: { done: "pass" } }) } }));
+    const d = kindOf(decideCase({ state: stateAt("build", { run: run({ code: "scratch" }) }, wf), workflows: [wf], receipts: [done(1)] }), "check_run");
+    expect(d).toMatchObject({ code: "scratch", passes: true });
+  });
+
+  test("a check cut short runs again under the intent already written", () => {
+    const d = kindOf(decideCase({ state: guarded(), receipts: [done(1), checking(2)] }), "check_run");
+    expect(d.intent.id).toBe("r-2");
+  });
+
+  test("a clean or reset check lets the report route", () => {
+    for (const verdict of ["clean", "reset"] as const) {
+      const d = kindOf(decideCase({ state: guarded(), receipts: [done(1), checking(2), checked(3, verdict)] }), "apply_receipts");
+      expect(d.state).toMatchObject({ step: "test", run: null });
+      expect(d.rejected).toEqual([]);
+    }
+  });
+
+  test("a refused or failed check refuses the report and parks the unit stuck with what it found", () => {
+    const d = kindOf(decideCase({ state: guarded(), receipts: [done(1), checking(2), checked(3, "refused", "tracked files changed since the run started: src/a.ts")] }), "apply_receipts");
+    expect(d.state.step).toBe("build");
+    expect(d.state.parked).toMatchObject({ reason: "run.check.refused", text: "the check after run run-1 reported refused it: tracked files changed since the run started: src/a.ts" });
+    expect(d.rejected).toEqual([{ seq: 1, reason: "the check after run run-1 reported refused it" }]);
+    const failed = kindOf(decideCase({ state: guarded(), receipts: [done(1), checking(2), checked(3, "failed", "git diff: fatal")] }), "apply_receipts");
+    expect(failed.state.parked?.reason).toBe("run.check.failed");
+  });
+
+  test("a launch not yet applied is checked too, a fresh run or a retry, under the code its receipt names", () => {
+    const started = (seq: number, over: Record<string, unknown> = {}) =>
+      receipt(seq, { kind: "run.started", run_id: "run-2", run_kind: "agent", executor: "claude", attended: false, code: "read", session: "s-2", step: "build", attempt: 1, ...over } as never);
+    const fresh = kindOf(decideCase({ state: stateAt("build", { run: null }), receipts: [started(1), done(2, { run_id: "run-2" })] }), "check_run");
+    expect(fresh).toMatchObject({ run_id: "run-2", code: "read" });
+    expect(fresh.intent.data).toEqual({ kind: "run.checking", run_id: "run-2", step: "build", attempt: 1 });
+    const retry = kindOf(decideCase({ state: guarded(), receipts: [started(1, { retry_of: "run-1", code: "scratch" }), done(2, { run_id: "run-2" })] }), "check_run");
+    expect(retry).toMatchObject({ run_id: "run-2", code: "scratch" });
+    // a launch the kernel would reject (a second fresh run beside the current one) is no run to check
+    expect(decideCase({ state: stateAt("build", { run: run() }), receipts: [started(1), done(2, { run_id: "run-2" })] })?.kind).toBe("apply_receipts");
+  });
+
+  test("a run that keeps its code, an ask or a stuck is applied as it comes", () => {
+    expect(decideCase({ state: stateAt("build", { run: run() }), receipts: [done(1)] })?.kind).toBe("apply_receipts");
+    expect(decideCase({ state: guarded(), receipts: [done(1, { verb: "ask", outcome: undefined, text: "Which?" })] })?.kind).toBe("apply_receipts");
   });
 });

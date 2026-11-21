@@ -7,35 +7,41 @@ description: Build one slice test-first, check and review it, and integrate it i
 start: implement
 steps:
   implement:
-    agent: "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps."
-    skills: [norn-implement]
-    inputs: [slice, spec, handoff, last_check, last_findings]
-    outcomes: { done: test }
-    means:
-      done: "every acceptance criterion (or rework point) has a passing test"
+    by: builder
+    do: "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps."
+    with: { skills: [norn-implement] }
+    reads: [slice, spec, handoff, last_check, findings?]
+    outcomes:
+      done:
+        to: test
+        means: "every acceptance criterion (or rework point) has a passing test"
   test:
-    check: "{checks.test}"
-    timeout: 10m
+    by: shell
+    do: "{checks.test}"
+    limits: { timeout: 10m }
     outcomes: { pass: review, fail: implement }
   review:
-    agent: "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch."
-    skills: [norn-review]
-    writes: docs
-    inputs: [slice, spec, diff, last_findings]
-    hand_back: { changes_requested: findings }
+    by: reviewer
+    do: "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch."
+    with: { skills: [norn-review] }
+    reads: [slice, spec, diff, findings?]
     outcomes:
-      approve:           integrate
-      changes_requested: implement
-    means:
-      approve: "all criteria met, no blocking findings"
-      changes_requested: "blocking findings, handed back with --findings <file>"
+      approve:
+        to: integrate
+        means: "all criteria met, no blocking findings"
+      changes_requested:
+        to: implement
+        means: "blocking findings, handed back as findings"
+        produces: [findings]
   integrate:
-    integrate:
+    by: vcs.integrate
     outcomes: { done: $done, conflict: merge }
   merge:
-    agent: "Slice mode: integrating this slice into the story branch conflicted; merge the story branch's commit the base_side input names into this slice in this worktree, resolve each conflict keeping the intent of both sides, prove it with the tests and commit the merge; never rebase."
-    skills: [norn-merge]
-    inputs: [slice, spec, base_side]
-    outcomes: { done: integrate }
-    means:
-      done: "conflicts resolved keeping the intent of both sides; tests pass"
+    by: builder
+    do: "Slice mode: integrating this slice into the story branch conflicted; merge the story branch's commit the base_side input names into this slice in this worktree, resolve each conflict keeping the intent of both sides, prove it with the tests and commit the merge; never rebase."
+    with: { skills: [norn-merge] }
+    reads: [slice, spec, base_side]
+    outcomes:
+      done:
+        to: integrate
+        means: "conflicts resolved keeping the intent of both sides; tests pass"

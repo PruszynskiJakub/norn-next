@@ -76,7 +76,7 @@ describe("the story's spec", () => {
 });
 
 describe("readable inputs", () => {
-  test("the brief names the story and each input under .agents/: the spec and handoff in its spec folder, the rest in .agents/inputs/, all ignored by git", async () => {
+  test("the brief names the story and each input under .agents/: the spec and handoff in its spec folder, the rest in .agents/run/in/, all ignored by git", async () => {
     const { h } = await started();
     const md = await brief(h);
     expect(md).toContain("## Story");
@@ -86,7 +86,7 @@ describe("readable inputs", () => {
     expect(md).toContain("- `last_check` — the last check's result. no check has run for this unit yet");
     expect(md).toContain("`.agents/specs/lt-1/handoffs/lt-1.md` is this unit's current state");
     expect(md).toContain("ignored by git");
-    expect(await h.files.read(`${WORKTREE}/.agents/inputs/.gitignore`)).toBe("*\n");
+    expect(await h.files.read(`${WORKTREE}/.agents/run/.gitignore`)).toBe("*\n");
     expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/.gitignore`)).toBe("*\n");
     expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/spec.md`)).toContain(ITEM.body);
     expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`)).toContain("# Handoff: lt-1");
@@ -102,7 +102,7 @@ describe("readable inputs", () => {
     await tickUntil(h, async () => (await record(h, UNIT)).state?.run?.step === "review");
     // the next step may run in another checkout: only the story's documents carry the handoff there
     await h.files.remove(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`);
-    await h.files.remove(`${WORKTREE}/.agents/inputs/.base/specs/lt-1/handoffs/lt-1.md`);
+    await h.files.remove(`${WORKTREE}/.agents/run/.base/specs/lt-1/handoffs/lt-1.md`);
     h.items[0] = trackerItem(1, { ...ITEM, body: "The help text says `teh` twice." });
     const md = await brief(h);
     expect(md).toContain("# norn brief — lt-1 · review #1");
@@ -120,6 +120,111 @@ describe("readable inputs", () => {
     expect(write?.ok).toBe(true);
     await brief(h);
     expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`)).toContain("newer, from elsewhere");
+  });
+
+  test("an untouched copy in a worktree made before the run folder, its base under .agents/inputs/.base/, never overwrites a newer document", async () => {
+    const { h } = await started();
+    await brief(h);
+    // the worktree as an older norn left it: norn's copy of the handoff only in the old base folder
+    const handoff = `.agents/specs/lt-1/handoffs/lt-1.md`;
+    const copy = await h.files.read(`${WORKTREE}/.agents/run/.base/specs/lt-1/handoffs/lt-1.md`);
+    expect(copy).toBe(await h.files.read(`${WORKTREE}/${handoff}`));
+    await h.files.write(`${WORKTREE}/.agents/inputs/.base/specs/lt-1/handoffs/lt-1.md`, copy ?? "");
+    await h.files.remove(`${WORKTREE}/.agents/run/.base/specs/lt-1/handoffs/lt-1.md`);
+    const write = await h.env.slots.store.artifacts?.write(UNIT, handoffArtifact(UNIT), "# Handoff\n\nnewer, from elsewhere\n");
+    expect(write?.ok).toBe(true);
+    await brief(h);
+    expect(await doc(h, handoffArtifact(UNIT))).toContain("newer, from elsewhere");
+    expect(await h.files.read(`${WORKTREE}/${handoff}`)).toContain("newer, from elsewhere");
+  });
+});
+
+describe("the run folder", () => {
+  test("a launch empties .agents/run/out/, so a report reads only what its own run wrote there", async () => {
+    const h = harness({ workflow: "handed" });
+    h.items.push(trackerItem(1, ITEM));
+    // left by an earlier run of the unit that died before it reported
+    await h.files.write(`${WORKTREE}/.agents/run/out/findings.json`, "[]");
+    await h.files.write(`${WORKTREE}/.agents/run/out/evidence/shot.txt`, "old");
+    await tickUntil(h, has("agent.start"));
+    const left = Object.keys(h.files.snapshot()).filter((p) => p.startsWith(`${WORKTREE}/.agents/run/out/`));
+    expect(left).toEqual([`${WORKTREE}/.agents/run/out/.gitignore`]);
+  });
+
+  test("a launch on a fresh worktree makes .agents/run/out/, so a shell redirect into $NORN_OUT finds its folder", async () => {
+    const h = harness({ workflow: "handed" });
+    h.items.push(trackerItem(1, ITEM));
+    await tickUntil(h, has("agent.start"));
+    // the host has no folders of their own: a folder exists once a file is in it
+    expect(await h.files.list(`${WORKTREE}/.agents/run/out`)).toEqual([".gitignore"]);
+    expect(await h.files.read(`${WORKTREE}/.agents/run/out/.gitignore`)).toBe("*\n");
+  });
+
+  test("norn brief makes .agents/run/out/ too, for a step briefed before its launch", async () => {
+    const { h } = await started();
+    await h.files.remove(`${WORKTREE}/.agents/run/out/.gitignore`);
+    await brief(h);
+    expect(await h.files.list(`${WORKTREE}/.agents/run/out`)).toEqual([".gitignore"]);
+  });
+
+  test("a launch removes a link left in .agents/run/out/ and never empties the folder it points at", async () => {
+    const h = harness({ workflow: "handed" });
+    h.items.push(trackerItem(1, ITEM));
+    await h.files.write("/machine/repo/test-output/report.txt", "the agent's test output");
+    await h.files.write("/machine/repo/test-output/shots/a.png", "png");
+    // an earlier run linked its evidence folder to the test output
+    await h.files.symlink("../../../../../test-output", `${WORKTREE}/.agents/run/out/evidence`);
+    await tickUntil(h, has("agent.start"));
+    expect(await h.files.read("/machine/repo/test-output/report.txt")).toBe("the agent's test output");
+    expect(await h.files.read("/machine/repo/test-output/shots/a.png")).toBe("png");
+    expect(await h.files.readLink(`${WORKTREE}/.agents/run/out/evidence`)).toBeNull();
+  });
+
+  for (const linked of [".agents/run/out", ".agents/run"]) {
+    test(`a launch removes ${linked} made a link and never empties the folder it points at`, async () => {
+      const h = harness({ workflow: "handed" });
+      h.items.push(trackerItem(1, ITEM));
+      await h.files.write("/machine/repo/test-output/report.txt", "the agent's test output");
+      await h.files.write("/machine/repo/test-output/out/criteria.json", "{}");
+      await h.files.symlink("/machine/repo/test-output", `${WORKTREE}/${linked}`);
+      await tickUntil(h, has("agent.start"));
+      expect(await h.files.read("/machine/repo/test-output/report.txt")).toBe("the agent's test output");
+      expect(await h.files.read("/machine/repo/test-output/out/criteria.json")).toBe("{}");
+      expect(await h.files.readLink(`${WORKTREE}/${linked}`)).toBeNull();
+      expect(await h.files.list(`${WORKTREE}/.agents/run/out`)).toEqual([".gitignore"]);
+    });
+  }
+});
+
+describe("a workflow's sources", () => {
+  async function designing(sources?: Record<string, string>): Promise<Harnessed> {
+    const h = harness({ workflow: "sourced", ...(sources && { kernel: { sources } }) });
+    h.items.push(trackerItem(1, ITEM));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    return h;
+  }
+
+  test("the brief names each source the step reads, at the workflow's path or the config's binding, which wins, and says it is read-only", async () => {
+    const h = await designing({ brand: "/assets/brand", adr: "/elsewhere/adr" });
+    const md = await brief(h);
+    expect(md).toContain("- `adr` — the source `adr` (a folder), read-only: `/elsewhere/adr`");
+    expect(md).toContain("- `brand` — the source `brand` (a folder), read-only: `/assets/brand`");
+    expect(md).toContain("- `tone` — the source `tone` (a file), read-only. nothing binds it on this machine, and the step reads it only when bound");
+    // the open findings, read as `findings?`, are norn's last_findings
+    expect(md).toContain("- `last_findings` — the last findings. no findings sent this work back");
+  });
+
+  test("a source only the workflow binds is at its path in the worktree", async () => {
+    const h = await designing({ brand: "/assets/brand" });
+    expect(await brief(h)).toContain("- `adr` — the source `adr` (a folder), read-only: `docs/adr`");
+  });
+
+  test("a step reading a source nothing binds never starts: it parks for a person to bind it", async () => {
+    const h = harness({ workflow: "sourced" });
+    h.items.push(trackerItem(1, ITEM));
+    await tickUntil(h, has("source.unbound"));
+    expect(h.launcher.of("start")).toEqual([]);
   });
 });
 

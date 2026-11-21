@@ -6,6 +6,7 @@
 import { type Decision, decide, type KernelFacts } from "@norn/kernel";
 import { ulid } from "@norn/schema";
 import { act } from "./act.ts";
+import { heldProblems } from "./confirm.ts";
 import type { RuntimeEnv, TickContext } from "./env.ts";
 import { gatherFacts } from "./facts.ts";
 import { mirrorSpec } from "./inputs.ts";
@@ -74,7 +75,7 @@ export async function tick(env: RuntimeEnv, tickId: string): Promise<TickReport>
   const lock = await acquireTickLock(env.ctx, tickId, env.config.lockStaleMs);
   if (!lock) return { tick_id: tickId, skipped: "locked", decisions: [], outcomes: [], problems: [] };
   const trace = new TickTrace(env.ctx, tickId);
-  const problems: string[] = [];
+  const problems: string[] = heldProblems(env.held);
   try {
     let decisions: Decision[] = [];
     try {

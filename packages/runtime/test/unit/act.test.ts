@@ -129,6 +129,9 @@ describe("agent runs", () => {
   test("a removed worktree is made again before an answer resumes the ended session, as the resumed agent runs in it", async () => {
     const { h, st } = await parkedWithAnswer();
     h.launcher.aliveAnswer = false;
+    // a person removed the worktree while the unit was parked
+    const wt = h.env.slots.vcs.worktree.path("lt-1");
+    for (const path of Object.keys(h.files.snapshot())) if (path.startsWith(`${wt}/`)) await h.files.remove(path);
     const ensuredBeforeAnswer: unknown[] = [];
     const answer = h.launcher.answer.bind(h.launcher);
     h.launcher.answer = async (...args) => {

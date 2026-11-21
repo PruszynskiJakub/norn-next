@@ -4,6 +4,7 @@
  * decisions.
  */
 import type { ForgeCapabilities, HarnessCapabilities, StoreCapabilities, TrackerCapabilities } from "@norn/plugin-api";
+import type { Attendance } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
 import type { Same } from "./same.ts";
 
@@ -34,6 +35,8 @@ export const HarnessCapabilitiesSchema = Type.Object(
     paneInput: Type.Boolean(),
     promptMarks: Type.Optional(Type.Boolean()),
     resume: Type.Optional(Type.Boolean()),
+    /** the agent runs inside an OS sandbox, from its harness or its runner; absent: none, so no gate is delegated to a supervisor on it */
+    sandbox: Type.Optional(Type.Boolean()),
   },
   closed,
 );
@@ -53,6 +56,15 @@ export const ExecutorCapabilities = Type.Object(
   { ...closed, title: "ExecutorCapabilities" },
 );
 export type ExecutorCapabilities = Static<typeof ExecutorCapabilities>;
+
+/**
+ * The name an executor runs under in the runner an attendance picks (`deep@person`), when the config
+ * gives it no runner of its own: one entry of `executors` per runner, so a run's record and handle name
+ * both the executor and its runner, and decide reads a runner's presence as it reads any capability.
+ */
+export function launchTarget(executor: string, attendance: Attendance): string {
+  return `${executor}@${attendance}`;
+}
 
 /** `tracker` and `forge` are null when none is configured; a store always is. */
 export const KernelCapabilities = Type.Object(

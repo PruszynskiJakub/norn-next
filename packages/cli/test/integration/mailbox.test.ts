@@ -5,9 +5,7 @@
  * the gate, and bob's machine then sees the story done from the remote's run data.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { machineName, type NornOut, norn, otherMachine, TEST_PLUGIN, type UnitShown, unitOf, type World, world } from "./world.ts";
+import { machineName, type NornOut, norn, otherMachine, TEST_PLUGIN, type UnitShown, unitOf, type World, world, writeWorkflow } from "./world.ts";
 
 const KEY = "lt-1";
 const SLOW = 240_000;
@@ -20,8 +18,7 @@ async function setUpRefs(w: World): Promise<void> {
   await norn(w, ["plugin", "add", TEST_PLUGIN, "--json"]);
   const init = await norn(w, ["init", "--tracker", "local", "--forge", "none", "--store", "refs", "--executor", "test", "--runner", "headless", "--yes", "--json"]);
   if (init.code !== 0) throw new Error(`init: ${init.stdout}${init.stderr}`);
-  mkdirSync(join(w.root, ".agents", "workflows"), { recursive: true });
-  writeFileSync(join(w.root, ".agents", "workflows", "gated.yaml"), GATED);
+  await writeWorkflow(w, "gated", GATED);
 }
 
 async function tickAs(w: World, env: Record<string, string>, rules: string[]): Promise<void> {

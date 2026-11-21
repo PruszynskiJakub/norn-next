@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Type } from "@sinclair/typebox";
-import { defineNornPlugin, ok, type StepKindDefinition, stepKindAnswerProblem, stepKindProblems, type Vcs, WAITING_OUTCOME } from "../../src/index.ts";
+import { defineNornPlugin, kindEffects, ok, type StepKindDefinition, stepKindAnswerProblem, stepKindProblems, type Vcs, WAITING_OUTCOME } from "../../src/index.ts";
 
 function kind(over: Partial<StepKindDefinition> = {}): StepKindDefinition {
   return {
@@ -56,6 +56,11 @@ describe("defineNornPlugin: step kinds", () => {
       expect(stepKindProblems(key, kind({ name: key }))).toEqual(["is a name the kernel keeps for itself"]);
     }
   });
+
+  test("`role` is a key a pinned agent step holds (plugin API 1.23), so no step kind takes it as its name or a config key", () => {
+    expect(stepKindProblems("open-pr", kind({ configSchema: Type.Object({ role: Type.String() }) }))).toEqual(["config keys role clash with step keys"]);
+    expect(stepKindProblems("role", kind({ name: "role" }))).toEqual(["is a name the kernel keeps for itself"]);
+  });
 });
 
 describe("step kind reads (plugin API 1.20)", () => {
@@ -71,6 +76,44 @@ describe("step kind reads (plugin API 1.20)", () => {
     expect(stepKindProblems("open-pr", kind({ reads: ["PR body", { name: "x y", fallback: "f" }] }))).toEqual(['reads "PR body", "x y" are not input names']);
     expect(stepKindProblems("open-pr", kind({ reads: ["pr_body", { name: "pr_body", fallback: "f" }] }))).toEqual(["reads repeat"]);
     expect(stepKindProblems("open-pr", kind({ reads: [{ name: "pr_body", fallback: " " }, 7 as never] }))).toEqual(["a read is a name, or {name, fallback} with the fallback it takes without it"]);
+  });
+});
+
+describe("step kind produces (plugin API 1.22)", () => {
+  test("a kind may declare the files it writes for later steps, each a name and a file in the story's spec folder, as an agent step does", () => {
+    expect(stepKindProblems("open-pr", kind({ produces: [{ name: "preview_url", file: "preview.md" }] }))).toEqual([]);
+    const plugin = defineNornPlugin({ name: "p", api: "^1.22", provides: { stepKinds: { preview: kind({ name: "preview", produces: [{ name: "preview_url", file: "preview.md" }] }) } } });
+    expect(plugin.provides.stepKinds?.preview?.produces).toEqual([{ name: "preview_url", file: "preview.md" }]);
+  });
+
+  test("a product is a name with a file, each named once", () => {
+    expect(stepKindProblems("open-pr", kind({ produces: "preview_url" as never }))).toEqual(["produces must be a list"]);
+    expect(stepKindProblems("open-pr", kind({ produces: ["preview_url" as never] }))).toEqual(["a product is {name, file}: the name later steps read it by and its file in the story's spec folder"]);
+    expect(stepKindProblems("open-pr", kind({ produces: [{ name: "Preview URL", file: "p.md" }] }))).toEqual(['produces "Preview URL" is not an input name']);
+    expect(stepKindProblems("open-pr", kind({ produces: [{ name: "url", file: "a.md" }, { name: "url", file: "b.md" }] }))).toEqual(["produces repeat"]);
+  });
+
+  test("a product's file stays in the story's spec folder, by the path rule an agent step's file follows", () => {
+    for (const file of ["../../package.json", "a/../../x.md", "/etc/x.md", "out\\x.md", "C:x.md", "c:/x.md"])
+      expect(stepKindProblems("open-pr", kind({ produces: [{ name: "url", file }] }))).toEqual([
+        `produces url names ${JSON.stringify(file)}, which leaves the story's spec folder: name a path inside it, without \`..\`, with \`/\` between folders and no drive letter`,
+      ]);
+    expect(stepKindProblems("open-pr", kind({ produces: [{ name: "url", file: "out/url.md" }] }))).toEqual([]);
+  });
+});
+
+describe("step kind effects (plugin API 1.24)", () => {
+  test("a kind may declare the effects a person must stand before: outward, cost, forge-write", () => {
+    expect(stepKindProblems("deploy", kind({ name: "deploy", effects: ["outward", "cost"] }))).toEqual([]);
+    expect(stepKindProblems("merge", kind({ name: "merge", effects: ["forge-write"] }))).toEqual([]);
+    const plugin = defineNornPlugin({ name: "p", api: "^1.24", provides: { stepKinds: { deploy: kind({ name: "deploy", effects: ["outward"] }) } } });
+    expect(plugin.provides.stepKinds?.deploy?.effects).toEqual(["outward"]);
+  });
+
+  test("an effect is one of those, named once, in a list", () => {
+    expect(stepKindProblems("deploy", kind({ name: "deploy", effects: "outward" as never }))).toEqual(['effects must be a list of "outward", "cost" or "forge-write"']);
+    expect(stepKindProblems("deploy", kind({ name: "deploy", effects: ["publish" as never] }))).toEqual(['effects must be a list of "outward", "cost" or "forge-write"']);
+    expect(stepKindProblems("deploy", kind({ name: "deploy", effects: ["cost", "cost"] }))).toEqual(["effects repeat"]);
   });
 });
 
@@ -103,5 +146,18 @@ describe("step kind slots", () => {
     const vcs = { name: "git" } as unknown as Vcs;
     expect(await pushKind.run({ ...base, slots: { vcs } }, ctx)).toEqual(ok({ outcome: "pushed", detail: "git" }));
     expect(await pushKind.run(base, ctx)).toEqual(ok({ outcome: "no-vcs", detail: undefined }));
+  });
+});
+
+describe("the effects of a step kind", () => {
+  test("the core fixes those of a kind over a slot, whatever its provider declares, so none can leave one out", () => {
+    expect(kindEffects("forge", "await-merge", [])).toEqual(["forge-write"]);
+    expect(kindEffects("forge", "await-merge", undefined)).toEqual(["forge-write"]);
+    expect(kindEffects("vcs", "push", ["outward"])).toEqual([]);
+  });
+
+  test("any other kind has the effects its plugin declares", () => {
+    expect(kindEffects("vercel", "preview", ["outward", "cost"])).toEqual(["outward", "cost"]);
+    expect(kindEffects("vcs", "rebase", undefined)).toEqual([]);
   });
 });

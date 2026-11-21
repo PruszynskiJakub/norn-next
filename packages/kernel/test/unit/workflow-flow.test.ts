@@ -10,6 +10,7 @@ const KINDS: Record<string, StepKindInfo> = {
   ...STEP_KINDS,
   publish: { ...kind("publish", ["done"]), reads: ["notes"] },
   announce: { ...kind("announce", ["done"]), reads: [{ name: "notes", fallback: "announces with no notes" }, "diff"] },
+  preview: { ...kind("preview", ["done", "failed"]), produces: [{ name: "preview_url", file: "preview.md" }] },
 };
 const opts = (over: Partial<LoadWorkflowOptions> = {}): LoadWorkflowOptions => ({ stepKinds: KINDS, sharedFiles: {}, config: DEFAULT_KERNEL_CONFIG, inputs: HOST, ...over });
 const agent = (outcomes: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ agent: "Do the work.", outcomes, ...extra });
@@ -82,6 +83,21 @@ describe("produces: what an agent step writes for the steps after it", () => {
     expect(loadWorkflow(doc, opts({ inputs: undefined })).ok).toBe(true);
   });
 
+  test("a step kind's product is held to the rule an agent step's is: never a file norn writes in the spec folder, never a name norn provides", () => {
+    const specFiles = [".gitignore", "spec.md", "handoffs/", "slices/"];
+    const kinds = {
+      ...KINDS,
+      respec: { ...kind("respec", ["done"]), produces: [{ name: "draft", file: "./Spec.md" }] },
+      rediff: { ...kind("rediff", ["done"]), produces: [{ name: "diff", file: "diff.md" }] },
+    };
+    const doc = wf({ a: { respec: null, outcomes: { done: "b" } }, b: { rediff: null, outcomes: { done: "$done" } } });
+    expect(errorsOf(loadWorkflow(doc, opts({ stepKinds: kinds, specFiles })))).toEqual([
+      { path: "/steps/a/respec", message: "step kind respec produces `draft` as `./Spec.md`, a file norn writes in the spec folder itself: the kind must name another (norn keeps .gitignore, spec.md, handoffs/, slices/)" },
+      { path: "/steps/b/rediff", message: "step kind rediff produces `diff`, an input norn provides: the kind must produce a name of its own" },
+    ]);
+    expect(loadWorkflow(doc, opts({ stepKinds: kinds, inputs: undefined })).ok).toBe(true);
+  });
+
   test("produces is a key of an agent step only", () => {
     const doc = wf({ t: { check: "x", timeout: "1m", produces: NOTES, outcomes: { pass: "$done", fail: "$stuck" } } });
     expect(errorsOf(loadWorkflow(doc, opts()))).toEqual([{ path: "/steps/t/produces", message: "`produces` is not a key of a check step" }]);
@@ -140,6 +156,22 @@ describe("the flow: a step reads only what every path to it produced", () => {
     expect(errorsOf(loadWorkflow(optional, opts()))).toEqual([]);
   });
 
+  test("a step kind's product is produced on every outcome it answers, so a later step reads it, and only after it", () => {
+    const after = wf({ deploy: { preview: null, outcomes: { done: "check", failed: "check" } }, check: agent({ done: "$done" }, { inputs: ["spec", "preview_url"] }) });
+    expect(errorsOf(loadWorkflow(after, opts()))).toEqual([]);
+    const before = wf({ check: agent({ done: "deploy" }, { inputs: ["spec", "preview_url"] }), deploy: { preview: null, outcomes: { done: "$done", failed: "$done" } } });
+    expect(errorsOf(loadWorkflow(before, opts()))).toEqual([
+      { path: "/steps/check/inputs/1", message: "step 'check' reads `preview_url`, but no step produces it on the path check: give a step on that path produces: preview_url" },
+    ]);
+  });
+
+  test("a step kind and an agent step producing one name write the same file, or the workflow is refused", () => {
+    const doc = wf({ deploy: { preview: null, outcomes: { done: "note", failed: "note" } }, note: agent({ done: "$done" }, { produces: { preview_url: { file: "other.md" } } }) });
+    expect(errorsOf(loadWorkflow(doc, opts()))).toEqual([
+      { path: "/steps/note/produces/preview_url/file", message: "`preview_url` is produced as preview.md by step deploy and as other.md here: a produced name names one file" },
+    ]);
+  });
+
   test("shared files are checked once flattened, and a refusal inside one names it", () => {
     const sharedFiles = {
       ship: { start: "out", steps: { out: { publish: null, outcomes: { done: { exit: "shipped" } } } } },
@@ -177,7 +209,9 @@ describe("revisions pinned before produces and reads", () => {
     for (const f of readdirSync(GOLDEN_DIR).filter((n) => n.endsWith(".json"))) {
       const c = JSON.parse(readFileSync(join(GOLDEN_DIR, f), "utf8")) as GoldenCase;
       const kinds = Object.fromEntries(Object.entries(c.step_kinds).map(([name, k]) => [name, { name, ...k } as StepKindInfo]));
-      for (const p of pinnedIn(c.facts)) pinned.set(p.hash, { doc: p.doc, kinds });
+      // a case added since pins a revision that may produce; only the older pins are this test's
+      const older = (doc: unknown) => !Object.values((doc as { steps?: Record<string, object> }).steps ?? {}).some((s) => "produces" in s);
+      for (const p of pinnedIn(c.facts)) if (older(p.doc)) pinned.set(p.hash, { doc: p.doc, kinds });
     }
     expect(pinned.size).toBeGreaterThan(5);
     for (const [hash, { doc, kinds }] of pinned) {
@@ -193,7 +227,8 @@ describe("revisions pinned before produces and reads", () => {
     const inputs = ["spec", "handoff", "last_check", "last_findings", "signal", "diff", "slice", "slices", "record", "resolution", "base_side"];
     const strip = (doc: unknown) => {
       const d = structuredClone(doc) as { steps: Record<string, Record<string, unknown>> };
-      for (const s of Object.values(d.steps)) delete s.produces;
+      // the files only: the reports a list names (criteria, findings) were never produces declarations
+      for (const s of Object.values(d.steps)) if (Array.isArray(s.produces)) s.produces = s.produces.filter((p) => typeof p === "string");
       return d;
     };
     for (const file of ["quick.yaml", "story.yaml"]) {

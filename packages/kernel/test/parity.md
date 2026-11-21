@@ -170,6 +170,9 @@ back as the unit's `corrupt_marked` fact.
 | `agent.ready.manual.no_runner` | `noop` | `agent.ready.no_headless` | `park` (inbox `manual`: auto mode, the executor lacks `headless`) |
 | (none) | | `agent.no_executor` | `park` (inbox `stuck`: the step's executor is not configured) |
 | (none) | | `agent.unguarded` | `park` (inbox `stuck`: the step is `writes: docs` and its executor's harness cannot deny a tool) |
+| (none) | | `agent.no_presence` | `park` (inbox `stuck`: the step is `attended: person` and no executor its binding names runs in a runner with presence) |
+| (none) | | `agent.check` | `check_run` (a `done` from a run that may not keep code: its processes killed, what changed since the visit's snapshot judged by its code level, reset or refused, before the report applies) |
+| (none) | | `source.unbound` | `park` (inbox `stuck`: the step reads a workflow source that neither the workflow's `path:` nor the config binds) |
 | (attended) | `noop` | `agent.ready.attended` | `park` (inbox `attended`) |
 | `agent.queued` | `noop` | dropped: every due agent starts; no cap bounds the runs at once | |
 | `agent.start.wait_active` | `noop` | dropped: the act protocol records a run before launching it, so no second run starts beside one on the record | |
@@ -193,6 +196,14 @@ back as the unit's `corrupt_marked` fact.
 | (none) | | `agent.reporting.lost` | `park` (inbox `stuck`: a report on the session with no receipt past the quiet window; nothing is written) |
 | (none) | | `agent.reported.rejected` | `park` (inbox `stuck`: the report's receipt was refused, e.g. an outcome the step does not declare; nothing is written, and a new report is applied as it comes) |
 | (none) | | `agent.retry.no_headless` | `park` (inbox `stuck`: a fresh session is needed and the executor cannot run headless) |
+| (none) | | `supervisor.ask` | `start_supervisor` (subject `ask`, with a `supervisor.started` intent: the question of an `attended: agent` step the person's `policy.stand_in.attended` grants, its `limits.asks` not spent and naming nothing only a person grants) |
+| (none) | | `supervisor.reserved` | `noop`: the question names a capability only a person grants (`question_reserved`), so it waits for them |
+| (none) | | `supervisor.asks_spent` | `noop`: the supervisor answered the step's `limits.asks` this visit, so the question waits in the mailbox |
+| (none) | | `supervisor.no_executor` | `noop`: no executor bound to the supervisor runs headless and denies a tool, so the question waits for the person |
+| (none) | | `supervisor.working` | `noop` while the supervisor at work is within the quiet window |
+| (none) | | `supervisor.silent` | `apply_receipts` (`supervisor.escalated`: no answer within the quiet window; what it stood in for goes back to the person) |
+| (none) | | `supervisor.died` | `apply_receipts` (`supervisor.escalated`: its process ended without an answer) |
+| (none) | | `supervisor.revoked` | `apply_receipts` (`supervisor.escalated`: the person's policy no longer grants the step or gate) |
 | `answer.resume.wait_active` | `noop` | dropped: as `agent.start.wait_active` | |
 | `answer.resume.queued` | `noop` | dropped: an answer is delivered to the live session, never by starting one | |
 | `agent.nudge.queued` | `noop` | dropped: a nudge waits on nothing | |
@@ -284,4 +295,4 @@ New rule ids: `agent.died.route`, `agent.died.manual`, `agent.died.retry`, `agen
 | `set_aside_record` | dropped: the store's compare-and-swap settles a lost race |
 | `restore_markers` | dropped: worktree markers belong to the host |
 | `reclaim_leases` | dropped: machine slot leases belong to the host |
-| (none) | `stop_run`, `run_step`, `renew_claim`, `release_claim`, `finish_story`, `flush` are new |
+| (none) | `stop_run`, `run_step`, `renew_claim`, `release_claim`, `finish_story`, `flush`, `check_run`, `start_supervisor` are new |

@@ -18,6 +18,7 @@ import { IsoTime, NonEmpty } from "@norn/schema";
 import { Type } from "@sinclair/typebox";
 import { appendEvents, readEvents } from "./events/log.ts";
 import { launchRecordPath, resumesDir } from "./events/paths.ts";
+import { runDirsEnv } from "./inputs.ts";
 import { WRITES_ENV } from "./live-run.ts";
 import type { LaunchHandle } from "./launcher-handle.ts";
 
@@ -127,7 +128,7 @@ export async function resumeWith(input: ResumeInput): Promise<PluginResult<void>
     const prepared = await input.prepare(launch.value.cwd);
     if (!prepared.ok) return prepared;
   }
-  const env = { ...input.env, [RUN_ENV.unit]: h.unit, [RUN_ENV.run]: h.run_id, [WRITES_ENV]: launch.value.writes ?? "worktree" };
+  const env = { ...input.env, [RUN_ENV.unit]: h.unit, [RUN_ENV.run]: h.run_id, [WRITES_ENV]: launch.value.writes ?? "worktree", ...runDirsEnv(launch.value.cwd) };
   let spec: ReturnType<Harness["launch"]>;
   try {
     const model = launch.value.model;
