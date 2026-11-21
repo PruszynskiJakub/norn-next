@@ -344,7 +344,7 @@ async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: Brief
     const steps = record.state?.workflow.doc.steps ?? {};
     const producer = Object.entries(steps).find(([, s]) => s.produces?.[name] !== undefined);
     if (producer) return materializeProduced(env, worktree, unit, name, producer[0], producer[1]);
-    // only a revision a unit pinned before unknown names were refused still lists one
+    // a pinned revision is loaded without the input check, so it may still name one: noted, never failed
     return { name, note: "norn provides no input of this name" };
   }
   switch (name) {

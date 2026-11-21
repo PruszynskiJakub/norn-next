@@ -54,7 +54,7 @@ An agent step's `inputs:` lists what its brief gives it. norn writes each one un
 | `resolution` | the resolution to review: each merge's remerge-diff and the conflicts this round recorded |
 | `base_side` | the base side of a conflict: the base commit to merge and what it changed in each conflicting path |
 
-An entry may also be a file in the repo, `{file: <path>, label: <text>}`, which the brief names as it is, or a name an earlier step produces (below). A workflow file naming any other input is refused when it loads, at the step and the entry (`/steps/review/inputs/2`), with the names above. A unit that pinned a workflow naming one before norn refused such names keeps running it, and its brief notes that norn provides no input of that name.
+An entry may also be a file in the repo, `{file: <path>, label: <text>}`, which the brief names as it is, or a name an earlier step produces (below). A workflow file naming any other input is refused when it loads, at the step and the entry (`/steps/review/inputs/2`), with the names above. A unit's pinned workflow loads without this check, so a pinned workflow that names one keeps running, and its brief notes that norn provides no input of that name.
 
 ### Produced files
 

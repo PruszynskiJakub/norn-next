@@ -28,8 +28,8 @@ export interface LoadWorkflowOptions {
   signals?: Readonly<Record<string, SignalDeclaration>>;
   /**
    * the input names the host's brief builder provides; an agent step naming another is refused. Left
-   * out when loading a unit's pinned revision, which loads as it was pinned: it was accepted then, and
-   * refusing it now would leave the unit with no workflow to decide by.
+   * out when loading a unit's pinned revision, which must load to its hash: refusing it would leave the
+   * unit with no workflow to decide by.
    */
   inputs?: readonly string[];
   /**
