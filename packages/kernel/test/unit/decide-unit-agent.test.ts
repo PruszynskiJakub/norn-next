@@ -677,6 +677,18 @@ describe("the check of a run that may not keep code, once it reports", () => {
     expect(failed.state.parked?.reason).toBe("run.check.failed");
   });
 
+  test("a launch not yet applied is checked too, a fresh run or a retry, under the code its receipt names", () => {
+    const started = (seq: number, over: Record<string, unknown> = {}) =>
+      receipt(seq, { kind: "run.started", run_id: "run-2", run_kind: "agent", executor: "claude", attended: false, code: "read", session: "s-2", step: "build", attempt: 1, ...over } as never);
+    const fresh = kindOf(decideCase({ state: stateAt("build", { run: null }), receipts: [started(1), done(2, { run_id: "run-2" })] }), "check_run");
+    expect(fresh).toMatchObject({ run_id: "run-2", code: "read" });
+    expect(fresh.intent.data).toEqual({ kind: "run.checking", run_id: "run-2", step: "build", attempt: 1 });
+    const retry = kindOf(decideCase({ state: guarded(), receipts: [started(1, { retry_of: "run-1", code: "scratch" }), done(2, { run_id: "run-2" })] }), "check_run");
+    expect(retry).toMatchObject({ run_id: "run-2", code: "scratch" });
+    // a launch the kernel would reject (a second fresh run beside the current one) is no run to check
+    expect(decideCase({ state: stateAt("build", { run: run() }), receipts: [started(1), done(2, { run_id: "run-2" })] })?.kind).toBe("apply_receipts");
+  });
+
   test("a run that keeps its code, an ask or a stuck is applied as it comes", () => {
     expect(decideCase({ state: stateAt("build", { run: run() }), receipts: [done(1)] })?.kind).toBe("apply_receipts");
     expect(decideCase({ state: guarded(), receipts: [done(1, { verb: "ask", outcome: undefined, text: "Which?" })] })?.kind).toBe("apply_receipts");

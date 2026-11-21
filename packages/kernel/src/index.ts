@@ -20,6 +20,7 @@ export * from "./model/actions.ts";
 export * from "./model/capabilities.ts";
 export * from "./model/config.ts";
 export * from "./model/grant.ts";
+export { launchedRun } from "./model/launched.ts";
 export * from "./model/detect.ts";
 export * from "./model/facts.ts";
 export * from "./model/receipts.ts";

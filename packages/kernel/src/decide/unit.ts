@@ -7,6 +7,7 @@
  */
 import type { Decision, DecisionOf } from "../model/actions.ts";
 import type { StoryFacts, UnitFacts } from "../model/facts.ts";
+import { launchedRun } from "../model/launched.ts";
 import type { RunState } from "../model/run-state.ts";
 import type { DecideContext } from "./context.ts";
 import { applyAction, markCorrupt } from "./record.ts";
@@ -108,10 +109,12 @@ function undeliverableAnswers(unit: UnitFacts, state: RunState, ctx: DecideConte
 
 /**
  * The check a reported run that may not keep code needs before its report applies: a `done` from the
- * run on the record with no `run.checked` yet. A check cut short runs again under the intent it wrote.
+ * run on the record with no `run.checked` yet. The run is the one live-run accepts reports from, so a
+ * launch applied in the same pass as its report is checked too. A check cut short runs again under
+ * the intent it wrote.
  */
 function checkDue(v: UnitView): DecisionOf<"check_run"> | null {
-  const run = v.state.run;
+  const run = launchedRun(v.state, v.unit.receipts);
   if (!run?.code) return null;
   const receipts = v.unit.receipts;
   const report = receipts.find((r) => r.data.kind === "run.reported" && r.data.run_id === run.id && r.data.verb === "done");

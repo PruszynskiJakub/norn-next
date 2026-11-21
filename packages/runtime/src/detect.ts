@@ -4,7 +4,7 @@
  * a record rather than a guess. A snapshot that cannot be taken is recorded as failed, which parks the
  * unit; the run never starts unwatched.
  */
-import { type ChangesSeen, type DecisionOf, judgeChanges, type KernelReceipt, type ReceiptDataOf, type ReceiptIntent, type RunSnapshot } from "@norn/kernel";
+import { type ChangesSeen, type DecisionOf, judgeChanges, type KernelReceipt, launchedRun, type ReceiptDataOf, type ReceiptIntent, type RunSnapshot } from "@norn/kernel";
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import { deriveUlid } from "@norn/schema";
 import { branchOf } from "./branches.ts";
@@ -130,7 +130,9 @@ async function checked(env: RuntimeEnv, unit: string, d: DecisionOf<"check_run">
 export async function checkRun(t: TickContext, d: DecisionOf<"check_run">): Promise<PluginResult<unknown>> {
   const unit = d.unit;
   if (unit === null) return fail("invalid", `${d.rule}: a check without a unit`, false);
-  const run = unitInFacts(t.facts, unit)?.state?.run;
+  const facts = unitInFacts(t.facts, unit);
+  // the run decide checked, which may be a launch not yet applied
+  const run = facts?.state ? launchedRun(facts.state, facts.receipts) : null;
   if (run?.id !== d.run_id) return fail("not_found", `run ${d.run_id} of ${unit} is not on the record`, false);
   const acted = await t.env.journal.act(unit, {
     intent: d.intent,

@@ -110,6 +110,16 @@ describe("norn done on a run that may not keep code", () => {
     expect(r.ok ? null : r.refusal).toMatchObject({ code: "code_changed", error: "the run may not keep code (code:scratch), and a git hook changed since the run started" });
   });
 
+  test("code:scratch refuses an outcome that passes the step while a tracked file other than a lockfile changed, naming it", async () => {
+    const { h, runId } = await live("passed");
+    h.checkouts.changed[WT] = ["bun.lock", "src/a.ts"];
+    const r = await done(h, runId, "pass");
+    expect(r.ok ? null : r.refusal).toMatchObject({
+      code: "code_changed",
+      error: "the run may not keep code (code:scratch), and an outcome that passes the step is refused while a tracked file other than a lockfile changed since the run started: src/a.ts",
+    });
+  });
+
   test("code:scratch takes an outcome that does not pass whatever it changed, as the check resets it", async () => {
     const { h, runId } = await live("scratched");
     h.checkouts.changed[WT] = ["src/a.ts"];
@@ -138,6 +148,37 @@ describe("the check after a run that may not keep code reports", () => {
     expect((await record(h, UNIT)).receipts.find((r) => r.data.kind === "run.checked")?.data).toMatchObject({ verdict: "reset", reset: ["src/a.ts"], head: true });
     await tickUntil(h, has("receipts.apply"));
     expect((await record(h, UNIT)).state?.ended).toBe("done");
+  });
+
+  test("code:scratch takes an outcome that passes over a lockfile alone, and the check resets the lockfile without moving the branch", async () => {
+    const { h, runId } = await live("passed");
+    h.checkouts.changed[WT] = ["bun.lock"];
+    const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "pass", criteria: [{ id: "AC1", verdict: "pass", evidence: "ran it" }] }, "r1");
+    expect(r.ok).toBe(true);
+    await tickUntil(h, has("agent.check"));
+    expect(h.vcsCalls.find((c) => c.op === "restore")?.args).toEqual([WT, { head: "head-0", tree: "tree-0" }, ["bun.lock"]]);
+    const checked = (await record(h, UNIT)).receipts.find((r) => r.data.kind === "run.checked")?.data;
+    expect(checked).toMatchObject({ verdict: "reset", reset: ["bun.lock"] });
+    expect(checked).not.toHaveProperty("head");
+    await tickUntil(h, has("receipts.apply"));
+    expect((await record(h, UNIT)).state?.ended).toBe("done");
+  });
+
+  test("a report against a launch no tick has applied yet is still checked before it routes", async () => {
+    const h = harness({ workflow: "granted", roles: SCRATCH });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    const rec = await record(h, UNIT);
+    expect(rec.state?.run ?? null).toBeNull();
+    const runId = (rec.receipts.findLast((r) => r.data.kind === "run.started")?.data as { run_id: string }).run_id;
+    h.checkouts.changed[WT] = [];
+    expect((await done(h, runId, "approve")).ok).toBe(true);
+    // a change landing after the report is what only the check can catch
+    h.checkouts.changed[WT] = ["src/late.ts"];
+    await tickUntil(h, has("agent.check"));
+    expect(h.launcher.calls.filter((c) => c.op === "stop").map((c) => c.args[0])).toEqual([`h-${runId}`]);
+    await tickUntil(h, has("receipts.apply"));
+    expect((await record(h, UNIT)).state?.parked).toMatchObject({ reason: "run.check.refused" });
   });
 
   test("a change that lands after norn done took the report refuses it and parks the unit stuck", async () => {

@@ -3,7 +3,7 @@
  * step that waits on a report, and which outcomes `done` may name. Read from the run state and the
  * flat workflow document it pins, so a hook process needs no loaded workflows to answer.
  */
-import { type KernelReceipt, OVERRIDABLE_OUTCOMES, type RunInfo, type RunState, type UnitJournal } from "@norn/kernel";
+import { type KernelReceipt, launchedRun, OVERRIDABLE_OUTCOMES, type RunInfo, type RunState, type UnitJournal } from "@norn/kernel";
 import type { HandBack, StepWrites, Verdict } from "@norn/schema";
 
 const CLASSIFIED: ReadonlySet<string> = new Set(OVERRIDABLE_OUTCOMES);
@@ -28,23 +28,6 @@ export interface LiveStep {
 /** The outcomes a step routes that an agent may report: the ones norn classifies itself are left out. */
 export function reportableOutcomes(routed: readonly string[]): string[] {
   return routed.filter((o) => !CLASSIFIED.has(o));
-}
-
-/**
- * The agent run the newest launch on the record started at the unit's step, applied or not. The
- * launch's receipt is applied by the next tick, but the agent it started asks for its brief and may
- * stop or report within seconds: until then the unapplied receipt is the only word that it is live.
- */
-function launchedRun(state: RunState, unapplied: readonly KernelReceipt[]): RunInfo | null {
-  let run = state.run;
-  for (const r of unapplied) {
-    const d = r.data;
-    if (d.kind !== "run.started" || d.run_kind !== "agent" || d.step !== state.step || d.attempt !== state.attempt || run?.id === d.run_id) continue;
-    // as the kernel applies it: a fresh run only where none is, a retry only of the current one
-    if ((d.retry_of ?? null) !== (run?.id ?? null)) continue;
-    run = { id: d.run_id, step: state.step, attempt: state.attempt, started_at: r.at, executor: d.executor, attended: d.attended, nudges: 0, ...(d.session !== undefined && { session: d.session }), ...(d.code !== undefined && { code: d.code }), ...(d.hooks !== undefined && { hooks: d.hooks }) };
-  }
-  return run;
 }
 
 /**
