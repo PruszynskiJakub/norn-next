@@ -55,11 +55,11 @@ export function createRuntimeEnv(deps: Omit<RuntimeDeps, "tickId">): PluginResul
   const packOnly = loadPackWorkflows(slots.value.pack, slots.value.stepKinds, deps.config.kernel, signals, deps.config.standIn);
   if (!packOnly.ok) return packOnly;
   const standIn = deps.config.standIn ?? { gates: [], attended: [] };
-  const workflows = holdChanged(overlaid.value, packOnly.value, deps.confirmedWorkflows ?? {}, (name) => ({
+  const workflows = holdChanged(overlaid.value, packOnly.value, deps.confirmedWorkflows ?? {}, (doc, name) => ({
     stepKinds: slots.value.stepKinds,
     config: deps.config.kernel,
     signals,
-    floor: { delegated: delegatedGates(standIn, { name }, name) },
+    floor: { delegated: delegatedGates(standIn, doc, name) },
   }));
   let env: RuntimeEnv | undefined;
   const launcher = launcherOf(deps, slots.value, () => env);

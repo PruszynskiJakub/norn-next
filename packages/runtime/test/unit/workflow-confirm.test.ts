@@ -42,9 +42,10 @@ const config: RuntimeConfig = {
   holder: "machine-a",
 };
 
-function envWith(workflows: Record<string, string>, confirmed: Record<string, string> = {}) {
+/** `gates`: the person gates the person's policy grants to a stand-in */
+function envWith(workflows: Record<string, string>, confirmed: Record<string, string> = {}, gates: string[] = []) {
   const repoWorkflows: RepoWorkflows = { workflows, shared: {} };
-  const r = createRuntimeEnv({ ctx: memoryHost(), plugins: PLUGINS, config, launcher: {} as never, sessions: { facts: () => null }, repoWorkflows, confirmedWorkflows: confirmed });
+  const r = createRuntimeEnv({ ctx: memoryHost(), plugins: PLUGINS, config: { ...config, standIn: { gates, attended: [] } }, launcher: {} as never, sessions: { facts: () => null }, repoWorkflows, confirmedWorkflows: confirmed });
   if (!r.ok) throw new Error(r.failure.message);
   return r.value;
 }
@@ -111,6 +112,31 @@ describe("a changed repo workflow is held for the person's confirmation", () => 
       const env = envWith({ "ship.yaml": wider }, { ship: bad });
       expect(env.held.ship?.running).toEqual({ hash: packShip.pinned.hash, from: "pack" });
     }
+  });
+});
+
+describe("a confirmed revision stands on the floor the policy sets now", () => {
+  /** one more person's step before the merge: a guarded change, held, and still on the floor once ready is granted */
+  const twoGates = (name: string) =>
+    ship({ ready: "{ by: person, do: Approve to merge., outcomes: { approve: sign, reject: { to: build, max: 2 } } }" })
+      .replace("name: ship", `name: ${name}`)
+      .replace("  merge:", "  sign: { by: person, do: Sign it off., outcomes: { approve: merge, reject: { to: build, max: 2 } } }\n  merge:");
+
+  test("a grant made after the person confirmed drops the revision the floor now refuses, and the held workflow says why", () => {
+    const wider = ship({ review: "{ by: reviewer, do: Review it., outcomes: { approve: ready, changes_requested: { to: build, max: 2 } } }" });
+    const confirmed = { ship: record(envWith({ "ship.yaml": wider }).held.ship?.current as LoadedWorkflow) };
+    const env = envWith({ "ship.yaml": twoGates("ship") }, confirmed, ["ship.ready"]);
+    expect(env.held.ship?.running).toBeNull();
+    expect(env.workflows.ship?.ok).toBe(false);
+    expect(env.held.ship?.refused).toContain("step merge (forge.await-merge) writes to the forge");
+    expect(env.held.ship?.refused).toContain("the policy grants ready to a stand-in (policy.stand_in.gates)");
+  });
+
+  test("the grant is matched by the revision's own name:, not its file's", () => {
+    const current = envWith({ "tidy.yaml": ship().replace("name: ship", "name: ship2") }).held.tidy?.current as LoadedWorkflow;
+    const confirmed = { tidy: record(current) };
+    expect(envWith({ "tidy.yaml": twoGates("ship2") }, confirmed).held.tidy?.running).toEqual({ hash: current.pinned.hash, from: "confirmed" });
+    expect(envWith({ "tidy.yaml": twoGates("ship2") }, confirmed, ["ship2.ready"]).held.tidy?.running).toBeNull();
   });
 });
 

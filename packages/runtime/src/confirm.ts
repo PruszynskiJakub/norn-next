@@ -37,19 +37,28 @@ export interface HeldWorkflow {
   current: LoadedWorkflow;
   changes: string[];
   running: { hash: string; from: "confirmed" | "pack" } | null;
+  /** why the revision the person confirmed runs no more: the floor refuses it under the policy as it is now */
+  refused?: string;
 }
+
+/** What each load takes but its shared files, worked out from the document loaded: a policy grant names a step by the workflow's own `name:`. */
+export type ConfirmOptions = (doc: unknown, name: string) => Omit<LoadWorkflowOptions, "sharedFiles">;
 
 /**
  * A confirmed revision, loaded as a pin is (to its own hash) but on the floor the policy sets now, so
- * a grant made since a confirmation never runs a revision the floor refuses. One that is not a pinned
- * revision, or no longer loads to its hash, confirms nothing.
+ * a grant made since a confirmation never runs a revision the floor refuses; `refused` then says why.
+ * One that is not a pinned revision, or no longer loads to its hash, confirms nothing.
  */
-function confirmedLoad(text: string | undefined, opts: Omit<LoadWorkflowOptions, "sharedFiles">): LoadedWorkflow | null {
-  if (text === undefined) return null;
+function confirmedLoad(text: string | undefined, name: string, opts: ConfirmOptions): { workflow: LoadedWorkflow | null; refused?: string } {
+  if (text === undefined) return { workflow: null };
   const pinned = parseJson(PinnedWorkflow, text, "a confirmed revision");
-  if (!pinned.ok) return null;
-  const load = loadWorkflow(structuredClone(pinned.value.doc), { ...opts, sharedFiles: {} });
-  return load.ok && load.workflow.pinned.hash === pinned.value.hash ? load.workflow : null;
+  if (!pinned.ok) return { workflow: null };
+  const load = loadWorkflow(structuredClone(pinned.value.doc), { ...opts(pinned.value.doc, name), sharedFiles: {} });
+  if (!load.ok) {
+    const floor = load.errors.filter((e) => e.granted !== undefined);
+    return floor.length > 0 ? { workflow: null, refused: floor.map((e) => e.message).join("; ") } : { workflow: null };
+  }
+  return { workflow: load.workflow.pinned.hash === pinned.value.hash ? load.workflow : null };
 }
 
 /**
@@ -60,7 +69,7 @@ export function holdChanged(
   overlaid: KernelWorkflows["byName"],
   packOnly: KernelWorkflows["byName"],
   confirmed: Readonly<Record<string, string>>,
-  opts: (name: string) => Omit<LoadWorkflowOptions, "sharedFiles">,
+  opts: ConfirmOptions,
 ): { byName: Record<string, WorkflowLoad>; held: Record<string, HeldWorkflow> } {
   const byName: Record<string, WorkflowLoad> = { ...overlaid };
   const held: Record<string, HeldWorkflow> = {};
@@ -70,17 +79,18 @@ export function holdChanged(
     const fromPack = packOnly[name];
     const pack = fromPack?.ok ? fromPack.workflow : null;
     if (pack?.pinned.hash === current.pinned.hash) continue;
-    const record = confirmedLoad(confirmed[name], opts(name));
+    const { workflow: record, refused } = confirmedLoad(confirmed[name], name, opts);
     const trusted = [record && { w: record, from: "confirmed" as const }, pack && { w: pack, from: "pack" as const }].filter((t) => t !== null);
     if (trusted.some(({ w }) => w.pinned.hash === current.pinned.hash || guardChanges(w.pinned.doc, current.pinned.doc).length === 0)) continue;
     const running = trusted[0] ?? null;
     // a workflow only the repo has is weighed against none: its own person's steps, attended: and allow: are all new
     const changes = guardChanges(running?.w.pinned.doc ?? { ...current.pinned.doc, steps: {} }, current.pinned.doc);
     if (changes.length === 0) continue;
-    held[name] = { current, changes, running: running && { hash: running.w.pinned.hash, from: running.from } };
+    held[name] = { current, changes, running: running && { hash: running.w.pinned.hash, from: running.from }, ...(refused !== undefined && { refused }) };
+    const dropped = refused !== undefined ? `; the revision the person confirmed is refused: ${refused}` : "";
     byName[name] = running
       ? { ok: true, workflow: running.w }
-      : { ok: false, errors: [{ path: "", message: `${name} is held for the person's confirmation (${changes.join("; ")}): a person runs norn workflow confirm ${name}` }] };
+      : { ok: false, errors: [{ path: "", message: `${name} is held for the person's confirmation (${changes.join("; ")}): a person runs norn workflow confirm ${name}${dropped}` }] };
   }
   return { byName, held };
 }

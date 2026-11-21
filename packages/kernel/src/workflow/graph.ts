@@ -151,9 +151,13 @@ export interface LoadedWorkflow {
   graph: WorkflowGraph;
 }
 
-/** One refusal at a JSON pointer into the document; `missing_kind` names an unregistered step kind so a host can say which plugin to add. */
+/**
+ * One refusal at a JSON pointer into the document; `missing_kind` names an unregistered step kind so a
+ * host can say which plugin to add; `granted` names the gates a policy grant delegates when the grant
+ * alone breaks the floor, so a host sends the person to their policy rather than to the file.
+ */
 export const WorkflowError = Type.Object(
-  { path: Type.String(), message: NonEmpty, missing_kind: Type.Optional(NonEmpty), shared: Type.Optional(NonEmpty) },
+  { path: Type.String(), message: NonEmpty, missing_kind: Type.Optional(NonEmpty), shared: Type.Optional(NonEmpty), granted: Type.Optional(Type.Array(NonEmpty, { minItems: 1 })) },
   { ...closed, title: "WorkflowError" },
 );
 export type WorkflowError = Static<typeof WorkflowError>;

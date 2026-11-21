@@ -38,12 +38,25 @@ function repoFileFor(repo: RepoWorkflows, name: string, errors: readonly Workflo
   return null;
 }
 
+/**
+ * The workflows only the person's policy takes off the floor, each with the gates its grants
+ * delegate: the file stands on the floor with nothing granted, so the policy is what to narrow.
+ */
+export function policyRefused(byName: Readonly<Record<string, WorkflowLoad>>): Array<{ workflow: string; gates: string[] }> {
+  return Object.entries(byName).flatMap(([workflow, load]) => {
+    if (load.ok || load.errors.length === 0 || !load.errors.every((e) => e.granted !== undefined)) return [];
+    return [{ workflow, gates: [...new Set(load.errors.flatMap((e) => e.granted ?? []))] }];
+  });
+}
+
 const errorText = (errors: readonly WorkflowError[]): string[] => errors.map((e) => `${e.path ? `${e.path}: ` : ""}${e.message}`);
 
 export function packFailure(byName: Readonly<Record<string, WorkflowLoad>>, src: PackSource): CliFailure | null {
   const missing = missingStepKinds(byName);
   if (missing) return missing;
-  const broken = Object.entries(byName).flatMap(([name, load]) => (load.ok || src.held?.includes(name) ? [] : [{ name, errors: load.errors }]));
+  // a workflow held for the person, or one only their policy takes off the floor, is the person's to settle: no tick stops for it
+  const policy = new Set(policyRefused(byName).map((p) => p.workflow));
+  const broken = Object.entries(byName).flatMap(([name, load]) => (load.ok || src.held?.includes(name) || policy.has(name) ? [] : [{ name, errors: load.errors }]));
   if (broken.length === 0) return null;
   const repo = src.repo ?? NO_REPO_WORKFLOWS;
   const inRepo = broken.flatMap((b) => {

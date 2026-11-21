@@ -51,6 +51,15 @@ describe("the floor: a person stands before every effect they cannot take back",
     expect(r[0]?.message).toContain("the policy grants ready to a stand-in (policy.stand_in.gates)");
   });
 
+  test("a refusal the grant alone causes names the granted gates, so a host tells the person's policy from a broken file", () => {
+    const granted = loadWorkflow(wf({ build, ready, merge }), opts({ floor: { delegated: ["ready"] } }));
+    expect(granted.ok ? [] : granted.errors.map((e) => e.granted)).toEqual([["ready"]]);
+    // a path around the gate refuses the file whatever the policy grants, even when the path shown passes the granted gate: that is the file's to fix
+    const around = wf({ build: { ...build, outcomes: { done: "ready", skip: "lint" } }, lint: { by: "builder", do: "Lint it.", outcomes: { done: "merge" } }, ready, merge });
+    const r = loadWorkflow(around, opts({ floor: { delegated: ["ready"] } }));
+    expect(r.ok ? [] : r.errors.map((e) => ({ granted: e.granted, shown: e.message.includes("build → ready → merge") }))).toEqual([{ granted: undefined, shown: true }]);
+  });
+
   test("the entry norn story update-branch re-enters starts a path too", () => {
     const doc = wf(
       { build, ready: { ...ready, outcomes: { approve: "update", reject: { to: "build", max: 2 } } }, update: { by: "vcs.update-branch", outcomes: { done: "merge", conflict: "build", clean: "merge", resolved: "merge" } }, merge },

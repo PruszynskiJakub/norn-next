@@ -16,6 +16,8 @@ import type { CliContext } from "./context.ts";
 import { GIT_UPGRADE, gitTooOld, MIN_GIT_TEXT } from "./git-version.ts";
 import { ensureLabels, nornLabels } from "./labels.ts";
 import { CliFailure, toFailure } from "./output.ts";
+import { NARROW_POLICY } from "./commands/person-support.ts";
+import { policyRefused } from "./plugins/pack-check.ts";
 import { legacySignalWarning } from "./plugins/signal-check.ts";
 import { unseenSkillWarning } from "./plugins/skill-check.ts";
 
@@ -96,8 +98,22 @@ function heldWarning(env: RuntimeEnv): { warning: string; do_instead: string } |
   if (held.length === 0) return null;
   const running = (r: (typeof held)[number][1]["running"]): string => (r === null ? "none of it" : r.from === "pack" ? "the pack's revision" : "the revision you last confirmed");
   return {
-    warning: held.map(([name, h]) => `workflow ${name} is held for your confirmation (${h.changes.join("; ")}); new rounds run ${running(h.running)}`).join("; "),
+    warning: held
+      .map(([name, h]) => `workflow ${name} is held for your confirmation (${h.changes.join("; ")}); new rounds run ${running(h.running)}${h.refused ? `, as the floor refuses the revision you confirmed under your policy now: ${h.refused}` : ""}`)
+      .join("; "),
     do_instead: held.map(([name]) => `norn workflow confirm ${name}`).join(", "),
+  };
+}
+
+/** The workflows only the person's policy takes off the floor: no tick stops for them, so doctor names the grant to narrow. */
+function policyWarning(env: RuntimeEnv): { warning: string; do_instead: string } | null {
+  const refused = policyRefused(env.workflows).sort((a, b) => a.workflow.localeCompare(b.workflow));
+  if (refused.length === 0) return null;
+  return {
+    warning: refused
+      .map((r) => `workflow ${r.workflow} starts no new round: your policy grants its gate${r.gates.length > 1 ? "s" : ""} ${r.gates.join(", ")} to a stand-in (policy.stand_in.gates), which leaves no person's step before an effect only a person may let happen; units already on it go on`)
+      .join("; "),
+    do_instead: NARROW_POLICY,
   };
 }
 
@@ -303,8 +319,9 @@ export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Prom
           const legacy = legacySignalWarning(env.value);
           const unbound = unboundSourceWarning(env.value);
           const held = heldWarning(env.value);
-          const warning = [await unseenSkillWarning(env.value), legacy?.warning, unbound?.warning, held?.warning].filter((w) => w).join("; ");
-          const doInstead = [legacy?.do_instead, unbound?.do_instead, held?.do_instead].filter((w) => w).join("; ");
+          const policy = policyWarning(env.value);
+          const warning = [await unseenSkillWarning(env.value), legacy?.warning, unbound?.warning, held?.warning, policy?.warning].filter((w) => w).join("; ");
+          const doInstead = [legacy?.do_instead, unbound?.do_instead, held?.do_instead, policy?.do_instead].filter((w) => w).join("; ");
           checks.push({ ...passed("workflows", workflowsDetail(env.value)), ...(warning ? { warning } : {}), ...(doInstead ? { do_instead: doInstead } : {}) });
         }
         if (!opts.repoOnly) {

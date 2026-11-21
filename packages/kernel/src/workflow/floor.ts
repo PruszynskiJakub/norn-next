@@ -25,9 +25,17 @@ const said = (effects: readonly KindEffect[]): string => {
 
 /**
  * `origins`: each place a round starts by itself, with how the refusal names it. `delegated`: the
- * gates a policy grant lets a stand-in decide, which are no person's step here.
+ * gates a policy grant lets a stand-in decide, which are no person's step here. A refusal is marked
+ * `granted` only when the workflow stands on the floor with nothing delegated: a shortest path may pass
+ * a granted gate while another path skips every gate, and that file is broken whatever the policy says.
  */
 export function floorErrors(steps: Readonly<Record<string, FloorStep>>, origins: ReadonlyArray<{ step: string; named: string }>, delegated: ReadonlySet<string>): WorkflowError[] {
+  const errors = pathErrors(steps, origins, delegated);
+  if (errors.length === 0 || delegated.size === 0 || pathErrors(steps, origins, new Set()).length === 0) return errors;
+  return errors.map(({ granted: _, ...e }) => e);
+}
+
+function pathErrors(steps: Readonly<Record<string, FloorStep>>, origins: ReadonlyArray<{ step: string; named: string }>, delegated: ReadonlySet<string>): WorkflowError[] {
   const errors: WorkflowError[] = [];
   const refused = new Set<string>();
   const stands = (name: string): boolean => steps[name]?.kind === "gate" && !delegated.has(name);
@@ -46,6 +54,7 @@ export function floorErrors(steps: Readonly<Record<string, FloorStep>>, origins:
         const granted = path.filter((s) => steps[s]?.kind === "gate" && delegated.has(s));
         const why = granted.length > 0 ? `; the policy grants ${granted.join(", ")} to a stand-in (policy.stand_in.gates)` : "";
         errors.push({
+          ...(granted.length > 0 && { granted }),
           path: `/steps/${at}`,
           message: `step ${at} (${step.actor}) ${said(step.effects)}, and ${origin.named} reaches it through ${path.join(" → ")} with no \`by: person\` step on the way${why}: put a person's step no policy grant delegates on every path to it`,
         });

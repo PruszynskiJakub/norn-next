@@ -297,6 +297,20 @@ describe("norn watch's cadence", () => {
     expect(w.ticks[4]?.lines).toEqual(["lt-1  agent.ready.manual → park"]);
   });
 
+  test("a held repo workflow the person confirms during the pause runs from the next tick, with no file changed in the repo", async () => {
+    // the repo's story.yaml drops the pack's person steps, so it is held before the watch starts
+    const m = repo({ seed: { [PATHS.local]: CONFIG, [`${ROOT}/.agents/workflows/story.yaml`]: TIDY_YAML.replace("name: tidy", "name: story") } });
+    const w = timedWatch(m, {
+      1: async () => {
+        await runCli(["workflow", "confirm", "story"], m.io);
+        await addItem(m, "First");
+      },
+    });
+    await runCli(["watch", "--interval", "30s", "--max-ticks", "5", "--json"], m.io);
+    expect(w.events).toContain("config reloaded");
+    expect(w.ticks[4]?.lines).toEqual(["lt-1  agent.ready.manual → park"]);
+  });
+
   test("a plugin added during the pause (its lock entry and config) is used from the next tick", async () => {
     const lock = JSON.stringify({ format: 1, plugins: [{ name: "norn-store-shared", spec: "norn-store-shared@^1", version: "1.0.0", api: "^1.5" }] });
     const config = `${CONFIG.replace("store: { use: local }", "store: { use: shared }")}plugins:\n  norn-store-shared: norn-store-shared@^1\n`;
