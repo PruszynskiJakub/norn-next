@@ -246,6 +246,7 @@ describe("harness launcher start of a docs-only step", () => {
     const refused = await s.launcher.start(run({ executor: "bg", attended: false, writes: "docs" }));
     expect(refused).toMatchObject({ ok: false, failure: { code: "invalid", retryable: false } });
     expect(!refused.ok && refused.failure.message).toContain("writes: docs");
+    expect(!refused.ok && refused.failure.message).toContain("run it on an executor whose harness can (by:)");
     expect([s.bgHarness.installs, s.bgHarness.launches, s.bg.starts]).toEqual([[], [], []]);
   });
 
