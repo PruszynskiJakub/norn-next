@@ -555,6 +555,36 @@ describe("a person's move to a step", () => {
     expect(d.state).toMatchObject({ step: "build", attempt: 2, applied_through: 3 });
   });
 
+  test("a done before a person's move or round from a run that may not keep code is checked first, and a refused check still refuses it", () => {
+    const guarded = state("gh-1", "plan", { run: { ...live, code: "scratch", session: "s-1" }, applied_through: 1 });
+    const done = receipt(2, { kind: "run.reported", run_id: "run-1", verb: "done", outcome: "done", step: "plan", attempt: 1 });
+    const round = { kind: "round.started" as const, workflow: NEXT_WF.pinned, by: "ann" };
+    for (const person of [receipt(3, moved("plan")), receipt(3, round)]) {
+      const d = storyDecisions(story({ units: [unit("gh-1", guarded, { receipts: [done, person] })] }))[0] as DecisionOf<"check_run">;
+      expect({ kind: d.kind, rule: d.rule, run: d.run_id, code: d.code, intent: d.intent.data }).toEqual({
+        kind: "check_run",
+        rule: "agent.check",
+        run: "run-1",
+        code: "scratch",
+        intent: { kind: "run.checking", run_id: "run-1", step: "plan", attempt: 1 },
+      });
+      const checking = receipt(4, { kind: "run.checking", run_id: "run-1", step: "plan", attempt: 1 });
+      const again = storyDecisions(story({ units: [unit("gh-1", guarded, { receipts: [done, person, checking] })] }))[0] as DecisionOf<"check_run">;
+      expect({ kind: again.kind, intent: again.intent.id }).toEqual({ kind: "check_run", intent: checking.id });
+      const clean = receipt(5, { kind: "run.checked", run_id: "run-1", verdict: "reset", step: "plan", attempt: 1 });
+      const routed = storyDecisions(story({ units: [unit("gh-1", guarded, { receipts: [done, person, checking, clean] })] }))[0] as DecisionOf<"apply_receipts">;
+      expect({ rule: routed.rule, rejected: routed.rejected, step: routed.state.step, through: routed.state.applied_through }).toEqual({ rule: "receipts.apply", rejected: [], step: "split", through: 2 });
+      const refused = receipt(5, { kind: "run.checked", run_id: "run-1", verdict: "refused", step: "plan", attempt: 1 });
+      const held = storyDecisions(story({ units: [unit("gh-1", guarded, { receipts: [done, person, checking, refused] })] }))[0] as DecisionOf<"apply_receipts">;
+      expect({ rule: held.rule, rejected: held.rejected, step: held.state.step, through: held.state.applied_through }).toEqual({
+        rule: "receipts.apply",
+        rejected: [{ seq: 2, reason: "the check after run run-1 reported refused it" }],
+        step: "plan",
+        through: 2,
+      });
+    }
+  });
+
   test("the receipts before a move are applied first", () => {
     const u = unit("gh-1", state("gh-1", "plan"), { receipts: [receipt(1, { kind: "mode.changed", mode: "auto", by: "ann" }), receipt(2, moved("plan"))] });
     const d = storyDecisions(story({ units: [u] }))[0] as DecisionOf<"apply_receipts">;

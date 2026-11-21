@@ -7,13 +7,13 @@
  */
 import type { Decision, DecisionOf } from "../model/actions.ts";
 import type { StoryFacts, UnitFacts } from "../model/facts.ts";
-import { launchedRun } from "../model/launched.ts";
 import type { RunState } from "../model/run-state.ts";
 import type { DecideContext } from "./context.ts";
+import { checkDue } from "./check-due.ts";
 import { applyAction, markCorrupt } from "./record.ts";
 import { decideAgent } from "./unit-agent.ts";
 import { decideCheck, decideGate, decidePluginStep } from "./unit-steps.ts";
-import { applyDecision, intentFor, noop, type UnitView } from "./unit-support.ts";
+import { applyDecision, noop, type UnitView } from "./unit-support.ts";
 
 /** The park of a gate waiting on its decision. */
 const GATE_PARK = "gate.park";
@@ -68,7 +68,7 @@ export function decideUnit(story: StoryFacts, unit: UnitFacts, ctx: DecideContex
   const derived = parked !== undefined && DERIVED_PARKS.has(parked.reason);
   const view: UnitView = { story, unit, state: derived ? unparked(state) : state, graph, step, ctx };
   // receipts always win over session and step facts, once a report that may not keep code is checked
-  const check = checkDue(view);
+  const check = checkDue(unit, view.state, step, ctx);
   if (check) return check;
   if (unit.receipts.length) {
     const d = keepVisitPark(applyDecision(view, "receipts.apply", []), state);
@@ -105,26 +105,6 @@ function undeliverableAnswers(unit: UnitFacts, state: RunState, ctx: DecideConte
   if (session === null && unit.run_alive === true) return [];
   if (session !== null && ctx.facts.capabilities.executors[run.executor]?.resume === true) return [];
   return unit.receipts.filter((r) => r.data.kind === "answer.sent").map((r) => r.id);
-}
-
-/**
- * The check a reported run that may not keep code needs before its report applies: a `done` from the
- * run on the record with no `run.checked` yet. The run is the one live-run accepts reports from, so a
- * launch applied in the same pass as its report is checked too. A check cut short runs again under
- * the intent it wrote.
- */
-function checkDue(v: UnitView): DecisionOf<"check_run"> | null {
-  const run = launchedRun(v.state, v.unit.receipts);
-  if (!run?.code) return null;
-  const receipts = v.unit.receipts;
-  const report = receipts.find((r) => r.data.kind === "run.reported" && r.data.run_id === run.id && r.data.verb === "done");
-  if (report?.data.kind !== "run.reported") return null;
-  if (receipts.some((r) => r.data.kind === "run.checked" && r.data.run_id === run.id)) return null;
-  const outcome = report.data.outcome;
-  const passes = outcome !== undefined && v.step.agent?.verdict[outcome] === "pass";
-  const begun = receipts.find((r) => r.data.kind === "run.checking" && r.data.run_id === run.id);
-  const intent = begun ? { id: begun.id, data: begun.data } : intentFor(v, { kind: "run.checking", run_id: run.id });
-  return { kind: "check_run", unit: v.unit.id, rule: "agent.check", run_id: run.id, code: run.code, passes, intent };
 }
 
 function unparked(state: RunState): RunState {

@@ -45,13 +45,17 @@ export interface ApplyResult {
  * step does not declare, a receipt for another step or attempt, a run's report when that run is not
  * the current one, and an approve or reject that comes from a step agent rather than through
  * `gate.decided` by a person or their delegate.
+ *
+ * With `through`, only receipts up to that seq apply; a check recorded after it still refuses a report
+ * before it, as a check written behind a person's round or move is the word on a report that came first.
  */
-export function applyReceipts(state: RunState, receipts: readonly KernelReceipt[], graph: WorkflowGraph): ApplyResult {
+export function applyReceipts(state: RunState, receipts: readonly KernelReceipt[], graph: WorkflowGraph, through = Number.POSITIVE_INFINITY): ApplyResult {
   const out: ApplyResult = { state, applied: [], rejected: [], routes: [] };
   const ordered = [...receipts].sort((a, b) => a.seq - b.seq);
   const vetoed = vetoedReports(ordered);
   for (const r of ordered) {
     if (r.seq <= out.state.applied_through) continue;
+    if (r.seq > through) break;
     const veto = vetoed.get(r.seq);
     if (veto !== undefined) {
       out.applied.push(r.seq);
