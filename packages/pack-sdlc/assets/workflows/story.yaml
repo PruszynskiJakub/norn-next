@@ -9,7 +9,7 @@
 # QA reports a verdict per acceptance criterion (produces: [criteria]) and may only report the outcome
 # matching its worst verdict; `unverified` (could not check here) goes to a person at human-qa.
 # A story waiting at human-qa, ready or merge goes back through update when the base moved
-# under it in a way that conflicts (base.stale; `behind` re-updates on any base commit).
+# under it in a way that conflicts (vcs.stale under signals:; `when: behind` re-updates on any base commit).
 # Steps shared with other workflows come from `shared/` (`use:`): the test command is the config's
 # `checks.test`; change the CI wait in `shared/ship.yaml`.
 name: story
@@ -21,15 +21,16 @@ steps:
     use: sync
     outcomes: { synced: slice }
   slice:
-    agent: >-
+    by: writer
+    do: >-
       Write slice files to slices/<nn>-<slug>.md in the spec folder. A slice has no QA of its own: list every
       slice's criteria in spec.md's frontmatter `criteria` too, each id prefixed with its slice number
       (`01.AC1`), next to the story's own, so the story's QA gives each one a verdict. First check the Plan section of spec.md
       against the code on this base: when spec.md has no Plan section, or the base changed what the plan
       relies on so that it no longer holds, write no slice files, say what no longer holds in the handoff's
       Notes and report `replan`.
-    skills: [norn-slice]
-    inputs: [spec, slices]
+    with: { skills: [norn-slice] }
+    reads: [spec, slices]
     outcomes:
       done:
         to: approve-slices
@@ -38,10 +39,12 @@ steps:
         to: $stuck
         means: "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans it in a refinement round from its plan step (norn story round <story> --workflow refinement --at plan)"
   approve-slices:
-    gate: "Review the slice files in the spec folder (edit them if needed). Approve to start the slices, or reject with what to change."
+    by: person
+    do: "Review the slice files in the spec folder (edit them if needed). Approve to start the slices, or reject with what to change."
     outcomes: { approve: slices, reject: { to: slice, max: 3 } }
   slices:
-    slices:
+    by: norn.each
+    reads: [slices]
     outcomes: { done: update, stuck: $stuck }
   # update, resolve, test and the light path's steps (shared/base-update.yaml)
   base-update:
@@ -52,9 +55,10 @@ steps:
       ship: ship
       redescribe: describe
   qa:
-    agent: "The criteria are spec.md's frontmatter `criteria`; an id `<nn>.<id>` is criterion `<id>` of slice file `<nn>-*.md`, which says what it means."
-    skills: [norn-qa]
-    inputs: [spec, slices, diff]
+    by: qa
+    do: "The criteria are spec.md's frontmatter `criteria`; an id `<nn>.<id>` is criterion `<id>` of slice file `<nn>-*.md`, which says what it means."
+    with: { skills: [norn-qa] }
+    reads: [spec, slices, diff]
     # a criteria report with every outcome, and only the outcome matching its worst verdict
     produces: [criteria]
     outcomes:
@@ -77,16 +81,18 @@ steps:
         verdict: unverified
         means: "criteria this session could not check; how to check each one is in the report"
   human-qa:
-    gate: "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed."
+    by: person
+    do: "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed."
     outcomes:
       approve: describe
       reject:  { to: implement, counter: qa_loop }
     on:
-      stale:   { to: update, counter: stale_loop }
+      vcs.stale: { to: update, counter: stale_loop }
   implement:
-    agent: "Rework the story in its worktree: the failing check, QA repro, CI failure or person's rejection the inputs name. Each rework point gets a test that fails before the code changes."
-    skills: [norn-implement]
-    inputs: [spec, handoff, last_check, last_findings]
+    by: builder
+    do: "Rework the story in its worktree: the failing check, QA repro, CI failure or person's rejection the inputs name. Each rework point gets a test that fails before the code changes."
+    with: { skills: [norn-implement] }
+    reads: [spec, handoff, last_check, last_findings]
     outcomes:
       done:
         to: review
@@ -94,10 +100,11 @@ steps:
   # only rework reaches implement, and slices are reviewed before they integrate: this reviews the
   # story-level rework, so a round without rework never runs it
   review:
-    agent: "Review the story-level rework against the findings it answers and the spec: it fixes what they ask and nothing else."
-    skills: [norn-review]
-    writes: docs
-    inputs: [spec, diff, last_findings]
+    by: reviewer
+    do: "Review the story-level rework against the findings it answers and the spec: it fixes what they ask and nothing else."
+    with: { skills: [norn-review] }
+    allow: [docs:write]
+    reads: [spec, diff, last_findings]
     outcomes:
       approve:
         to: test
@@ -107,9 +114,10 @@ steps:
         means: "blocking findings, handed back with --findings <file>"
         produces: [findings]
   describe:
-    agent: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
-    skills: [norn-pr]
-    inputs: [spec, diff, record]
+    by: writer
+    do: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
+    with: { skills: [norn-pr] }
+    reads: [spec, diff, record]
     # open-pr reads it; norn done refuses the report while pr.md is missing or empty
     produces: [{ name: pr_body, file: pr.md }]
     outcomes:
@@ -128,7 +136,8 @@ counters:
   qa_loop: { max: 2 }
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
-# update-branch re-enters update, not sync (the default would be the first update step); a base move
+# `norn story update-branch` re-enters update, not sync (the default would be the first update step); a base move
 # without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once per
 # base move (no push, no CI): red goes back through update like a conflict
-base: { stale: conflict, step: update, verify: test }
+signals: { vcs.stale: { when: conflict, verify: test } }
+entries: { update-branch: update }

@@ -183,12 +183,15 @@ describe("the base side of a conflict", () => {
   });
 });
 
+/** What a step of a workflow file lists for its brief: `reads:` in the step form, `inputs:` in the older one. */
+function listedInputs(text: string, step: string): string[] {
+  const s = (parse(text) as { steps: Record<string, { reads?: unknown[]; inputs?: unknown[] }> }).steps[step];
+  return (s?.reads ?? s?.inputs ?? []).filter((i): i is string => typeof i === "string");
+}
+
 /** The steps a pack or repo workflow sends to merge a base or story-branch commit, and the inputs each lists in its file. */
 function resolverInputs(): { where: string; inputs: string[] }[] {
-  const of = (where: string, text: string, step: string) => {
-    const doc = parse(text) as { steps: Record<string, { inputs?: unknown[] }> };
-    return { where: `${where}#${step}`, inputs: (doc.steps[step]?.inputs ?? []).filter((i): i is string => typeof i === "string") };
-  };
+  const of = (where: string, text: string, step: string) => ({ where: `${where}#${step}`, inputs: listedInputs(text, step) });
   const repo = (file: string) => readFileSync(join(REPO_ROOT, ".agents", "workflows", file), "utf8");
   return [
     of("pack shared/sync.yaml", SDLC_PACK.shared["sync.yaml"] ?? "", "sync-resolve"),
@@ -225,7 +228,7 @@ describe("each step sent to merge the base, as its workflow file lists its input
       { where: "repo slice.yaml#merge", text: readFileSync(join(REPO_ROOT, ".agents", "workflows", "slice.yaml"), "utf8") },
     ];
     for (const { where, text } of steps) {
-      const inputs = ((parse(text) as { steps: Record<string, { inputs?: string[] }> }).steps.merge?.inputs ?? []).filter((i) => typeof i === "string");
+      const inputs = listedInputs(text, "merge");
       const made = await materializeInputs(h.env, slice, briefWith(inputs));
       if (!made.ok) throw new Error(made.failure.message);
       expect({ where, path: made.value.inputs.find((i) => i.name === "base_side")?.path }).toEqual({ where, path: ".agents/inputs/base_side.md" });

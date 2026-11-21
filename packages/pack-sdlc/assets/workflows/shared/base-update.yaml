@@ -15,23 +15,25 @@ steps:
   # story with no open pull request, or whose remote branch took commits a person pushed: those were
   # never reviewed, so a base move never skips a gate or describe for them)
   update:
-    update-branch:
+    by: vcs.update-branch
     outcomes:
       done: test
       clean: test-merge
       resolved: test-resolution
       conflict: resolve
   resolve:
-    agent: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase."
-    skills: [norn-merge]
-    inputs: [spec, handoff, base_side]
+    by: builder
+    do: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase."
+    with: { skills: [norn-merge] }
+    reads: [spec, handoff, base_side]
     outcomes:
       done:
         to: update
         means: "base merged into the story branch, conflicts resolved and committed"
   test:
-    check: "{checks.test}"
-    timeout: 15m
+    by: shell
+    do: "{checks.test}"
+    limits: { timeout: 15m }
     outcomes: { pass: { exit: tested }, fail: { exit: broken } }
   # the light path's tests run the same command
   test-merge:
@@ -42,13 +44,14 @@ steps:
     outcomes: { pass: resolution-review, fail: { exit: broken } }
   # reviews only what the resolver changed (each merge's remerge-diff), never the whole story again
   resolution-review:
-    agent: >-
+    by: reviewer
+    do: >-
       Review only the resolution: each remerge-diff under Inputs is where a merge differs from git's own
       merge of its parents, a base change the resolver dropped included. Judge whether it keeps the intent
       of both sides. Report `redescribe` when the merge danger pr.md describes no longer holds.
-    skills: [norn-review]
-    writes: docs
-    inputs: [spec, resolution]
+    with: { skills: [norn-review] }
+    allow: [docs:write]
+    reads: [spec, resolution]
     outcomes:
       approve:
         exit: ship

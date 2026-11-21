@@ -9,7 +9,8 @@ description: Check an issue still holds, add its context, and recommend what com
 start: explore
 steps:
   explore:
-    agent: >-
+    by: investigator
+    do: >-
       The issue is mirrored in spec.md. Post the `## Triage` comment on it and add the kind, risk and priority
       labels: `norn:kind:bug|feature|security|chore|docs`, `norn:risk:low|medium|high`,
       `norn:priority:low|medium|high|extreme`; a label missing on the remote is named in the comment
@@ -17,8 +18,8 @@ steps:
       an exception to the brief's rule on remote writes; never remove a label, the intake label `norn` included. Change no file, spec.md included,
       but the handoff. The recommendation lives only in that comment:
       report `norn done done --note "<recommendation>: <reason>"`.
-    skills: [norn-triage]
-    inputs: [spec, handoff]
+    with: { skills: [norn-triage] }
+    reads: [spec, handoff]
     outcomes:
       done:
         to: $done

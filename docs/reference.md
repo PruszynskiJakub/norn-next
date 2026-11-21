@@ -24,21 +24,63 @@ The nearer file wins: the committed file over the local file over the user file 
 
 A slot names a plugin with `use`: the bundled ones are listed by `norn plugin list`, and `norn plugin add <spec>` installs another and pins it in the plugin lock. An executor pairs a harness (the agent: `claude`, `pi`) with a runner (where it runs: `headless`, `herdr`); an agent step runs on `executor`, or on the only executor when there is one.
 
+## Steps
+
+A step is written with thirteen keys, and the set never grows: what an actor needs beyond them goes under `with:`, and a step kind is named by value.
+
+| Key | What it says |
+|---|---|
+| `by` | who acts: an agent role (`builder`, `reviewer`, `qa`, `investigator`, `writer`), `person`, `shell`, or a step kind as `<namespace>.<kind>` |
+| `do` | an agent's instruction, the decision a person makes, or the command a shell step runs |
+| `with` | how the actor works: an agent's `skills`, a shell step's `exits` (exit code → outcome), a step kind's settings |
+| `reads` | what an agent step's brief gives it ([Inputs](#inputs)); `norn.each` takes `[slices]` |
+| `produces` | what every outcome of an agent step produces, unless the outcome lists its own ([Outcomes](#outcomes)) |
+| `allow` | what an agent step may write: `docs:write` alone keeps it to the story's documents, `code:write` writes the worktree (the default) ([What an agent step writes](#what-an-agent-step-writes)) |
+| `attended` | `person`: a person stays alongside the agent in its pane and starts the step |
+| `limits` | an agent step's `deadline`, `nudges` and `retries`; a shell step's `timeout`, which it needs |
+| `outcomes` | where each outcome leads ([Outcomes](#outcomes)) |
+| `on` | what may move a waiting step, a person's or a wait step kind's, by signal ([Signals](#signals)) |
+| `description`, `use`, `like` | a note; `use: <file>` brings in `shared/<file>.yaml`; `like: <step>` copies a step of the same file, each key it writes replacing the copied value whole |
+
+```yaml
+ci:
+  by: shell
+  do: ./scripts/wait-for-ci.sh
+  with: { exits: { 3: stale } }
+  limits: { timeout: 30m }
+  outcomes: { pass: ready, fail: { exit: ci-failed }, stale: { exit: stale } }
+merge:
+  by: forge.await-merge
+  outcomes: { merged: $done }
+  on: { vcs.stale: { exit: stale }, vcs.unpushed: open-pr }
+```
+
+A step kind's namespace is the slot it works over, `vcs.` (`update-branch`, `integrate`, `push`, `verify-base`) or `forge.` (`open-pr`, `await-merge`), so a workflow moves between providers unchanged; a kind over no slot is named after its plugin (`vercel.preview`), and `norn.each`, which runs the story's slices through `kernel.slice_workflow`, is the core's. A signal is named the same way (`vcs.stale`, `norn.timeout`). Each actor takes only its own keys, and a key of the older form in a step written with `by:` is refused with where it is written now (`skills` under `with:`, `inputs` as `reads:`, `timeout` under `limits:`, `writes: docs` as `allow: [docs:write]`). An agent role picks no executor: the config's `executor` runs it; a step that must name one, or a `model`, keeps the older form. `attended:` takes `person` alone for now.
+
+A workflow sets the stale signal's settings once, and names the step `norn story update-branch` re-enters:
+
+```yaml
+signals: { vcs.stale: { when: conflict, verify: test } }   # when: conflict (default) or behind
+entries: { update-branch: update }
+```
+
+**The older form.** One head key per step, `agent: <instruction>`, `check: <command>`, `gate: <decision>`, `slices:`, or a step kind's bare name with no value (`open-pr:`), with `skills:`, `inputs:`, `writes:`, `attended: true`, `timeout:`, `exits:` and the step kind's settings beside it, and `base: { stale, step, verify }` for the workflow. It still loads, and pins the same document: a unit pins every workflow in that form, so a pin's hash never depends on which form its file used.
+
 ## Signals
 
-A gate or a wait step kind (`await-merge`) routes signals under `on:`, beside its `outcomes:`. Each entry takes the route shape of `outcomes:` (a step name, `$done`, `$stuck`, or `{to | exit, max, counter}`), plus the signal's own parameters. The edge is `<step>.<signal>`, so `counter:`, `reset_on` and `norn run rerun --reset` name it as they name an outcome's. A route back is bounded by `kernel.counters.stale` (10) unless it sets `max:`.
+A person step or a wait step kind (`forge.await-merge`) routes signals under `on:`, beside its `outcomes:`. Each entry takes the route shape of `outcomes:` (a step name, `$done`, `$stuck`, or `{to | exit, max, counter}`), plus the signal's own parameters. The edge is `<step>.<signal>`, so `counter:`, `reset_on` and `norn run rerun --reset` name it as they name an outcome's. A route back is bounded by `kernel.counters.stale` (10) unless it sets `max:`.
 
 | Signal | Source | Parameters | Fires when | Occurrence id |
 |---|---|---|---|---|
-| `stale` | vcs | none | the base moved under the story the way the workflow's `base.stale` names: `behind` (the base has a commit the story lacks) or `conflict` (the default: merging the base conflicts, or with `base.verify` breaks the merged tree) | the base commit |
-| `unpushed` | vcs | none | the story branch moved past its open change's head with commits beyond the story's spec folder | the story head |
-| `timeout` | clock | `after:` a duration (`30m`, `48h`, `7d`), required | the step has waited `after:`: a gate since it parked, a wait step since its run started | the step visit (`ready#3`) |
+| `vcs.stale` | vcs | none | the base moved under the story the way the workflow's `signals: { vcs.stale: { when } }` names: `behind` (the base has a commit the story lacks) or `conflict` (the default: merging the base conflicts, or with `verify:` breaks the merged tree) | the base commit |
+| `vcs.unpushed` | vcs | none | the story branch moved past its open change's head with commits beyond the story's spec folder | the story head |
+| `norn.timeout` | clock | `after:` a duration (`30m`, `48h`, `7d`), required | the step has waited `after:`: a gate since it parked, a wait step since its run started | the step visit (`ready#3`) |
 
-A plugin declares more under `provides.signals`; `norn plugin list` names them, and a workflow that routes one loads only with that plugin configured. A signal fires once per occurrence id in a round, the first listed first, one per tick, and only for the story's own unit. `on:` on an agent, check, effect step or slices step is refused, and so is an undeclared signal or a name under both `outcomes:` and `on:`. A wait step kind that answers a signal's name as its own outcome (`await-merge` answers `unpushed`) takes the one route under `on:` for both. A waiting step written before `on:`, with `stale` or `unpushed` under `outcomes:`, still loads to the same graph; `norn doctor` warns about a repo file in that form.
+A plugin declares more under `provides.signals`, named `<slot>.<signal>` when it declares a slot and `<plugin>.<signal>` otherwise; `norn plugin list` names them, and a workflow that routes one loads only with that plugin configured. A signal fires once per occurrence id in a round, the first listed first, one per tick, and only for the story's own unit. `on:` on an agent, shell, effect step or `norn.each` is refused, and so is an undeclared signal, a signal named without its namespace, or a name under both `outcomes:` and `on:`. A wait step kind that answers a signal's name as its own outcome (`await-merge` answers `unpushed`) takes the one route under `on:` for both. A waiting step in the older form names signals bare (`stale:`); one written before `on:`, with `stale` or `unpushed` under `outcomes:`, still loads to the same graph; `norn doctor` warns about a repo file in that form.
 
 ## Inputs
 
-An agent step's `inputs:` lists what its brief gives it. norn writes each one under `.agents/` in the unit's worktree, and the brief names its path; an input norn holds nothing for yet is listed with a note.
+An agent step's `reads:` (`inputs:` in the older form) lists what its brief gives it. norn writes each one under `.agents/` in the unit's worktree, and the brief names its path; an input norn holds nothing for yet is listed with a note.
 
 | Input | What the agent gets |
 |---|---|
@@ -62,7 +104,7 @@ An agent step's `inputs:` lists what its brief gives it. norn writes each one un
 
 A red check is passed over in the search, never a stop: it carries no findings, and the ones before it are still what the rework answers. Two producers sending findings into one step (QA's `fail` and a person's `reject` at `human-qa` both reach `implement`) need no naming: the one that sent this visit back is open.
 
-An entry may also be a file in the repo, `{file: <path>, label: <text>}`, which the brief names as it is, or a name an earlier step produces (below). A workflow file naming any other input is refused when it loads, at the step and the entry (`/steps/review/inputs/2`), with the names above. A unit's pinned workflow loads without this check, so a pinned workflow that names one keeps running, and its brief notes that norn provides no input of that name.
+An entry may also be a file in the repo, `{file: <path>, label: <text>}`, which the brief names as it is, or a name an earlier step produces (below). A workflow file naming any other input is refused when it loads, at the step and the entry (`/steps/review/reads/2`), with the names above. A unit's pinned workflow loads without this check, so a pinned workflow that names one keeps running, and its brief notes that norn provides no input of that name.
 
 ## Outcomes
 
@@ -70,8 +112,9 @@ A step's `outcomes:` routes each outcome it ends with. A route is a bare target 
 
 ```yaml
 qa:
-  agent: "Give each criterion a verdict with evidence."
-  inputs: [spec, slices, diff]
+  by: qa
+  do: "Give each criterion a verdict with evidence."
+  reads: [spec, slices, diff]
   produces: [criteria]                   # what every outcome produces, unless it lists its own
   outcomes:
     pass:       { to: describe, verdict: pass, means: "every criterion observed with evidence" }
@@ -95,7 +138,7 @@ An entry of a `produces:` list is a report norn takes with the outcome, written 
 - `findings` (or `evidence`): handed back with the outcome; an outcome hands back one of them. Findings become the next step's open findings ([Inputs](#inputs)). A person's `reject` at a gate produces findings from its reason without saying so.
 - `{ name: <name>, file: <path> }`: a file the agent writes in the spec folder (below), declared once in the step and named bare in any other list of it.
 
-`means`, `verdict` and `produces` belong to an agent step's outcomes; on a gate's or a step kind's they are refused, and so is one on a route the kernel takes (`stuck`, `timeout`, …). A step says each of them one way: an outcome object's `means` with a step's `means:` map, or an outcome's `produces` with `criteria:` or `hand_back:`, is refused with the spelling to use. Outcome objects are how a file is written; a unit pins its workflow with the older keys (`means:`, `verdict:`, `criteria: required`, `hand_back:`, `produces: {<name>: {file, on}}`), which a file may still use, so the two spellings of one workflow pin the same document and hash.
+`means`, `verdict` and `produces` belong to an agent step's outcomes; on a person's, a shell step's or a step kind's they are refused, and so is one on a route the kernel takes (`stuck`, `timeout`, …). A step says each of them one way: an outcome object's `means` with a step's `means:` map, or an outcome's `produces` with `criteria:` or `hand_back:`, is refused with the spelling to use. Outcome objects are how a file is written; a unit pins its workflow with the older keys (`means:`, `verdict:`, `criteria: required`, `hand_back:`, `produces: {<name>: {file, on}}`), which a file may still use, so the two spellings of one workflow pin the same document and hash.
 
 ### Produced files
 
@@ -103,7 +146,8 @@ An agent step declares the files it writes for later steps in a `produces:` list
 
 ```yaml
 describe:
-  agent: "Write the PR body to pr.md in the spec folder."
+  by: writer
+  do: "Write the PR body to pr.md in the spec folder."
   produces: [{ name: pr_body, file: pr.md }]
   outcomes: { done: ship }
 ```
@@ -112,21 +156,21 @@ describe:
 - The step's list is due on every outcome the step reports; an outcome that lists its own, such as `changes_requested: { to: implement, produces: [findings] }`, needs only what it lists. A name with no file in the step, or one name given two files, is refused. The older form, a map `pr_body: { file: pr.md, on: [done] }`, still loads: there `on:` names the outcomes, and without it every outcome but one that hands findings back.
 - A produced name may not be an input norn provides, and every step producing one name writes the same file.
 - `norn done <outcome>` is refused (`produced_missing`) while a file due on that outcome is missing or empty in the worktree; a file left by an earlier pass counts, as norn does not check that this run wrote it. The brief says which file each outcome needs.
-- A later step lists the name under `inputs:`, and its brief names the file. norn keeps the file with the story's documents, so a step in another worktree gets it too.
+- A later step lists the name under `reads:`, and its brief names the file. norn keeps the file with the story's documents, so a step in another worktree gets it too.
 - A step that lists a produced name, or a step kind that reads one, must have a producer before it on every path from `start`, the producer reporting an outcome the file is due on. A file where some path lacks one is refused when it loads, naming the step and that path (`plan.skip → review`). A route back is fine.
 
 The bundled `describe` steps produce `pr_body`, which `open-pr` reads. `open-pr` reads it with a fallback: a base update's light path reaches `open-pr` again without `describe`, and then it reads the `pr.md` an earlier pass left, else opens the change with norn's footer alone. A unit that pinned its workflow before `produces:` existed loads it to the same graph and hash.
 
 ## What an agent step writes
 
-An agent step's `writes:` says where its agent may write, as the worktree hooks hold it ([Concepts](concepts.md#what-an-agent-step-may-write)).
+An agent step's `allow:` says where its agent may write, as the worktree hooks hold it ([Concepts](concepts.md#what-an-agent-step-may-write)); the older form says `writes: worktree` or `writes: docs`.
 
-| Value | The agent may write | Needs |
+| `allow:` | The agent may write | Needs |
 |---|---|---|
-| `worktree` (default) | its unit's worktree, and the temp folders (`$TMPDIR`, `/tmp`) | nothing |
-| `docs` | the story's spec folder in the worktree (`.agents/specs/<story>/`), and the temp folders | an executor whose harness can refuse a tool call (`denyTool`); on any other the unit parks `stuck` with `agent.unguarded` before an agent starts |
+| left out, or with `code:write` (`writes: worktree`) | its unit's worktree, and the temp folders (`$TMPDIR`, `/tmp`) | nothing |
+| `[docs:write]` (`writes: docs`) | the story's spec folder in the worktree (`.agents/specs/<story>/`), and the temp folders | an executor whose harness can refuse a tool call (`denyTool`); on any other the unit parks `stuck` with `agent.unguarded` before an agent starts |
 
-Every step is refused a write into norn's run state. Only the agent tool's file writes are judged; a shell command is not. `writes:` on a step that is not an agent step is refused when the workflow loads.
+Every step is refused a write into norn's run state. Only the agent tool's file writes are judged; a shell command is not. `allow:` (or `writes:`) on a step that is not an agent step is refused when the workflow loads, and so is a capability other than `code:write` and `docs:write`.
 
 ## Generated reference
 

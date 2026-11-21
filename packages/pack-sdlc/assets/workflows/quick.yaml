@@ -5,7 +5,7 @@
 # draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a person at
 # ready, then wait at merge until the person merges the PR.
 # A story waiting at ready or merge goes back through update when the base moved under it in a way
-# that conflicts (base.stale: conflict).
+# that conflicts (`signals: { vcs.stale: { when: conflict } }`).
 # Steps shared with other workflows come from `shared/` (`use:`): the test command is the config's
 # `checks.test`; change the CI wait in `shared/ship.yaml`.
 name: quick
@@ -17,15 +17,16 @@ steps:
     use: sync
     outcomes: { synced: implement }
   implement:
-    agent: >-
+    by: builder
+    do: >-
       Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one,
       otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask.
       A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the
       suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Notes and
       the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
       changing any code, then fix the cause.
-    skills: [norn-implement]
-    inputs: [spec, handoff, last_check, last_findings]
+    with: { skills: [norn-implement] }
+    reads: [spec, handoff, last_check, last_findings]
     outcomes:
       done:
         to: update
@@ -39,10 +40,11 @@ steps:
       ship: ship
       redescribe: describe
   review:
-    agent: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
-    skills: [norn-review]
-    writes: docs
-    inputs: [spec, diff, last_findings]
+    by: reviewer
+    do: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
+    with: { skills: [norn-review] }
+    allow: [docs:write]
+    reads: [spec, diff, last_findings]
     outcomes:
       approve:
         to: describe
@@ -52,9 +54,10 @@ steps:
         means: "blocking findings, handed back with --findings <file>"
         produces: [findings]
   describe:
-    agent: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
-    skills: [norn-pr]
-    inputs: [spec, diff, handoff]
+    by: writer
+    do: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
+    with: { skills: [norn-pr] }
+    reads: [spec, diff, handoff]
     # open-pr reads it; norn done refuses the report while pr.md is missing or empty
     produces: [{ name: pr_body, file: pr.md }]
     outcomes:
@@ -68,7 +71,8 @@ steps:
       ci-failed: { to: implement, max: 3 }
       rejected: implement
       stale: update
-# update-branch re-enters update, not sync (the default would be the first update step); a base move
+# `norn story update-branch` re-enters update, not sync (the default would be the first update step); a base move
 # without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once per
 # base move (no push, no CI): red goes back through update like a conflict
-base: { stale: conflict, step: update, verify: test }
+signals: { vcs.stale: { when: conflict, verify: test } }
+entries: { update-branch: update }

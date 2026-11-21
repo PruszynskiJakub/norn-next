@@ -9,22 +9,24 @@ description: Agree a story's spec and plan with a person, against the current ba
 start: sync
 steps:
   sync:
-    update-branch:
+    by: vcs.update-branch
     # a branch that already held its base (clean) or took it in after a resolve (resolved) goes on to refine too
     outcomes: { done: refine, conflict: sync-resolve, clean: refine, resolved: refine }
   sync-resolve:
-    agent: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase."
-    skills: [norn-merge]
-    inputs: [spec, handoff, base_side]
+    by: builder
+    do: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase."
+    with: { skills: [norn-merge] }
+    reads: [spec, handoff, base_side]
     outcomes:
       done:
         to: sync
         means: "base merged into the story branch, conflicts resolved and committed"
   refine:
-    agent: "Write the spec into the body of spec.md; keep its frontmatter unchanged."
-    skills: [norn-refine]
-    attended: true
-    inputs: [spec, handoff]
+    by: writer
+    do: "Write the spec into the body of spec.md; keep its frontmatter unchanged."
+    with: { skills: [norn-refine] }
+    attended: person
+    reads: [spec, handoff]
     outcomes:
       done:
         to: plan
@@ -33,19 +35,21 @@ steps:
         to: clarify
         means: "spec written, but open questions are listed that need the person's answers"
   clarify:
-    agent: "Settle the spec's open questions with the person, one question at a time, folding each answer into the section it changes."
-    skills: [norn-clarify]
-    attended: true
-    inputs: [spec, handoff]
+    by: writer
+    do: "Settle the spec's open questions with the person, one question at a time, folding each answer into the section it changes."
+    with: { skills: [norn-clarify] }
+    attended: person
+    reads: [spec, handoff]
     outcomes:
       done:
         to: plan
         means: "every open question is answered and folded into the spec"
   plan:
-    agent: "Write the Plan section of spec.md."
-    skills: [norn-plan]
-    attended: true
-    inputs: [spec, handoff]
+    by: writer
+    do: "Write the Plan section of spec.md."
+    with: { skills: [norn-plan] }
+    attended: person
+    reads: [spec, handoff]
     outcomes:
       done:
         to: $done

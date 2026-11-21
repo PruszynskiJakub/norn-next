@@ -133,7 +133,7 @@ A tick takes a lock, so a cron tick and `norn watch` take turns. cron has a mini
 
 ## The base moved under a story
 
-norn merges the base into the story branch in an `update-branch:` step, never by rebasing. When the merge conflicts, the shipped workflows send it to an agent step that resolves it, and the story goes on. A story waiting at a gate or at `await-merge:` goes back through its update step when the base moves under it in a way that conflicts (`base.stale` in the workflow). A base move without a conflict can still break the story; `base.verify: <check step>` runs that check on the merge of the base into the story head, once per base move, and sends the story back through update when it fails.
+norn merges the base into the story branch in a `vcs.update-branch` step, never by rebasing. When the merge conflicts, the shipped workflows send it to an agent step that resolves it, and the story goes on. A story waiting at a person step or at `forge.await-merge` goes back through its update step when the base moves under it in a way that conflicts (`signals: { vcs.stale: { when: conflict } }` in the workflow). A base move without a conflict can still break the story; `verify: <shell step>` beside `when:` runs that check on the merge of the base into the story head, once per base move, and sends the story back through update when it fails.
 
 You may also push to the story branch yourself at any time: norn merges your push in and never loses it.
 
@@ -152,25 +152,28 @@ When the merge conflicts, norn aborts it and refuses with the conflicting paths 
 ## Write your own workflow
 
 1. Put a YAML file in `.agents/workflows/`. A file with the name of one of the pack's (`quick.yaml`) replaces it; a new name (`docs.yaml`) adds a workflow. Start from the pack's file of the same name.
-2. Edit the steps. Each opens with one head key that says what happens (`agent:`, `check:`, `gate:`, `slices:`, or a step kind with no value such as `open-pr:`), then says where each outcome goes in `outcomes:`. An agent step's head is its orientation, what the step is for; `skills:` (optional) lists the skills it uses, `by:` picks an executor, `inputs:` what its brief gives it (the names are in [Reference › Inputs](reference.md#inputs)), each outcome's `means:` says what it means, and `writes: docs` keeps it to the story's documents ([Concepts](concepts.md#what-an-agent-step-may-write)). An outcome is a bare target, or an object with its target and what it means, its bound and what it produces ([Reference › Outcomes](reference.md#outcomes)):
+2. Edit the steps. Each says who acts with `by:` (an agent role, `person`, `shell`, or a step kind such as `forge.open-pr`), what they do with `do:`, and where each outcome goes in `outcomes:`. An agent step's `do:` is its orientation, what the step is for; `with: { skills: […] }` (optional) lists the skills it uses, `reads:` what its brief gives it (the names are in [Reference › Inputs](reference.md#inputs)), each outcome's `means:` says what it means, and `allow: [docs:write]` keeps it to the story's documents ([Concepts](concepts.md#what-an-agent-step-may-write)). An outcome is a bare target, or an object with its target and what it means, its bound and what it produces ([Reference › Outcomes](reference.md#outcomes)); every key is in [Reference › Steps](reference.md#steps):
 
 ```yaml
   implement:
-    agent: Build the change the spec asks for, test-first.
-    skills: [norn-implement]
-    inputs: [spec, handoff, last_check]
+    by: builder
+    do: Build the change the spec asks for, test-first.
+    with: { skills: [norn-implement] }
+    reads: [spec, handoff, last_check]
     outcomes:
       done: { to: test, means: "every criterion has a passing test" }
   test:
-    check: "{checks.test}"
-    timeout: 15m
+    by: shell
+    do: "{checks.test}"
+    limits: { timeout: 15m }
     outcomes: { pass: review, fail: { to: implement, max: 3 } }
   ready:
-    gate: Read the draft PR. Approve to wait for the merge, or reject with what to change.
+    by: person
+    do: Read the draft PR. Approve to wait for the merge, or reject with what to change.
     outcomes: { approve: merge, reject: implement }
 ```
 
-   A check's head is a shell command. `{checks.<name>}` in it stands for the command the config sets under that name: the pack's test steps run `{checks.test}`, which `norn init` detects from your build files and `norn config set checks.test "npm ci && npm test"` changes (default `bun test`).
+   A shell step's `do:` is a shell command. `{checks.<name>}` in it stands for the command the config sets under that name: the pack's test steps run `{checks.test}`, which `norn init` detects from your build files and `norn config set checks.test "npm ci && npm test"` changes (default `bun test`).
 3. Commit it, or keep it local: norn loads the files in `.agents/workflows/` of the main checkout. `norn doctor` shows a workflow that does not load, naming the file and the step.
 4. Use it: label an item `norn:wf:docs`, or `norn story create "…" --workflow docs` with the local tracker.
 
@@ -217,7 +220,7 @@ Every route back to an earlier step is counted, and a unit whose counter passes 
 
 ## Name your own skill in a step
 
-Write the skill under a name without the `norn-` prefix in `.agents/skills/<name>/SKILL.md`, commit it, and list it in the step: `skills: [my-review]`. A skill a step lists that neither the pack ships nor the repo keeps (in `.agents/skills/` or a harness's skills folder) draws a warning from `norn doctor`; the tick still runs the workflow, because the harness may load the skill from a user-level folder or a plugin (`plugin:skill`, which is not looked for). To change how a pack skill works, commit your own folder under the pack skill's name: norn finds no mark of its own in it and leaves it alone, so your version is the one the agent loads.
+Write the skill under a name without the `norn-` prefix in `.agents/skills/<name>/SKILL.md`, commit it, and list it in the step: `with: { skills: [my-review] }`. A skill a step lists that neither the pack ships nor the repo keeps (in `.agents/skills/` or a harness's skills folder) draws a warning from `norn doctor`; the tick still runs the workflow, because the harness may load the skill from a user-level folder or a plugin (`plugin:skill`, which is not looked for). To change how a pack skill works, commit your own folder under the pack skill's name: norn finds no mark of its own in it and leaves it alone, so your version is the one the agent loads.
 
 ## Run without GitHub
 
