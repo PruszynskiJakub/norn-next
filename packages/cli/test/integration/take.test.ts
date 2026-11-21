@@ -5,9 +5,7 @@
  * and so one local store, as two people on one box, or two machines over a shared claim, would.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { machineName, type NornOut, norn, setUp, type UnitShown, unitOf, type World, world } from "./world.ts";
+import { confirmWorkflows, machineName, type NornOut, norn, setUp, type UnitShown, unitOf, type World, world, writeWorkflow } from "./world.ts";
 
 const KEY = "lt-1";
 const SLOW = 180_000;
@@ -48,8 +46,8 @@ describe("a story taken over by another holder, through the CLI alone", () => {
   beforeAll(async () => {
     w = await world("work");
     await setUp(w);
-    mkdirSync(join(w.root, ".agents", "workflows"), { recursive: true });
-    writeFileSync(join(w.root, ".agents", "workflows", "gated.yaml"), GATED);
+    await writeWorkflow(w, "gated", GATED, ALICE);
+    await confirmWorkflows(w, BOB);
     await norn(w, ["story", "create", "Look into it", "--workflow", "gated", "--json"], ALICE);
     await tickUntil(w, ALICE, alice, (u) => u?.step === "look" && u.parked !== undefined);
     await tickAs(w, BOB, bobBefore);

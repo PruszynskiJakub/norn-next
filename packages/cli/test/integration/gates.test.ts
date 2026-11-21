@@ -267,7 +267,8 @@ describe("QA's verdicts and notes at the person's gate", () => {
     const [refused, accepted] = [tries(1)[0], tries(2)[0]];
     expect(refused).toMatchObject({ code: 3, body: { code: "outcome_contradicts_verdicts" } });
     expect(String(refused?.body.error)).toContain("AC2");
-    expect(String(refused?.body.do_instead)).toContain("norn done unverified --criteria");
+    expect(String(refused?.body.do_instead)).toContain("norn done unverified");
+    expect(String(refused?.body.do_instead)).not.toContain("--criteria");
     expect(accepted?.code).toBe(0);
   });
 

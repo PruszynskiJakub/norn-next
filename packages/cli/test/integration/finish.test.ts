@@ -7,9 +7,9 @@
  * story whose base moved under it.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { agentNotes, awaitNote, type NornOut, norn, personPush, plans, refsUnder, setUp, sh, status, type StoryShown, tickUntil, type UnitShown, type World, world, worktreeOf } from "./world.ts";
+import { agentNotes, awaitNote, type NornOut, norn, personPush, plans, refsUnder, setUp, sh, status, type StoryShown, tickUntil, type UnitShown, type World, world, worktreeOf, writeWorkflow } from "./world.ts";
 
 const KEY = "lt-1";
 const SLOW = 300_000;
@@ -239,7 +239,7 @@ describe("stories on two workflows side by side, one workflow edited mid-story",
     await tickUntil(w, rules, (u) => u?.ended === "done", 90_000, "lt-2");
     soloEnded = await unitIn(w, "lt-2");
     gatedWhileSoloRan = await unitIn(w, "lt-1");
-    writeFileSync(join(w.root, ".agents", "workflows", "gated.yaml"), GATED_V2);
+    await writeWorkflow(w, "gated", GATED_V2);
     await person(w, "story", "create", "Gated after the edit", "--workflow", "gated");
     await tickUntil(w, rules, parkedAt("look"), 60_000, "lt-3");
     before = await unitIn(w, "lt-1");
@@ -283,11 +283,10 @@ describe("a round's pin over a shared file, and the next round", () => {
   beforeAll(async () => {
     w = await world("work");
     await setUp(w, { workflow: "uses", workflows: { uses: USES } });
-    mkdirSync(join(w.root, ".agents", "workflows", "shared"), { recursive: true });
-    writeFileSync(join(w.root, ".agents", "workflows", "shared", "ask.yaml"), SHARED_ASK);
+    await writeWorkflow(w, "shared/ask", SHARED_ASK);
     await person(w, "story", "create", "Ask it");
     await tickUntil(w, rules, parkedAt("q"));
-    writeFileSync(join(w.root, ".agents", "workflows", "shared", "ask.yaml"), SHARED_ASK.replace("First text.", "Second text."));
+    await writeWorkflow(w, "shared/ask", SHARED_ASK.replace("First text.", "Second text."));
     pinnedText = (await unitIn(w, KEY))?.waiting?.text;
     sharedRound = await norn(w, ["story", "round", KEY, "--workflow", "shared/ask", "--json"]);
     await person(w, "story", "approve", KEY);

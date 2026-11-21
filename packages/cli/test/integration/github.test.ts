@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { nodeExec } from "@norn/host-node";
 import { parse } from "yaml";
 import { callsOf, editGh, fakeGh, type GhPr, type GhState, ghCalls, ghState, LOGIN, openPr, pushes, visibleBody, WEB } from "./fake-gh.ts";
-import { agentNotes, type NornOut, norn, setUp, sh, status, TEST_PLUGIN, tickUntil, type UnitShown, unitOf, type World, world } from "./world.ts";
+import { agentNotes, type NornOut, norn, setUp, sh, status, TEST_PLUGIN, tickUntil, type UnitShown, unitOf, type World, world, writeWorkflow } from "./world.ts";
 
 const SLOW = 180_000;
 const COLOR = "5319E7";
@@ -53,8 +53,8 @@ describe("labels on a GitHub repository", () => {
     repoDoctor = ghCalls(w).slice(before);
 
     mkdirSync(join(w.root, ".agents", "workflows"), { recursive: true });
-    writeFileSync(join(w.root, ".agents", "workflows", "mine.yaml"), ["name: mine", "start: look", "steps:", "  look:", "    gate: Look.", "    outcomes: { approve: $done, reject: $stuck }", ""].join("\n"));
     writeFileSync(join(w.root, ".agents", "workflows", "broken.yaml"), "name: broken\nstart: nowhere\nsteps: {}\n");
+    await writeWorkflow(w, "mine", ["name: mine", "start: look", "steps:", "  look:", "    gate: Look.", "    outcomes: { approve: $done, reject: $stuck }", ""].join("\n"));
     before = ghCalls(w).length;
     await norn(w, ["doctor", "--json"]);
     newWorkflow = callsOf(ghCalls(w).slice(before), "label create");
@@ -150,8 +150,7 @@ describe("GitHub refusing norn", () => {
     editGh(w, (s) => {
       s.fail["label create"] = { code: 1, stderr: "HTTP 403: Resource not accessible by integration (https://api.github.com/repos/acme/app/labels)" };
     });
-    mkdirSync(join(w.root, ".agents", "workflows"), { recursive: true });
-    writeFileSync(join(w.root, ".agents", "workflows", "mine.yaml"), ["name: mine", "start: look", "steps:", "  look:", "    gate: Look.", "    outcomes: { approve: $done, reject: $stuck }", ""].join("\n"));
+    await writeWorkflow(w, "mine", ["name: mine", "start: look", "steps:", "  look:", "    gate: Look.", "    outcomes: { approve: $done, reject: $stuck }", ""].join("\n"));
     doctor403 = await norn(w, ["doctor", "--json"]);
     const before = ghCalls(w).length;
     create403 = await norn(w, ["story", "create", "Make it", "--workflow", "mine", "--json"]);
@@ -268,10 +267,10 @@ const FLOW = [
 ].join("\n");
 
 /** The repo's flow workflow with the pack's shared ship steps beside it, as a repo copies them. */
-function writeFlow(w: World): void {
+async function writeFlow(w: World): Promise<void> {
   mkdirSync(join(w.root, ".agents", "workflows", "shared"), { recursive: true });
-  writeFileSync(join(w.root, ".agents", "workflows", "flow.yaml"), FLOW);
   writeFileSync(join(w.root, ".agents", "workflows", "shared", "ship.yaml"), SHIP);
+  await writeWorkflow(w, "flow", FLOW);
 }
 
 const KEY = "gh-1";
@@ -307,7 +306,7 @@ describe("a story's pull request on GitHub", () => {
     w = await world("work");
     fakeGh(w);
     await setUp(w, { tracker: "github", forge: "github" });
-    writeFlow(w);
+    await writeFlow(w);
     await norn(w, ["doctor", "--json"]);
     editGh(w, (s) => {
       s.issues = [{ number: 1, title: "Ship the thing", body: "", open: true, assignees: [LOGIN], labels: ["norn", "norn:wf:flow"], author: LOGIN, comments: [] }];
@@ -565,8 +564,13 @@ function repoFile(...parts: string[]): string {
   if (!existsSync(file)) throw new Error(`the CI script tests read ${parts.join("/")} from this repo, and it is gone: point them at where it moved`);
   return file;
 }
-/** A workflow's `ci` check script, read from the file as the workflow loader reads it. */
-const ciScript = (file: string): string => ((parse(readFileSync(file, "utf8")) as { steps: { ci: { check: string } } }).steps.ci.check);
+/** A workflow's `ci` script, read from the file as the workflow loader reads it: `do:` under `by: shell`, or the older `check:`. */
+function ciScript(file: string): string {
+  const ci = (parse(readFileSync(file, "utf8")) as { steps: { ci: { do?: string; check?: string } } }).steps.ci;
+  const script = ci.do ?? ci.check;
+  if (script === undefined) throw new Error(`${file}: the ci step has neither do: nor check:`);
+  return script;
+}
 
 interface ScriptRun {
   code: number;

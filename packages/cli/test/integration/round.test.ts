@@ -4,9 +4,7 @@
  * next workflow, which the tick picks up again, making the worktree again from the story's branch.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { type NornOut, norn, setUp, sh, status, type StoryShown, tickUntil, type World, world } from "./world.ts";
+import { type NornOut, norn, setUp, sh, status, type StoryShown, tickUntil, type World, world, writeWorkflow } from "./world.ts";
 
 const KEY = "lt-1";
 const SLOW = 180_000;
@@ -41,8 +39,7 @@ describe("a story's next round, through the CLI alone", () => {
   beforeAll(async () => {
     w = await world("work");
     await setUp(w);
-    mkdirSync(join(w.root, ".agents", "workflows"), { recursive: true });
-    writeFileSync(join(w.root, ".agents", "workflows", "triaged.yaml"), TRIAGED);
+    await writeWorkflow(w, "triaged", TRIAGED);
     await norn(w, ["story", "create", "Look into it", "--workflow", "triaged", "--json"]);
     await tickUntil(w, rules, (u) => u?.step === "look" && u.parked !== undefined);
     early = await norn(w, ["story", "round", KEY, "--workflow", "e2e", "--json"]);

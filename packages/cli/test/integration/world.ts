@@ -202,10 +202,28 @@ export async function setUp(w: World, opts: SetUpOptions = {}): Promise<{ added:
     const set = await norn(w, ["config", "set", key, value, "--json"]);
     if (set.code !== 0) throw new Error(`config set ${key}: ${set.stdout}${set.stderr}`);
   }
-  // the person confirms the repo's own workflows, as a person setting a repo up would; one that does
-  // not load yet has nothing to confirm, and the test that wrote it reads that refusal itself
-  for (const name of Object.keys(opts.workflows ?? {})) await norn(w, ["workflow", "confirm", name, "--json"]);
+  await confirmWorkflows(w);
   return { added, init };
+}
+
+/**
+ * The person confirms every repo workflow in `.agents/workflows/`, as a person who wrote or edited
+ * them would, so a change to a person's step, `attended:` or `allow:` is not held. One that does not
+ * load, or that nothing holds, has nothing to confirm; a test that reads that refusal makes the call
+ * itself. Confirmation lives in the machine dir, so `env` names the machine (a `USER`) when it differs.
+ */
+export async function confirmWorkflows(w: World, env: Record<string, string> = {}): Promise<void> {
+  const dir = join(w.root, ".agents", "workflows");
+  if (!existsSync(dir)) return;
+  for (const file of readdirSync(dir).filter((f) => f.endsWith(".yaml")).sort()) await norn(w, ["workflow", "confirm", file.slice(0, -".yaml".length), "--json"], env);
+}
+
+/** A repo workflow file written as a person writes it (`name` may be `shared/<file>`), then confirmed by them. */
+export async function writeWorkflow(w: World, name: string, text: string, env: Record<string, string> = {}): Promise<void> {
+  const file = join(w.root, ".agents", "workflows", `${name}.yaml`);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, text);
+  await confirmWorkflows(w, env);
 }
 
 export interface UnitShown {
