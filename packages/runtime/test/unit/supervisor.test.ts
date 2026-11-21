@@ -146,6 +146,33 @@ describe("the supervisor of an attended: agent step", () => {
     await h.runtime.tick();
     expect(h.launcher.of("start")).toHaveLength(2);
   });
+  test("a supervisor's answer that lands in the tick after the person's is refused and never reaches the agent", async () => {
+    const h = harness({ workflow: "supervised", kernel: GRANT });
+    const { handle, askId } = await asked(h, "Which database should the cache use?");
+    const sup = await supervisorOf(h);
+    const state = (await record(h, "lt-1")).state;
+    const person = await h.env.journal.record("lt-1", { id: "person-answer", data: { kind: "answer.sent", input_id: askId, text: "SQLite, for now.", by: h.config.holder, step: state?.step as string, attempt: state?.attempt as number } });
+    expect(person.ok).toBe(true);
+    const late = await reportRun(h.env, "lt-1", sup.id, { verb: "done", outcome: "answer", text: "Postgres, as the spec says." }, "sup-late");
+    expect(late.ok).toBe(true);
+    await tickUntil(h, async () => (await record(h, "lt-1")).state?.parked === undefined);
+    const delivered = h.launcher.of("answer");
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0]?.slice(0, 3)).toEqual([handle, askId, "SQLite, for now."]);
+  });
+
+  test("a supervisor whose process ended without an answer hands the question back to the person", async () => {
+    const h = harness({ workflow: "supervised", kernel: GRANT });
+    await asked(h, "Which database should the cache use?");
+    const sup = await supervisorOf(h);
+    h.launcher.alive = async (handle: string) => (handle === sup.session ? false : null);
+    const reports = await tickUntil(h, has("supervisor.died"));
+    expect(reports.flatMap(rulesOf)).toContain("lt-1 supervisor.died");
+    const state = (await record(h, "lt-1")).state;
+    expect(state?.parked?.reason).toBe(ASKED_PARK);
+    expect(state?.supervisor).toBeUndefined();
+    expect(state?.supervised?.escalated?.map((e) => e.input)).toEqual([state?.parked?.input_id as string]);
+  });
 });
 
 describe("a gate the person's policy grants to a stand-in", () => {

@@ -33,14 +33,16 @@ async function restoreRemovedWorktree(t: TickContext, unit: string, handle: stri
  * launcher is idempotent by input id, so a commit that then fails and is applied again next tick
  * delivers nothing twice, where delivering after the commit could lose an answer to a crash. A failed
  * delivery holds the commit back for the same reason. The answers decide marked `undelivered` have
- * no session that could take them and are applied as they are: the run's retry carries them.
+ * no session that could take them and are applied as they are: the run's retry carries them. An
+ * answer the kernel refused (a supervisor's, after the person answered) never reaches the agent, or
+ * the late word it was told is refused would still be read.
  */
-async function deliverAnswers(t: TickContext, unit: string, through: number, before: RunState | null, undelivered: readonly string[]): Promise<PluginResult<unknown>> {
+async function deliverAnswers(t: TickContext, unit: string, through: number, before: RunState | null, undelivered: readonly string[], rejected: ReadonlySet<number>): Promise<PluginResult<unknown>> {
   const handle = before?.run?.session;
   if (!handle) return ok(null);
   let worktreeChecked = false;
   for (const r of unitInFacts(t.facts, unit)?.receipts ?? []) {
-    if (r.seq > through || r.data.kind !== "answer.sent" || undelivered.includes(r.id)) continue;
+    if (r.seq > through || r.data.kind !== "answer.sent" || undelivered.includes(r.id) || rejected.has(r.seq)) continue;
     // a dialog's keys go to a live pane, which resumes nothing
     if (!worktreeChecked && r.data.to !== "dialog") {
       const restored = await restoreRemovedWorktree(t, unit, handle);
@@ -72,7 +74,7 @@ async function stopReplaced(t: TickContext, before: RunState | null, after: RunS
 export async function applyReceipts(t: TickContext, d: DecisionOf<"apply_receipts">): Promise<PluginResult<unknown>> {
   const unit = unitOf(d);
   const before = unitInFacts(t.facts, unit)?.state ?? null;
-  const wrote = await writeAndCommit(t.env, t.facts, unit, d.receipts, d.state, d.expect_version, () => deliverAnswers(t, unit, d.state.applied_through, before, d.undelivered ?? []));
+  const wrote = await writeAndCommit(t.env, t.facts, unit, d.receipts, d.state, d.expect_version, () => deliverAnswers(t, unit, d.state.applied_through, before, d.undelivered ?? [], new Set(d.rejected.map((r) => r.seq))));
   if (!wrote.ok) return wrote;
   await stopReplaced(t, before, d.state);
   return ok({ ...wrote.value, ...(d.rejected.length ? { rejected: d.rejected } : {}) });

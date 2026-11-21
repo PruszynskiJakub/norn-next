@@ -303,7 +303,13 @@ describe("an executor's OS sandbox", () => {
     if (!harnessed) throw new Error("no claude executor");
     const byHarness = { ...h.env, slots: { ...h.env.slots, executors: { claude: { ...harnessed, capabilities: { ...harnessed.capabilities, sandbox: true } } } } };
     expect((await capsOf(byHarness))?.sandbox).toBe(true);
-    const launcher = Object.assign(Object.create(Object.getPrototypeOf(h.launcher)), h.launcher, { modesOf: () => ({ headless: true, attended: false, paneInput: false, dialogKeys: false, focus: false, sandbox: true }) });
-    expect((await capsOf({ ...h.env, launcher }))?.sandbox).toBe(true);
+    const boxed = defineNornPlugin({
+      name: "fake-runners",
+      api: "^1.5",
+      provides: { runners: { boxed: { configSchema: Type.Object({}), create: () => ({ name: "boxed", capabilities: { attended: false, headless: true, paneInput: false, sandbox: true }, start: async () => ok({ handle: "x" }), alive: async () => ok(true), send: async () => ok(undefined), stop: async () => ok(undefined) }) } } },
+    });
+    const byRunner = createRuntimeEnv({ ctx: h.ctx, plugins: [...h.plugins, boxed], config: { ...h.config, runner: { name: "boxed" } }, sessions: h.sessions });
+    if (!byRunner.ok) throw new Error(byRunner.failure.message);
+    expect((await capsOf(byRunner.value))?.sandbox).toBe(true);
   });
 });

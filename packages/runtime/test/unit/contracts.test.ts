@@ -53,4 +53,14 @@ describe("harness launcher modes", () => {
     expect(launcher.modesOf("bg")).toEqual({ headless: true, attended: false, paneInput: false, dialogKeys: false, focus: false });
     expect(launcher.modesOf("nope")).toBeNull();
   });
+  test("a runner that holds its agent in an OS sandbox makes its executor sandboxed; one that declares none leaves the flag out", () => {
+    const boxed = new HarnessLauncher({
+      ctx: memoryHost(),
+      executors: { boxed: { harness: harness(true), runner: runner({ attended: false, headless: true, paneInput: false, sandbox: true }) } },
+      hookCommand: ["norn", "hook"],
+      renderBrief: async () => ok("brief"),
+    });
+    expect(boxed.modesOf("boxed")?.sandbox).toBe(true);
+    expect(launcher.modesOf("bg")).not.toHaveProperty("sandbox");
+  });
 });
