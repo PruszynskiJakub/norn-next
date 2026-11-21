@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { packProblems } from "@norn/plugin-api";
+import { packProblems, stepRoles } from "@norn/plugin-api";
 import { packSdlcPlugin, SDLC_PACK } from "../../src/index.ts";
 
 const ASSETS = join(import.meta.dir, "..", "..", "assets");
@@ -28,6 +28,18 @@ describe("norn-pack-sdlc", () => {
     expect(packSdlcPlugin.provides.packs?.sdlc).toEqual(SDLC_PACK);
     expect(Object.isFrozen(packSdlcPlugin.provides.packs?.sdlc)).toBe(true);
     expect(packProblems(SDLC_PACK)).toEqual([]);
+  });
+
+  test("registers the roles a step names with by:, each with its purpose and capabilities, and the supervisor, which does no step", () => {
+    expect(Object.fromEntries(Object.entries(SDLC_PACK.roles ?? {}).map(([name, r]) => [name, r.allow]))).toEqual({
+      builder: ["code:write", "docs:write", "exec:any"],
+      reviewer: ["code:read", "exec:checks", "out:findings"],
+      qa: ["code:scratch", "exec:any", "out:criteria", "out:evidence", "out:findings"],
+      investigator: ["code:scratch", "exec:any", "out:findings", "tracker:comment", "tracker:label"],
+      writer: ["docs:write"],
+      supervisor: ["read:any", "answer", "decide:granted", "escalate"],
+    });
+    expect(stepRoles(SDLC_PACK.roles ?? {})).toEqual(["builder", "reviewer", "qa", "investigator", "writer"]);
   });
 
   test("carries every file under its assets folder, each with its text, and nothing else", () => {

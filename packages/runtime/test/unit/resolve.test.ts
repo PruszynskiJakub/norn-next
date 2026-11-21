@@ -100,6 +100,16 @@ describe("loadPackWorkflows and createRuntime", () => {
     expect([...HOST_INPUTS].sort()).toEqual(["base_side", "diff", "handoff", "last_check", "last_findings", "record", "resolution", "signal", "slice", "slices", "spec"]);
   });
 
+  test("a step's by: names a role the pack registers for a step, or the shipped roles when the pack registers none", () => {
+    const file = (role: string) => `name: r\nstart: build\nsteps:\n  build:\n    by: ${role}\n    do: Build it.\n    outcomes: { done: $done }\n`;
+    const roles = { designer: { purpose: "Designs it.", allow: ["docs:write" as const] }, supervisor: { purpose: "Answers.", allow: ["answer" as const], supervises: true as const } };
+    const r = loadPackWorkflows({ workflows: { "designer.yaml": file("designer"), "qa.yaml": file("qa"), "supervisor.yaml": file("supervisor") }, shared: {}, skills: {}, roles }, {});
+    if (!r.ok) throw new Error(r.failure.message);
+    expect([r.value.designer?.ok, r.value.qa?.ok, r.value.supervisor?.ok]).toEqual([true, false, false]);
+    const shipped = loadPackWorkflows({ workflows: { "qa.yaml": file("qa") }, shared: {}, skills: {} }, {});
+    expect(shipped.ok && shipped.value.qa?.ok).toBe(true);
+  });
+
   test("a workflow file producing a file norn writes in the spec folder itself is refused, naming the ones it keeps", () => {
     const file = (produced: string) => `name: own\nstart: build\nsteps:\n  build:\n    agent: Build it.\n    produces: { notes: { file: ${produced} } }\n    outcomes: { done: $done }\n`;
     const r = loadPackWorkflows({ workflows: { "own.yaml": file("handoffs/x.md"), "fine.yaml": file("notes.md") }, shared: {}, skills: {} }, {});

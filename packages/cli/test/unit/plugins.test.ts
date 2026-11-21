@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { memoryFiles } from "@norn/conformance";
 import type { WorkflowLoad } from "@norn/kernel";
-import { defineNornPlugin, type NornPlugin, PLUGIN_API_VERSION } from "@norn/plugin-api";
+import { SDLC_PACK } from "@norn/pack-sdlc";
+import { defineNornPlugin, type NornPlugin, PLUGIN_API_VERSION, stepRoles } from "@norn/plugin-api";
+import { AGENT_ROLES } from "@norn/schema";
 import {
   BUNDLED_PLUGINS,
   bundledNames,
@@ -59,6 +61,10 @@ function failureOf(r: ReturnType<typeof resolvePlugins>): CliFailure {
 }
 
 describe("bundled plugins", () => {
+  test("the roles the loader falls back to, for a pack that registers none, are the shipped pack's step roles", () => {
+    expect(stepRoles(SDLC_PACK.roles ?? {})).toEqual([...AGENT_ROLES]);
+  });
+
   test("the binary ships exactly the agreed set", () => {
     expect(bundledNames().sort()).toEqual(
       [

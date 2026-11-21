@@ -20,6 +20,7 @@ import {
   type SignalDeclaration,
   type SignalSourceDefinition,
   type StepKindDefinition,
+  stepRoles,
   type Store,
   type Tracker,
   type Vcs,
@@ -158,6 +159,7 @@ export function loadPackWorkflows(
     else sharedBroken.push({ path: "", message: `shared/${file} does not parse: ${doc.message}`, shared: file.replace(/\.ya?ml$/, "") });
   }
   const byName: Record<string, WorkflowLoad> = {};
+  const roles = pack.roles && stepRoles(pack.roles);
   for (const [file, text] of Object.entries(pack.workflows)) {
     const name = file.replace(/\.ya?ml$/, "");
     const doc = parseYaml(text);
@@ -165,7 +167,7 @@ export function loadPackWorkflows(
       byName[name] = { ok: false, errors: [{ path: "", message: `${file} does not parse: ${doc.message}` }] };
       continue;
     }
-    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config, signals, inputs: HOST_INPUTS, specFiles: SPEC_FOLDER_FILES });
+    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config, signals, inputs: HOST_INPUTS, specFiles: SPEC_FOLDER_FILES, ...(roles && { roles }) });
     byName[name] = load.ok || sharedBroken.length === 0 ? load : { ok: false, errors: [...sharedBroken, ...load.errors] };
   }
   return ok(byName);

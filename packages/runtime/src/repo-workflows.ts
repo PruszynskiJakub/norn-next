@@ -51,7 +51,7 @@ function overlay(base: Readonly<Record<string, string>>, over: Readonly<Record<s
 
 /** The pack with the repo's files laid over it; its skills are the pack's. */
 export function overlayRepoWorkflows(pack: Pack, repo: RepoWorkflows): Pack {
-  return { workflows: overlay(pack.workflows, repo.workflows), shared: overlay(pack.shared, repo.shared), skills: pack.skills };
+  return { workflows: overlay(pack.workflows, repo.workflows), shared: overlay(pack.shared, repo.shared), skills: pack.skills, ...(pack.roles && { roles: pack.roles }) };
 }
 
 /** Where a person finds the file a workflow, or a shared file, was loaded from: the repo's path, or null for the pack's. */

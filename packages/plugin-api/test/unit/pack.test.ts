@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { defineNornPlugin, isPackPath, type Pack, packProblems } from "../../src/index.ts";
+import { CAPABILITIES, defineNornPlugin, isPackPath, type Pack, packProblems, type RoleDefinition, stepRoles } from "../../src/index.ts";
 
 function pack(over: Partial<Pack> = {}): Pack {
   return {
@@ -36,6 +36,28 @@ describe("pack contract", () => {
     ]);
     expect(packProblems({ workflows: [], shared: {}, skills: null })).toEqual(["workflows must be an object of file texts", "skills must be an object"]);
     expect(packProblems(null)).toEqual(["is not an object"]);
+  });
+});
+
+describe("pack roles (plugin API 1.23)", () => {
+  test("a role names its purpose and the capabilities it may be granted; a supervisor does no step", () => {
+    const roles: Record<string, RoleDefinition> = {
+      builder: { purpose: "Builds the change.", allow: ["code:write", "docs:write", "exec:any"] },
+      supervisor: { purpose: "Answers for the person.", allow: ["read:any", "answer"], supervises: true },
+    };
+    expect(packProblems(pack({ roles }))).toEqual([]);
+    expect(stepRoles(roles)).toEqual(["builder"]);
+  });
+
+  test("names every problem: a bad role name, no purpose, a capability norn does not know, one given twice, and a role that is no object", () => {
+    expect(packProblems(pack({ roles: { "Bad Name": { purpose: "x", allow: [] }, quiet: { purpose: "", allow: ["code:write", "net:any", "code:write"] }, odd: 3 } as never }))).toEqual([
+      'role name "Bad Name" must match ^[a-z][a-z0-9_-]*$',
+      "role quiet needs a purpose",
+      `role quiet asks for net:any, which is not a capability: name one of ${CAPABILITIES.join(", ")}`,
+      "role quiet names code:write twice",
+      "role odd must be an object with purpose and allow",
+    ]);
+    expect(packProblems(pack({ roles: [] as never }))).toEqual(["roles must be an object of roles"]);
   });
 });
 

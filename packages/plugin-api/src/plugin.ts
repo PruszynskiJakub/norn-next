@@ -103,7 +103,8 @@ function freezePack(p: Pack): Pack {
   const copy = (r: Record<string, string>) => Object.freeze({ ...r });
   const skills: Record<string, Readonly<Record<string, string>>> = {};
   for (const [name, files] of Object.entries(p.skills)) skills[name] = copy(files);
-  return Object.freeze({ workflows: copy(p.workflows), shared: copy(p.shared), skills: Object.freeze(skills) });
+  const roles = p.roles && Object.freeze(Object.fromEntries(Object.entries(p.roles).map(([n, r]) => [n, Object.freeze({ ...r, allow: Object.freeze([...r.allow]) })])));
+  return Object.freeze({ workflows: copy(p.workflows), shared: copy(p.shared), skills: Object.freeze(skills), ...(roles && { roles }) });
 }
 
 function slot<T>(plugin: string, name: string, given: Record<string, T> | undefined, checkOne: (plugin: string, key: string, v: T) => void): Readonly<Record<string, T>> | undefined {
