@@ -67,7 +67,7 @@ export function lowerActor(name: string, step: Obj, names: SurfaceNames): Lowere
   const formOnly = Object.keys(step).filter((k) => FORM_ONLY.includes(k));
   if (heads.length) {
     if (formOnly.length) return refused(at, `step '${name}' is written with the head key \`${heads[0]}\` and with \`${formOnly[0]}\`: write it with by: and do: alone`);
-    if (typeof step.attended === "string") return refused(`${at}/attended`, `\`attended: ${step.attended}\` belongs to a step written with by:; an ${heads[0]}: step takes attended: true`);
+    if (typeof step.attended === "string") return refused(`${at}/attended`, `\`attended: ${step.attended}\` belongs to a step written with by:; ${/^[aeiou]/.test(heads[0] as string) ? "an" : "a"} ${heads[0]}: step takes attended: true`);
     return { step };
   }
   if (step.by === undefined) return formOnly.length ? refused(at, `step '${name}' names no actor: give it by: (an agent role, person, shell, or a step kind as <namespace>.<kind>)`) : { step };
