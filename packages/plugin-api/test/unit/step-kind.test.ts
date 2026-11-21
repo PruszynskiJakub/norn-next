@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Type } from "@sinclair/typebox";
-import { defineNornPlugin, ok, type StepKindDefinition, stepKindAnswerProblem, stepKindProblems, type Vcs, WAITING_OUTCOME } from "../../src/index.ts";
+import { defineNornPlugin, kindEffects, ok, type StepKindDefinition, stepKindAnswerProblem, stepKindProblems, type Vcs, WAITING_OUTCOME } from "../../src/index.ts";
 
 function kind(over: Partial<StepKindDefinition> = {}): StepKindDefinition {
   return {
@@ -146,5 +146,18 @@ describe("step kind slots", () => {
     const vcs = { name: "git" } as unknown as Vcs;
     expect(await pushKind.run({ ...base, slots: { vcs } }, ctx)).toEqual(ok({ outcome: "pushed", detail: "git" }));
     expect(await pushKind.run(base, ctx)).toEqual(ok({ outcome: "no-vcs", detail: undefined }));
+  });
+});
+
+describe("the effects of a step kind", () => {
+  test("the core fixes those of a kind over a slot, whatever its provider declares, so none can leave one out", () => {
+    expect(kindEffects("forge", "await-merge", [])).toEqual(["forge-write"]);
+    expect(kindEffects("forge", "await-merge", undefined)).toEqual(["forge-write"]);
+    expect(kindEffects("vcs", "push", ["outward"])).toEqual([]);
+  });
+
+  test("any other kind has the effects its plugin declares", () => {
+    expect(kindEffects("vercel", "preview", ["outward", "cost"])).toEqual(["outward", "cost"]);
+    expect(kindEffects("vcs", "rebase", undefined)).toEqual([]);
   });
 });

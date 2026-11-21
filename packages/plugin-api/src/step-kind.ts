@@ -172,6 +172,26 @@ export const LEAVES_SPEC_FOLDER = "leaves the story's spec folder: name a path i
 export const KIND_EFFECTS = ["outward", "cost", "forge-write"] as const;
 export type KindEffect = (typeof KIND_EFFECTS)[number];
 
+/**
+ * The effects of the kinds over a slot, fixed by the core whichever plugin provides them (plugin API
+ * 1.25): a workflow moves between providers unchanged, so a provider that left an effect out would
+ * move the person's floor with it.
+ */
+export const SLOT_KIND_EFFECTS: Readonly<Record<string, readonly KindEffect[]>> = Object.freeze({
+  "forge.await-merge": ["forge-write"],
+  "forge.open-pr": [],
+  "vcs.update-branch": [],
+  "vcs.integrate": [],
+  "vcs.push": [],
+  "vcs.verify-base": [],
+});
+
+/** The effects a kind has: the core's for a kind over a slot it names, else those its plugin declares. */
+export function kindEffects(namespace: string | undefined, name: string, declared: readonly KindEffect[] | undefined): readonly KindEffect[] {
+  const fixed = namespace === undefined ? undefined : SLOT_KIND_EFFECTS[`${namespace}.${name}`];
+  return fixed ?? declared ?? [];
+}
+
 export interface StepKindProduct {
   name: string;
   file: string;

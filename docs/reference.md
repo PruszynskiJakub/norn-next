@@ -338,6 +338,8 @@ Install, list, update and remove plugins
 
 Install a plugin (npm spec, git URL or local path) and pin it in the lock
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn plugin add <spec>
 ```
@@ -361,6 +363,8 @@ norn plugin remove <name>
 ##### `norn plugin update`
 
 Update an installed plugin to the newest version its spec allows
+
+A person's command: refused in an agent's session (`person_only`).
 
 ```sh
 norn plugin update <name>

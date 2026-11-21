@@ -11,6 +11,7 @@ export { CliContext, type CliIo, type Terminal } from "./context.ts";
 export * from "./home.ts";
 export * from "./output.ts";
 export { BUNDLED_PLUGINS, bundledNames } from "./plugins/bundled.ts";
+export { acceptedPluginPath } from "./plugins/accepted.ts";
 export { importFromPluginsDir, type InstalledLoad, loadInstalled, type PluginImporter } from "./plugins/installed.ts";
 export * from "./plugins/lock.ts";
 export { missingStepKinds, picks, type Resolution, resolvePlugins } from "./plugins/resolve.ts";

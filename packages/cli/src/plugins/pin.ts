@@ -11,6 +11,7 @@ import { bundledNames } from "./bundled.ts";
 import { providesOf, providesText } from "./describe.ts";
 import { installPlugin, repoLock } from "./install.ts";
 import { loadInstalled } from "./installed.ts";
+import { effectsText, writeAccepted } from "./accepted.ts";
 import { type LockEntry, withEntry, writeLock } from "./lock.ts";
 
 /** Install `spec`, check it loads on this plugin API, and pin it; `plugin update` runs the same. */
@@ -36,7 +37,12 @@ export async function pinPlugin(ctx: CliContext, spec: string, verb: "add" | "up
   // the config first: a config file norn cannot write refuses before the lock pins anything
   const config = await setConfigKey(r.w.ctx.files, r.paths, r.team ? "repo" : "local", `plugins.${entry.name}`, entry.spec);
   await writeLock(r.w.ctx.files, r.path, withEntry(r.lock, entry));
+  // the person running add or update accepts the effects its kinds declare now, and the floor reads them
+  const accepted = await writeAccepted(r.w.ctx.files, r.w.home, entry, load.plugin);
   const provides = providesOf(load.plugin);
-  const value = { ...entry, plugin: load.plugin.name, provides, lock: r.path, config: config.file, team: r.team };
-  return rendered(value, `${verb === "add" ? "Added" : "Updated"} ${entry.name} ${entry.version} (plugin API ${entry.api}), pinned in ${r.path}.\nProvides ${providesText(provides)}.`);
+  const value = { ...entry, plugin: load.plugin.name, provides, effects: accepted.effects, lock: r.path, config: config.file, team: r.team };
+  return rendered(
+    value,
+    `${verb === "add" ? "Added" : "Updated"} ${entry.name} ${entry.version} (plugin API ${entry.api}), pinned in ${r.path}.\nProvides ${providesText(provides)}.\nIts step kinds' effects, accepted: ${effectsText(accepted.effects)}.`,
+  );
 }

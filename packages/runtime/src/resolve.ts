@@ -21,6 +21,7 @@ import {
   type SignalSourceDefinition,
   type StepKindDefinition,
   stepRoles,
+  kindEffects,
   type Capability,
   type RoleDefinition,
   type Store,
@@ -73,7 +74,8 @@ export function collectStepKinds(plugins: readonly NornPlugin[]): PluginResult<R
       if (by[key] !== undefined) return fail("invalid", `step kind ${key} is provided by ${by[key]} and ${p.name}`);
       by[key] = p.name;
       // a kind over a slot is named by the slot, so a workflow moves between providers unchanged
-      out[key] = { ...kind, namespace: kind.slot ?? p.name };
+      const namespace = kind.slot ?? p.name;
+      out[key] = { ...kind, namespace, effects: kindEffects(namespace, key, kind.effects) };
     }
   }
   return ok(out);

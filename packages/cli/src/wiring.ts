@@ -15,6 +15,7 @@ import { configPaths, LAYERS, type Layer, lockPath } from "./config/paths.ts";
 import { homePaths, locateRepo, machineDir, type RepoIdentity } from "./home.ts";
 import { configFailure, refuse } from "./output.ts";
 import { BUNDLED_PLUGINS } from "./plugins/bundled.ts";
+import { checkAccepted } from "./plugins/accepted.ts";
 import { type PluginImporter, loadInstalled } from "./plugins/installed.ts";
 import { type PluginLock, readLock } from "./plugins/lock.ts";
 import { resolvePlugins } from "./plugins/resolve.ts";
@@ -82,6 +83,7 @@ export async function wirePlugins(w: WiredRepo, loaded: LoadedConfig, importer: 
   const lock = await readLock(w.ctx.files, path);
   const pluginsDir = homePaths(w.home).plugins;
   const installed = await Promise.all(lock.plugins.map((e) => loadInstalled(e, pluginsDir, importer, PLUGIN_API_VERSION)));
+  for (const load of installed) if (load.ok) await checkAccepted(w.ctx.files, w.home, load.entry, load.plugin);
   const r = resolvePlugins({ config: loaded.config, bundled: BUNDLED_PLUGINS, lock, installed });
   if (!r.ok) throw r.failure;
   const installedAs: Record<string, string> = {};

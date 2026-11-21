@@ -21,6 +21,9 @@ const PERSON_ONLY: Record<string, string[]> = {
   "run rerun": ["run", "rerun", UNIT],
   tidy: ["tidy", "--dry-run"],
   "workflow confirm": ["workflow", "confirm", "story"],
+  // what an added plugin's step kinds may do is the person's to accept
+  "plugin add": ["plugin", "add", "/src/x"],
+  "plugin update": ["plugin", "update", "norn-plugin-x"],
   // only for the policy: what the person lets stand in for them is theirs to grant
   "config set": ["config", "set", "policy.stand_in.gates", "[story.ready]", "--user"],
 };
