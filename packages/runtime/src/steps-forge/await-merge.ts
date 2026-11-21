@@ -69,5 +69,6 @@ export const awaitMerge: StepKindDefinition<typeof AwaitMergeConfig> = {
   configSchema: AwaitMergeConfig,
   outcomes: ["merged", "unpushed"],
   mode: "wait",
+  slot: "forge",
   run,
 };

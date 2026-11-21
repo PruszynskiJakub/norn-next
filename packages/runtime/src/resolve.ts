@@ -34,11 +34,14 @@ export interface ResolvedSlots {
   store: Store;
   vcs: Vcs;
   executors: Readonly<Record<string, Harness>>;
-  stepKinds: Readonly<Record<string, StepKindDefinition>>;
+  stepKinds: Readonly<Record<string, ProvidedStepKind>>;
   /** the signal sources the plugins provide, by signal name; the host's own (vcs, clock) are not among them */
   signals: Readonly<Record<string, ProvidedSignal>>;
   pack: Pack;
 }
+
+/** A plugin's step kind with the namespace a workflow file names it by (`vcs` in `vcs.update-branch`). */
+export type ProvidedStepKind = StepKindDefinition & { namespace?: string };
 
 /** A plugin's signal source with the plugin that provides it, the `source` its signals name. */
 export interface ProvidedSignal {
@@ -59,14 +62,15 @@ export function findProvided<T>(plugins: readonly NornPlugin[], slot: SlotName, 
 }
 
 /** Every step kind the plugins provide; two plugins giving one head key is a refusal, since a workflow could not say which it means. */
-export function collectStepKinds(plugins: readonly NornPlugin[]): PluginResult<Readonly<Record<string, StepKindDefinition>>> {
-  const out: Record<string, StepKindDefinition> = {};
+export function collectStepKinds(plugins: readonly NornPlugin[]): PluginResult<Readonly<Record<string, ProvidedStepKind>>> {
+  const out: Record<string, ProvidedStepKind> = {};
   const by: Record<string, string> = {};
   for (const p of plugins) {
     for (const [key, kind] of Object.entries(p.provides.stepKinds ?? {})) {
       if (by[key] !== undefined) return fail("invalid", `step kind ${key} is provided by ${by[key]} and ${p.name}`);
       by[key] = p.name;
-      out[key] = kind;
+      // a kind over a slot is named by the slot, so a workflow moves between providers unchanged
+      out[key] = { ...kind, namespace: kind.slot ?? p.name };
     }
   }
   return ok(out);
@@ -87,7 +91,9 @@ export function collectSignals(plugins: readonly NornPlugin[]): PluginResult<Rea
 
 /** What the workflow loader reads of the plugins' signals: each name, who reports it, and the parameters an `on:` entry may give it. */
 export function signalDeclarations(signals: Readonly<Record<string, ProvidedSignal>>): Record<string, SignalDeclaration> {
-  return Object.fromEntries(Object.entries(signals).map(([name, s]) => [name, { name, source: s.source, ...(s.def.params !== undefined && { params: s.def.params }) }]));
+  return Object.fromEntries(
+    Object.entries(signals).map(([name, s]) => [name, { name, source: s.source, namespace: s.def.slot ?? s.source, ...(s.def.params !== undefined && { params: s.def.params }) }]),
+  );
 }
 
 export function resolveSlots(ctx: HostContext, plugins: readonly NornPlugin[], config: RuntimeConfig): PluginResult<ResolvedSlots> {
@@ -140,7 +146,7 @@ function parseYaml(text: string): { ok: true; value: unknown } | { ok: false; me
  */
 export function loadPackWorkflows(
   pack: Pack,
-  stepKinds: Readonly<Record<string, StepKindDefinition>>,
+  stepKinds: Readonly<Record<string, ProvidedStepKind>>,
   config: Pick<RuntimeConfig["kernel"], "counterDefaults" | "maxNudges" | "maxRetries" | "deadlineMs"> = DEFAULT_KERNEL_CONFIG,
   signals: Readonly<Record<string, SignalDeclaration>> = {},
 ): PluginResult<KernelWorkflows["byName"]> {

@@ -2,11 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { memoryHost } from "@norn/conformance";
 import { forgeNonePlugin } from "@norn/forge-none";
 import { DEFAULT_KERNEL_CONFIG } from "@norn/kernel";
-import { defineNornPlugin, type NornPlugin } from "@norn/plugin-api";
+import { defineNornPlugin, type NornPlugin, ok } from "@norn/plugin-api";
+import { Type } from "@sinclair/typebox";
 import { localStorePlugin } from "@norn/store-local";
 import { localTrackerPlugin } from "@norn/tracker-local";
 import { vcsGitPlugin } from "@norn/vcs-git";
-import { collectStepKinds, createRuntime, HOST_INPUTS, loadPackWorkflows, type RuntimeConfig, resolveSlots, SPEC_FOLDER_FILES, stepsForgePlugin } from "../../src/index.ts";
+import { collectSignals, collectStepKinds, createRuntime, HOST_INPUTS, loadPackWorkflows, type RuntimeConfig, resolveSlots, SPEC_FOLDER_FILES, signalDeclarations, stepsForgePlugin } from "../../src/index.ts";
 
 const pack = defineNornPlugin({
   name: "norn-pack-tiny",
@@ -61,6 +62,26 @@ describe("resolveSlots", () => {
     const again = defineNornPlugin({ name: "other", api: "^1.4", provides: { stepKinds: { push: vcsGitPlugin.provides.stepKinds?.push as never } } });
     const r = collectStepKinds([vcsGitPlugin, again]);
     expect(r.ok ? null : r.failure.message).toBe("step kind push is provided by norn-vcs-git and other");
+  });
+
+  test("each step kind and signal carries the namespace a workflow file names it by: the slot it works over, else its plugin's name", () => {
+    const preview = { name: "preview", configSchema: Type.Object({}), outcomes: ["done"], mode: "effect" as const, run: async () => ok({ outcome: "done" }) };
+    const read = async () => ok(null);
+    const vercel = defineNornPlugin({ name: "vercel", api: "^1.21", provides: { stepKinds: { preview }, signals: { deployed: { read }, "ci-failed": { read, slot: "forge" } } } });
+    const kinds = collectStepKinds([vcsGitPlugin, stepsForgePlugin, vercel]);
+    if (!kinds.ok) throw new Error(kinds.failure.message);
+    expect(Object.fromEntries(Object.entries(kinds.value).map(([k, d]) => [k, d.namespace]))).toEqual({
+      "update-branch": "vcs",
+      integrate: "vcs",
+      push: "vcs",
+      "verify-base": "vcs",
+      "open-pr": "forge",
+      "await-merge": "forge",
+      preview: "vercel",
+    });
+    const signals = collectSignals([vercel]);
+    if (!signals.ok) throw new Error(signals.failure.message);
+    expect(Object.values(signalDeclarations(signals.value)).map((d) => `${d.namespace}.${d.name}`)).toEqual(["vercel.deployed", "forge.ci-failed"]);
   });
 });
 

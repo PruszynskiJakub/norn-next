@@ -123,5 +123,6 @@ export const verifyBase: StepKindDefinition<typeof VerifyBaseConfig> = {
   configSchema: VerifyBaseConfig,
   outcomes: ["verified", "broken"],
   mode: "wait",
+  slot: "vcs",
   run,
 };

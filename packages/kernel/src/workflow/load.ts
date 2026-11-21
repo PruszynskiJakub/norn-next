@@ -14,8 +14,12 @@ import { flowErrors, producesOn, readersOf } from "./produces.ts";
 import { checkGraph } from "./shape.ts";
 import { type ReadStep, readStep } from "./steps.ts";
 
-/** What the loader needs of a registered step kind; `run` stays with the host. */
-export type StepKindInfo = Pick<StepKindDefinition, "name" | "configSchema" | "outcomes" | "mode" | "reads">;
+/**
+ * What the loader needs of a registered step kind; `run` stays with the host. `namespace` is what leads
+ * its name in a workflow file (`forge` in `forge.open-pr`), which the host knows from the plugin;
+ * without it the kind's `slot` does, and a kind with neither is named only in the older form.
+ */
+export type StepKindInfo = Pick<StepKindDefinition, "name" | "configSchema" | "outcomes" | "mode" | "reads" | "slot"> & { namespace?: string };
 
 export interface LoadWorkflowOptions {
   /** every step kind the configured plugins provide, by head key */

@@ -9,6 +9,10 @@ describe("norn-vcs-git", () => {
     expect(Object.keys(vcsGitPlugin.provides.stepKinds ?? {}).sort()).toEqual(["integrate", "push", "update-branch", "verify-base"]);
   });
 
+  test("its step kinds work over the vcs slot, so a workflow names them vcs.<kind>", () => {
+    expect(Object.values(vcsGitPlugin.provides.stepKinds ?? {}).map((k) => k.slot)).toEqual(["vcs", "vcs", "vcs", "vcs"]);
+  });
+
   test("the git vcs fits the contract and keeps worktrees under the machine folder, a slice beside its story", () => {
     const ctx = memoryHost();
     const made = createVcs(gitVcsFactory, ctx, {});

@@ -41,5 +41,6 @@ export const push: StepKindDefinition<typeof PushConfig> = {
   configSchema: PushConfig,
   outcomes: ["done"],
   mode: "effect",
+  slot: "vcs",
   run,
 };

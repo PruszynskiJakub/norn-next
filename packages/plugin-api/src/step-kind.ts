@@ -27,9 +27,16 @@ export const BUILTIN_STEP_KINDS = ["agent", "check", "gate", "slices"] as const;
 export type BuiltinStepKind = (typeof BUILTIN_STEP_KINDS)[number];
 
 /**
- * Every other key a workflow step may hold. A step kind's name or config key may not be one of these,
- * or the loader could not tell which key of a step is its head. A keyword added here refuses a plugin
- * that used its name, so it takes a minor bump of the plugin API.
+ * The keys a workflow file writes a step with (plugin API 1.21). The set is closed: what a step's
+ * actor needs beyond them goes under `with:`, and a step kind is named by value (`by: forge.open-pr`),
+ * so no plugin can collide with a key and no feature needs a new one.
+ */
+export const STEP_KEYS = ["by", "do", "with", "reads", "produces", "allow", "attended", "limits", "outcomes", "on", "description", "use", "like"] as const;
+
+/**
+ * Every key a step may hold beside a head key: the step keys, and the older form's keys, which a
+ * pinned document holds for good. A step kind's name or config key may not be one of these, or the
+ * loader could not tell which key of a pinned step is its head. Closed with `STEP_KEYS`: it never grows.
  */
 export const STEP_KEYWORDS = [
   "use",
@@ -53,7 +60,21 @@ export const STEP_KEYWORDS = [
   "timeout",
   "exits",
   "on",
+  "do",
+  "with",
+  "reads",
+  "allow",
+  "limits",
 ] as const;
+
+/** The slots a step kind or signal source may work over; a workflow names it `<slot>.<name>`, so a workflow moves between providers unchanged. */
+export const KIND_SLOTS = ["vcs", "forge", "tracker"] as const;
+export type KindSlot = (typeof KIND_SLOTS)[number];
+
+/** What is wrong with a declared `slot`; null when it is absent or one of `KIND_SLOTS`. */
+export function slotProblem(slot: unknown): string | null {
+  return slot === undefined || (KIND_SLOTS as readonly unknown[]).includes(slot) ? null : `slot must be ${KIND_SLOTS.map((s) => `"${s}"`).join(", ").replace(/, ([^,]*)$/, " or $1")}`;
+}
 
 /** The outcome a `wait` kind answers while what it waits for has not happened; never routed. */
 export const WAITING_OUTCOME = "waiting";
@@ -128,6 +149,11 @@ export interface StepKindDefinition<S extends TSchema = TSchema> {
   mode: StepKindMode;
   /** what the kind reads that an earlier step produces; absent: nothing */
   reads?: StepKindRead[];
+  /**
+   * The slot the kind works over (plugin API 1.21): a workflow names it `<slot>.<name>`
+   * (`vcs.update-branch`). Absent, it is named after the plugin that provides it (`vercel.preview`).
+   */
+  slot?: KindSlot;
   run(input: StepKindInput<Static<S>>, ctx: HostContext): Promise<PluginResult<StepKindOutcome>>;
 }
 
@@ -162,6 +188,8 @@ export function stepKindProblems(key: string, value: unknown): string[] {
     if (outcomes.includes(WAITING_OUTCOME)) out.push(`outcome ${WAITING_OUTCOME} is implied for a wait kind and never declared`);
   }
   if (v.reads !== undefined) out.push(...readsProblems(v.reads));
+  const slot = slotProblem(v.slot);
+  if (slot) out.push(slot);
   return out;
 }
 
