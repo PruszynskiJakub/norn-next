@@ -6,8 +6,9 @@
  *   an agent that does not try;
  * - the env each ancestor process was started with, which no descendant can rewrite: an agent that
  *   clears its own env still runs below the agent process the launch marked.
- * Neither reaches a process the agent detached from its own tree (one reparented to init), nor a
- * write to the store that bypasses the CLI: only an OS sandbox closes those (docs/limitations.md).
+ * Neither reaches a process the agent detached from its own tree (one reparented to init), a CLI run
+ * with the agent's own code loaded into it (a preload), nor a write to the store that bypasses the
+ * CLI: only an OS sandbox closes those (docs/limitations.md).
  * A person typing in an attended step's pane goes through the agent's own shell; they run the
  * command from a shell of their own instead.
  */

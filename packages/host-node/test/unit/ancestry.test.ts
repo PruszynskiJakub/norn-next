@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chainOf, envFromEnviron, parentFromStat, readParents, readPsEnvs } from "../../src/index.ts";
+import { ancestorPids, chainOf, envFromEnviron, parentFromStat, readParents, readPsEnvs } from "../../src/index.ts";
 
 const NAMES = ["NORN_UNIT", "NORN_RUN_ID"] as const;
 
@@ -13,6 +13,15 @@ describe("reading a process's ancestry", () => {
     expect(chainOf(readParents("500 400\n400 999\n"), 500)).toEqual([500, 400]);
     expect(chainOf(readParents("500 400\n400 500\n"), 500)).toEqual([500, 400]);
     expect(chainOf(readParents(""), 500)).toEqual([]);
+  });
+
+  test("a table that does not list a live parent is unreadable, never an empty chain", () => {
+    expect(ancestorPids("500 400\n400 1\n", 500)).toEqual([500, 400]);
+    // a ps that prints nothing would otherwise read as a process with no marked ancestor
+    expect(() => ancestorPids("", 500)).toThrow(/does not list/);
+    expect(() => ancestorPids("400 1\n", 500)).toThrow(/does not list/);
+    // a parent of 1 is a process reparented to init: no ancestors to read, and no table needed
+    expect(ancestorPids("", 1)).toEqual([]);
   });
 
   test("an ancestor's start env is read from ps -E, the env after the command, a blank value kept as blank", () => {

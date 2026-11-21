@@ -2,7 +2,8 @@
  * This process's ancestors and the env each was started with. A process cannot rewrite the start env
  * of a process above it, so a mark a launch put on an agent's process holds for everything below it,
  * whatever env a descendant clears for itself. Linux reads `/proc`; elsewhere `ps -E` (BSD, macOS)
- * prints the start env after the command, readable for the user's own processes.
+ * prints the start env after the command, readable for the user's own processes. `ps` is run by its
+ * absolute path, never looked up on the PATH the caller inherits, which a descendant controls.
  */
 import { readFile } from "node:fs/promises";
 import { nodeExec } from "./exec.ts";
@@ -13,6 +14,8 @@ export interface AncestorProcess {
   env: Record<string, string> | null;
 }
 
+/** Where BSD and macOS keep `ps`; macOS protects it from being replaced or injected into. */
+const PS = "/bin/ps";
 /** `ps` in the C locale, as spawn.ts runs it. */
 const PS_ENV = { LC_ALL: "C", LANG: "C" };
 /** `ps -p` exits 1 when a listed pid is gone, still printing the others. */
@@ -35,6 +38,18 @@ export function chainOf(parents: ReadonlyMap<number, number>, from: number): num
   const chain: number[] = [];
   for (let pid = from; pid > 1 && parents.has(pid) && !chain.includes(pid) && chain.length < MAX_DEPTH; pid = parents.get(pid) as number) chain.push(pid);
   return chain;
+}
+
+/**
+ * The chain above this process, read from the `ps -A` table, nearest first. A table that does not
+ * list a live parent (one above init) is unreadable, never an empty chain: an empty chain reads as a
+ * process with no marked ancestor.
+ */
+export function ancestorPids(table: string, ppid: number): number[] {
+  if (ppid <= 1) return [];
+  const parents = readParents(table);
+  if (!parents.has(ppid)) throw new Error(`the process table does not list this process's parent ${ppid}`);
+  return chainOf(parents, ppid);
 }
 
 const escape = (name: string): string => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -85,11 +100,11 @@ export function parentFromStat(text: string): number | null {
 }
 
 async function psAncestry(names: readonly string[]): Promise<AncestorProcess[]> {
-  const table = await nodeExec(["ps", "-A", "-o", "pid=", "-o", "ppid="], { env: PS_ENV, timeoutMs: 5_000 });
+  const table = await nodeExec([PS, "-A", "-o", "pid=", "-o", "ppid="], { env: PS_ENV, timeoutMs: 5_000 });
   if (table.code !== 0) throw new Error(`ps -A exited ${table.code}: ${table.stderr.trim() || "no output"}`);
-  const chain = chainOf(readParents(table.stdout), process.ppid);
+  const chain = ancestorPids(table.stdout, process.ppid);
   if (chain.length === 0) return [];
-  const listed = await nodeExec(["ps", "-E", "-ww", "-o", "pid=", "-o", "command=", "-p", chain.join(",")], { env: PS_ENV, timeoutMs: 5_000 });
+  const listed = await nodeExec([PS, "-E", "-ww", "-o", "pid=", "-o", "command=", "-p", chain.join(",")], { env: PS_ENV, timeoutMs: 5_000 });
   if (listed.code !== 0 && listed.code !== PS_SOME_GONE) throw new Error(`ps -E exited ${listed.code}: ${listed.stderr.trim() || "no output"}`);
   const envs = readPsEnvs(listed.stdout, names);
   return chain.map((pid) => ({ pid, env: envs.get(pid) ?? null }));
@@ -99,7 +114,9 @@ async function procAncestry(names: readonly string[]): Promise<AncestorProcess[]
   const out: AncestorProcess[] = [];
   for (let pid = process.ppid; pid > 1 && out.length < MAX_DEPTH && !out.some((a) => a.pid === pid); ) {
     const stat = await readFile(`/proc/${pid}/stat`, "utf8").catch(() => null);
-    // gone between two reads: the chain above it is no longer this process's
+    // a parent that cannot be read would leave no chain at all, which reads as no marked ancestor
+    if (stat === null && out.length === 0) throw new Error(`/proc/${pid}/stat of this process's parent cannot be read`);
+    // an ancestor gone between two reads: the chain above it is no longer this process's
     if (stat === null) break;
     const environ = await readFile(`/proc/${pid}/environ`, "utf8").catch(() => null);
     out.push({ pid, env: environ === null ? null : envFromEnviron(environ, names) });

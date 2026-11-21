@@ -83,6 +83,7 @@ What norn 0.35 did that this norn leaves out on purpose, each with what to do in
 - **A person's commands are refused in an agent's session, not made impossible there.** norn refuses `norn story approve` and the other person-only commands when the launch env (`NORN_UNIT`, `NORN_RUN_ID`) is set in the command's env or in the start env of any process above it, so clearing the variables in the agent's shell is not enough. Without an OS sandbox around the agent, its shell can still reach what the person's user can:
   - a process it detaches from its own tree (a double fork, reparented to init) has no marked ancestor, and runs the command as a person's;
   - nothing stops a write to the store that bypasses the CLI, such as a receipt written by hand under norn's run state or a push to `refs/norn/*`;
+  - nothing stops it running the CLI with code of its own loaded, such as a preload through `BUN_OPTIONS` or `NODE_OPTIONS`, or a copy of norn with the check removed: that is the same as writing to the store by hand;
   - macOS shows no start env for its own system binaries (`sh`, `zsh`), so the mark is read on the agent's harness process, never on the shells between it and the command.
 
   The brief forbids all of it; only a sandbox that keeps the agent out of the store and in its own process tree makes it impossible.
