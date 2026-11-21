@@ -5,7 +5,7 @@
 # the stale-schema test, typecheck, npm package and a binary built and smoke-tested) and wait for a
 # person at `ready`, who judges the version and the changelog there; the person merges the PR, and
 # CI smokes every binary on its own OS, tags and publishes on that merge.
-# Any commit on the base makes the changelog incomplete (base.stale: behind): a release
+# Any commit on the base makes the changelog incomplete (vcs.stale when: behind): a release
 # waiting at `ready` or `merge` goes back through update and prepare. A red CI means the base is
 # broken: the story goes $stuck; fix the base in its own story, then send the release back through
 # the base update: `norn run rerun gh-N --step update`.
@@ -14,7 +14,9 @@ description: Write the changelog and propose the version, open the draft PR, wai
 start: prepare
 steps:
   prepare:
-    agent: >-
+    # it writes CHANGELOG.md, the version bumps and the skill copies, so it needs the builder's code:write
+    by: builder
+    do: >-
       Write the changelog section, the version bumps and the proposed version with its reason as the
       skill says; a version given in the issue's `## Version` or in the reject at ready (under Rework) wins over
       your proposal. Also write the PR body to pr.md in the spec folder: the proposed version, its
@@ -22,49 +24,55 @@ steps:
       the bump, copy packages/pack-sdlc/assets/skills/norn* over .agents/skills/norn* as the skill
       says, so that once the PR merges the repo's skill copies match the published binary. Rename the issue to "Release X.Y.Z" with `gh issue edit`, the one remote
       write this step allows. Change no code.
-    skills: [release]
-    inputs: [spec, handoff]
+    with: { skills: [release] }
+    reads: [spec, handoff]
+    # open-pr reads it; norn done refuses the report while pr.md is missing or empty
+    produces: [{ name: pr_body, file: pr.md }]
     outcomes:
-      done: open-pr
-    means:
-      done: "CHANGELOG.md, packages/cli/package.json and the README badge carry version X.Y.Z, .agents/skills/norn* match the bundled sources; pr.md and the handoff name it with its reason"
+      done:
+        to: open-pr
+        means: "CHANGELOG.md, packages/cli/package.json and the README badge carry version X.Y.Z, .agents/skills/norn* match the bundled sources; pr.md and the handoff name it with its reason"
   update:
-    update-branch:
+    by: vcs.update-branch
     # a branch that already held its base (clean) or took it in after a resolve (resolved) is prepared again too
     outcomes: { done: prepare, conflict: resolve, clean: prepare, resolved: prepare }
   resolve:
-    agent: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. CHANGELOG.md and version conflicts: keep the base side; prepare writes the release section again next."
-    skills: [norn-merge]
-    inputs: [spec, handoff, base_side]
+    by: builder
+    do: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. CHANGELOG.md and version conflicts: keep the base side; prepare writes the release section again next."
+    with: { skills: [norn-merge] }
+    reads: [spec, handoff, base_side]
     outcomes:
-      done: update
-    means:
-      done: "base merged into the story branch, conflicts resolved and committed"
+      done:
+        to: update
+        means: "base merged into the story branch, conflicts resolved and committed"
   # release.yml smokes every binary on its own OS after the merge, before it pushes the tag; a red
   # CI means the base is broken
   ship:
     use: ci
     outcomes: { passed: ready, failed: $stuck, stale: { to: update, counter: stale_loop } }
   ready:
-    gate: >-
+    by: person
+    do: >-
       Read the draft release PR: the proposed version and its reason, and the new CHANGELOG.md section.
       Approve to wait for the merge (a person merges the PR; CI then tags and publishes), or
       reject with the version or changelog changes you want.
     outcomes:
       approve: merge
       reject:  prepare
-      stale:   { to: update, counter: stale_loop }
+    on:
+      vcs.stale: { to: update, counter: stale_loop }
       # the story branch holds commits its PR lacks: push them through open-pr before a person merges
-      unpushed: open-pr
+      vcs.unpushed: open-pr
   # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
-  # move it counts as stale (base.stale) sends it back through update by itself
+  # move it counts as stale (vcs.stale) sends it back through update by itself
   merge:
-    await-merge:
+    by: forge.await-merge
     outcomes:
       merged: $done
-      stale: { to: update, counter: stale_loop }
-      unpushed: open-pr
+    on:
+      vcs.stale: { to: update, counter: stale_loop }
+      vcs.unpushed: open-pr
 counters:
   # a stale re-entry is progress from outside (a commit landed on the base), bounded by those commits
   stale_loop: { max: 10 }
-base: { stale: behind }
+signals: { vcs.stale: { when: behind } }

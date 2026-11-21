@@ -9,7 +9,8 @@ description: Check an issue still holds, add its context, and recommend what com
 start: explore
 steps:
   explore:
-    agent: >-
+    by: investigator
+    do: >-
       The issue is mirrored in spec.md. Run norn's behaviour from this checkout's code, `bun packages/cli/src/main.ts …`
       after `bun install --frozen-lockfile`, never the installed `norn`, and only in a throwaway git repo under $TMPDIR:
       this worktree is a live norn unit. A change to norn's
@@ -20,9 +21,9 @@ steps:
       an exception to the brief's rule on remote writes; never remove a label, the intake label `norn` included. Change no file, spec.md included,
       but the handoff. The recommendation lives only in that comment:
       report `norn done done --note "<recommendation>: <reason>"`.
-    skills: [norn-triage]
-    inputs: [spec, handoff]
+    with: { skills: [norn-triage] }
+    reads: [spec, handoff]
     outcomes:
-      done: $done
-    means:
-      done: "the ## Triage comment is posted, with one recommendation (refinement, quick, reproduce or close) and its reason, and the kind, risk and priority labels that could be set are on the issue"
+      done:
+        to: $done
+        means: "the ## Triage comment is posted, with one recommendation (refinement, quick, reproduce or close) and its reason, and the kind, risk and priority labels that could be set are on the issue"

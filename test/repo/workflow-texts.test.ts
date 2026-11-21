@@ -24,15 +24,30 @@ interface AgentStep {
   skills: string[];
 }
 
+interface WrittenStep {
+  by?: unknown;
+  do?: unknown;
+  with?: { skills?: unknown[] };
+  reads?: unknown[];
+  agent?: unknown;
+  inputs?: unknown[];
+  skills?: unknown[];
+}
+
 function agentSteps(): AgentStep[] {
   const out: AgentStep[] = [];
   for (const file of DIRS.flatMap(yamlFiles)) {
-    const doc = parse(readFileSync(file, "utf8")) as { steps?: Record<string, { agent?: unknown; inputs?: unknown[]; skills?: unknown[] }> };
+    const doc = parse(readFileSync(file, "utf8")) as { steps?: Record<string, WrittenStep> };
     for (const [name, step] of Object.entries(doc.steps ?? {})) {
-      if (typeof step?.agent !== "string") continue;
-      const inputs = (step.inputs ?? []).filter((i): i is string => typeof i === "string");
-      const skills = (step.skills ?? []).filter((i): i is string => typeof i === "string");
-      out.push({ where: `${relative(ROOT, file)}#${name}`, text: step.agent, inputs, skills });
+      // an agent step names a role with by: (never person, shell or a namespaced kind), or, in the older form, says agent:
+      const byRole = typeof step?.by === "string" && !["person", "shell"].includes(step.by) && !step.by.includes(".");
+      const text = byRole ? step.do : step?.agent;
+      if (typeof text !== "string") continue;
+      const strings = (xs: unknown[] | undefined) => (xs ?? []).filter((i): i is string => typeof i === "string");
+      // an optional read is written with a trailing ? and names the same input
+      const inputs = strings(byRole ? step.reads : step.inputs).map((i) => i.replace(/\?$/, ""));
+      const skills = strings(byRole ? step.with?.skills : step.skills);
+      out.push({ where: `${relative(ROOT, file)}#${name}`, text, inputs, skills });
     }
   }
   return out;

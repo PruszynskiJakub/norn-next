@@ -13,7 +13,8 @@ steps:
     use: sync
     outcomes: { synced: implement }
   implement:
-    agent: >-
+    by: builder
+    do: >-
       Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one,
       otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask.
       A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the
@@ -23,34 +24,39 @@ steps:
       Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
       Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (norn runs its agent with NORN_UNIT set) and a dev build run there would act on its claim and on its run state (state.json, receipts) in the checkout's machine dir.
       Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in CI, which the `ci` check waits for, so do not run them before handing back.
-    skills: [norn-implement]
-    inputs: [spec, handoff, last_check, last_findings]
+    with: { skills: [norn-implement] }
+    reads: [spec, handoff, last_check, findings?]
     outcomes:
-      done: update
-    means:
-      done: "the change is made; each behaviour change and rework point has a passing test"
+      done:
+        to: update
+        means: "the change is made; each behaviour change and rework point has a passing test"
   base-update:
     use: base-update
     outcomes: { tested: review, failed: implement, merged: open-pr, redescribe: describe }
   review:
-    agent: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
-    skills: [norn-review]
-    inputs: [spec, diff, last_findings]
-    hand_back: { changes_requested: findings }
+    by: reviewer
+    do: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
+    with: { skills: [norn-review] }
+    reads: [spec, diff, findings?]
     outcomes:
-      approve:           describe
-      changes_requested: implement
-    means:
-      approve: "the change does what the story asks and nothing else, no blocking findings"
-      changes_requested: "blocking findings, handed back with --findings <file>"
+      approve:
+        to: describe
+        means: "the change does what the story asks and nothing else, no blocking findings"
+      changes_requested:
+        to: implement
+        means: "blocking findings, handed back as findings"
+        produces: [findings]
   describe:
-    agent: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
-    skills: [norn-pr]
-    inputs: [spec, diff, handoff]
+    by: writer
+    do: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
+    with: { skills: [norn-pr] }
+    reads: [spec, diff, handoff]
+    # open-pr reads it; norn done refuses the report while pr.md is missing or empty
+    produces: [{ name: pr_body, file: pr.md }]
     outcomes:
-      done: open-pr
-    means:
-      done: "pr.md describes the branch as it is now: summary, evidence, merge danger"
+      done:
+        to: open-pr
+        means: "pr.md describes the branch as it is now: summary, evidence, merge danger"
   # a red run's failures become last_check for implement, whose rework goes back through open-pr to the new head
   ship:
     use: ci
@@ -61,7 +67,8 @@ steps:
 counters:
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
-# update-branch re-enters update, not sync (the default would be the first update step); a base move
+# `norn story update-branch` re-enters update, not sync (the default would be the first update step); a base move
 # without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once per
 # base move (no push, no CI): red goes back through update like a conflict
-base: { stale: conflict, step: update, verify: test }
+signals: { vcs.stale: { when: conflict, verify: test } }
+entries: { update-branch: update }
