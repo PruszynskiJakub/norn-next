@@ -32,8 +32,14 @@ export const KernelConfig = Type.Object(
     deadlineMs: Type.Union([PosInt, Type.Null()]),
     /** how stories run when neither the story nor its workflow says */
     mode: Mode,
-    /** the executor an agent step runs on when it names none with `by:` */
+    /** the executor an agent step runs on when it names none with `by:` and `bind` binds neither its step nor its role */
     executor: NonEmpty,
+    /**
+     * A step (`<workflow>.<step>`) or an agent role → the executors it runs on, first match first: the
+     * first one configured, with presence when a person stays beside the step, and a harness that denies
+     * a tool when the step writes only docs. A step's binding outranks its role's. Absent: none.
+     */
+    bind: Type.Optional(Type.Record(NonEmpty, Type.Array(NonEmpty, { minItems: 1 }))),
     /** the workflow a story takes at intake when its item names none */
     workflow: NonEmpty,
     /**

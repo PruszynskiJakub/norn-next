@@ -11,7 +11,7 @@
  */
 import type { Mode } from "@norn/schema";
 import type { Decision } from "../model/actions.ts";
-import type { ExecutorCapabilities } from "../model/capabilities.ts";
+import { type ExecutorCapabilities, launchTarget } from "../model/capabilities.ts";
 import type { ClassifiedOutcome } from "../model/receipts.ts";
 import type { RunInfo } from "../model/run-state.ts";
 import type { SessionFacts } from "../session/view.ts";
@@ -31,9 +31,54 @@ function personDrives(v: UnitView): boolean {
   return effectiveMode(v) === "manual" && v.state.requested === undefined;
 }
 
-/** The executor a step runs on: its `by:`, else the config's. */
-export function executorOf(v: UnitView, spec: AgentStepSpec): string {
-  return spec.executor ?? v.ctx.config.executor;
+/**
+ * The executors a step may run on, first choice first: an older step's `by:`, else the config's
+ * binding of this workflow's step, else of the step's role, else the config's executor.
+ */
+function candidatesOf(v: UnitView, spec: AgentStepSpec): readonly string[] {
+  if (spec.executor !== null) return [spec.executor];
+  const bind = v.ctx.config.bind ?? {};
+  const own = bind[`${v.state.workflow.name}.${v.state.step}`];
+  if (own) return own;
+  const byRole = spec.role !== undefined ? bind[spec.role] : undefined;
+  return byRole ?? [v.ctx.config.executor];
+}
+
+type Match = { ok: true; target: string; caps: ExecutorCapabilities } | { ok: false; rule: string; text: string };
+
+/**
+ * Whether `executor` can run the step, and under which name: in its own runner, else in the runner the
+ * step's attendance picks (`launchTarget`). A person beside the agent needs a runner with presence, and
+ * a docs-only step a harness that denies a tool: both are facts, so a binding that cannot hold the step
+ * parks it before any agent starts, never at the launcher.
+ */
+function matchExecutor(v: UnitView, spec: AgentStepSpec, executor: string): Match {
+  const byAttendance = launchTarget(executor, spec.attended);
+  const target = capsOf(v, byAttendance) ? byAttendance : executor;
+  const caps = capsOf(v, target);
+  const runsElsewhere = Object.keys(v.ctx.facts.capabilities.executors).some((k) => k.startsWith(`${executor}@`));
+  if (!caps && runsElsewhere && spec.attended === "person")
+    return { ok: false, rule: "agent.no_presence", text: `step '${v.state.step}' is attended: person, but executor '${executor}' has no runner for it: set runners.person to a runner with presence (herdr)` };
+  if (!caps && runsElsewhere) return { ok: false, rule: "agent.no_executor", text: `executor '${executor}' has no runner for attended: ${spec.attended}: set runners.${spec.attended}` };
+  if (!caps) return { ok: false, rule: "agent.no_executor", text: `executor '${executor}' is not configured` };
+  if (spec.attended === "person" && !caps.attended)
+    return {
+      ok: false,
+      rule: "agent.no_presence",
+      text: `step '${v.state.step}' is attended: person, but executor '${target}' runs where no person can sit beside it; bind the step to an executor whose runner has presence, or set runners.person to one (herdr)`,
+    };
+  const guardless = unguardedText(v, spec, target, caps);
+  if (guardless) return { ok: false, rule: "agent.unguarded", text: guardless };
+  return { ok: true, target, caps };
+}
+
+/** The first candidate that can run the step; with none, the first one's rule and every one's reason. */
+function chooseExecutor(v: UnitView, spec: AgentStepSpec): Match {
+  const tried = candidatesOf(v, spec).map((e) => matchExecutor(v, spec, e));
+  const found = tried.find((m) => m.ok);
+  if (found) return found;
+  const failed = tried as Extract<Match, { ok: false }>[];
+  return { ok: false, rule: (failed[0] as Extract<Match, { ok: false }>).rule, text: failed.map((m) => m.text).join("; ") };
 }
 
 function capsOf(v: UnitView, executor: string): ExecutorCapabilities | null {
@@ -68,9 +113,14 @@ function briefOf(v: UnitView, spec: AgentStepSpec) {
 }
 
 /** A docs-only step is held by the write guard alone: on a harness that cannot deny a tool it would run unguarded, so no agent starts, fresh or retried. */
-function unguarded(v: UnitView, spec: AgentStepSpec, executor: string, caps: ExecutorCapabilities): Decision | null {
+function unguardedText(v: UnitView, spec: AgentStepSpec, executor: string, caps: ExecutorCapabilities): string | null {
   if (spec.writes !== "docs" || caps.denyTool) return null;
-  return parkDecision(v, "agent.unguarded", "stuck", { text: `step '${v.state.step}' is writes: docs, but executor '${executor}' cannot deny a tool, so its writes would go unguarded; run it on an executor whose harness can (by:)` });
+  return `step '${v.state.step}' is writes: docs, but executor '${executor}' cannot deny a tool, so its writes would go unguarded; run it on an executor whose harness can (by:)`;
+}
+
+function unguarded(v: UnitView, spec: AgentStepSpec, executor: string, caps: ExecutorCapabilities): Decision | null {
+  const text = unguardedText(v, spec, executor, caps);
+  return text === null ? null : parkDecision(v, "agent.unguarded", "stuck", { text });
 }
 
 /**
@@ -89,21 +139,20 @@ function unboundSource(v: UnitView, spec: AgentStepSpec): Decision | null {
 function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
   const unbound = unboundSource(v, spec);
   if (unbound) return unbound;
+  // matched before an attended step waits, so a person is never asked to start what cannot run beside them
+  const match = chooseExecutor(v, spec);
+  if (!match.ok) return parkDecision(v, match.rule, "stuck", { text: match.text });
+  const { target: executor, caps } = match;
   // an attended step waits for the person who works beside it to start it (`run.requested`), in either mode
   if (spec.attended === "person" && v.state.requested === undefined) return parkDecision(v, "agent.ready.attended", "attended", { text: spec.instructions });
-  const executor = executorOf(v, spec);
-  const caps = capsOf(v, executor);
-  if (!caps) return parkDecision(v, "agent.no_executor", "stuck", { text: `executor '${executor}' is not configured` });
-  const guardless = unguarded(v, spec, executor, caps);
-  if (guardless) return guardless;
   // a person's `run.requested` starts this visit's agent once; manual mode still holds the next step
   if (personDrives(v)) return parkDecision(v, "agent.ready.manual", "manual", { text: spec.instructions });
   // a run a person started may open where they watch it (a pane); one nobody started must run headless
   const personStarted = v.state.requested !== undefined && caps.attended;
   if (!caps.headless && !personStarted) return parkDecision(v, "agent.ready.no_headless", "manual", { text: `auto mode, but executor '${executor}' cannot run headless` });
   const run_id = v.ctx.nextId();
-  // attended only where the person can sit beside it (a pane); started headless, it is retried and nudged as an auto run
-  const attended = spec.attended === "person" && personStarted;
+  // the match gave a person beside the step a runner with presence, and their start is on the record
+  const attended = spec.attended === "person";
   return {
     kind: "start_run",
     unit: v.unit.id,

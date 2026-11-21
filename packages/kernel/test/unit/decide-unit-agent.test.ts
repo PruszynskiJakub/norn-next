@@ -103,13 +103,22 @@ describe("a ready agent step", () => {
     expect(d).toMatchObject({ rule: "agent.ready.attended", inbox: { kind: "attended" } });
   });
 
-  test("a person's start lifts an attended step's park: in a pane the run is attended, headless it runs as an auto run", () => {
+  test("a person's start lifts an attended step's park, and its run is attended in the pane", () => {
     const wf = loaded(graph({ build: { agent: agentSpec({ attended: "person" }) } }));
     const requested = { by: "ann", at: NOW };
     const pane = kindOf(decideCase({ state: stateAt("build", { requested }, wf), workflows: [wf], executors: { claude: caps({ headless: true, attended: true }) } }), "start_run");
     expect([pane.rule, pane.attended, pane.intent.data]).toMatchObject(["agent.start", true, { kind: "run.started", attended: true }]);
-    const headless = kindOf(decideCase({ state: stateAt("build", { requested }, wf), workflows: [wf], executors: { claude: caps({ headless: true, attended: false }) } }), "start_run");
-    expect([headless.rule, headless.attended]).toEqual(["agent.start", false]);
+  });
+
+  test("an attended step on a runner without presence parks stuck naming the fix, started or not, and never runs as an auto run", () => {
+    const wf = loaded(graph({ build: { agent: agentSpec({ attended: "person" }) } }));
+    const headless = { claude: caps({ headless: true, attended: false }) };
+    for (const requested of [undefined, { by: "ann", at: NOW }]) {
+      const d = kindOf(decideCase({ state: stateAt("build", requested ? { requested } : {}, wf), workflows: [wf], executors: headless }), "park");
+      expect(d).toMatchObject({ rule: "agent.no_presence", inbox: { kind: "stuck" } });
+      expect(d.inbox?.text).toContain("claude");
+      expect(d.inbox?.text).toContain("runners.person");
+    }
   });
 
   test("auto mode on an executor that cannot run headless waits for a person", () => {
@@ -138,6 +147,73 @@ describe("a ready agent step", () => {
   test("a park a receipt put there holds", () => {
     const parked = { reason: "build: the agent asks a question", since: minutesAgo(3) };
     expect(decideCase({ state: stateAt("build", { parked }) })).toMatchObject({ kind: "noop", rule: "unit.parked" });
+  });
+});
+
+describe("the executor and runner a step runs on", () => {
+  const roleWf = (over: Partial<Parameters<typeof agentSpec>[0]> = {}) => loaded(graph({ build: { agent: agentSpec({ role: "builder", ...over }) } }));
+  const startOn = (c: Parameters<typeof decideCase>[0]) => kindOf(decideCase(c), "start_run").executor;
+
+  test("the config's bind: maps the step's role to an executor, and a binding of the workflow's step outranks the role's", () => {
+    const wf = roleWf();
+    const executors = { claude: caps(), deep: caps(), other: caps() };
+    expect(startOn({ state: stateAt("build", {}, wf), workflows: [wf], executors, config: { bind: { builder: ["deep"] } } })).toBe("deep");
+    expect(startOn({ state: stateAt("build", {}, wf), workflows: [wf], executors, config: { bind: { builder: ["deep"], "story.build": ["other"] } } })).toBe("other");
+    // a binding of another workflow's step, or of another role, leaves the config's executor
+    expect(startOn({ state: stateAt("build", {}, wf), workflows: [wf], executors, config: { bind: { reviewer: ["deep"], "slice.build": ["other"] } } })).toBe("claude");
+    // an older step's by: names its executor, which no binding moves
+    const named = roleWf({ executor: "other" });
+    expect(startOn({ state: stateAt("build", {}, named), workflows: [named], executors, config: { bind: { builder: ["deep"] } } })).toBe("other");
+  });
+
+  test("a fallback list runs the first executor that matches the step: configured, with presence for a person beside it, and a harness that denies a tool for a docs-only step", () => {
+    const requested = { by: "ann", at: NOW };
+    const executors = { headless: caps({ attended: false }), loose: caps({ denyTool: false }), deep: caps() };
+    const bind = { builder: ["gone", "headless", "loose", "deep"] };
+    const attended = roleWf({ attended: "person" });
+    expect(startOn({ state: stateAt("build", { requested }, attended), workflows: [attended], executors, config: { bind } })).toBe("loose");
+    const docs = roleWf({ attended: "person", writes: "docs" });
+    expect(startOn({ state: stateAt("build", { requested }, docs), workflows: [docs], executors, config: { bind } })).toBe("deep");
+    const plain = roleWf();
+    expect(startOn({ state: stateAt("build", {}, plain), workflows: [plain], executors, config: { bind } })).toBe("headless");
+  });
+
+  test("when no executor of the list matches, the unit parks with the first one's rule and every one's reason", () => {
+    const wf = roleWf({ attended: "person", writes: "docs" });
+    const d = kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf], executors: { headless: caps({ attended: false }), loose: caps({ denyTool: false }) }, config: { bind: { builder: ["headless", "loose", "gone"] } } }), "park");
+    expect(d.rule).toBe("agent.no_presence");
+    for (const name of ["headless", "loose", "gone"]) expect(d.inbox?.text).toContain(`'${name}'`);
+  });
+
+  test("an executor without a runner of its own runs in the runner the step's attendance picks", () => {
+    const executors = { "deep@person": caps({ headless: false, attended: true }), "deep@agent": caps({ attended: false }), "deep@none": caps({ attended: false }) };
+    const config = { bind: { builder: ["deep"] } };
+    const requested = { by: "ann", at: NOW };
+    for (const [attended, target] of [["none", "deep@none"], ["agent", "deep@agent"], ["person", "deep@person"]] as const) {
+      const wf = roleWf({ attended });
+      const d = kindOf(decideCase({ state: stateAt("build", { requested }, wf), workflows: [wf], executors, config }), "start_run");
+      expect([attended, d.executor, d.attended]).toEqual([attended, target, attended === "person"]);
+    }
+  });
+
+  test("an executor whose runner for the step's attendance is not set parks: without presence for a person, unconfigured otherwise", () => {
+    const executors = { "deep@none": caps({ attended: false }) };
+    const config = { bind: { builder: ["deep"] } };
+    const person = roleWf({ attended: "person" });
+    const p = kindOf(decideCase({ state: stateAt("build", {}, person), workflows: [person], executors, config }), "park");
+    expect(p.rule).toBe("agent.no_presence");
+    expect(p.inbox?.text).toContain("runners.person");
+    const agent = roleWf({ attended: "agent" });
+    const a = kindOf(decideCase({ state: stateAt("build", {}, agent), workflows: [agent], executors, config }), "park");
+    expect(a.rule).toBe("agent.no_executor");
+    expect(a.inbox?.text).toContain("runners.agent");
+  });
+
+  test("a retry stays on the executor and runner its run started on", () => {
+    const wf = roleWf();
+    const executors = { "deep@none": caps(), other: caps() };
+    const d = kindOf(decideCase({ state: stateAt("build", { run: run({ executor: "deep@none" }) }, wf), workflows: [wf], session: session("ended"), executors, config: { bind: { builder: ["other"] } } }), "retry_run");
+    expect(d.executor).toBe("deep@none");
   });
 });
 

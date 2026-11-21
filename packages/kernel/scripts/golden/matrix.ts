@@ -262,6 +262,16 @@ export const MATRIX: Scenario[] = [
     ["agent.unguarded"],
   ),
   scenario(
+    "agent-no-presence",
+    "A ready attended step whose executor runs only headless, waiting for its start or started by a person: the story waits for a person to give it a runner with presence rather than run the agent with nobody beside it.",
+    { files: shippedFiles("refinement"), capabilities: capabilities({ executors: { claude: executor({ attended: false }) } }) },
+    (w) => {
+      seed(w, "gh-140", { workflow: "refinement", step: "refine" });
+      seed(w, "gh-141", { workflow: "refinement", step: "refine", state: { requested: { by: "person", at: earlier(w, 1) } } });
+    },
+    ["agent.no_presence"],
+  ),
+  scenario(
     "source-unbound",
     "A ready step reads a workflow source that neither the workflow nor this machine's config binds: the story waits for a person to bind it rather than run the agent on a place that is not there.",
     { files: { sourced: SOURCED_DOC }, config: config({ workflow: "sourced" }) },
