@@ -8,6 +8,8 @@ Commands a person or an agent reads print markdown. Every command prints one JSO
 
 A refusal prints `{error, do_instead, code}` (as markdown without `--json`): what was refused, what to do instead and a stable code. The exit code says why: `refused` (3) when a rule says no, `usage` (2) for bad arguments, `corrupt` (4) when a file norn keeps fails validation, `busy` (5) when another process holds the lock or the claim, `config` (6) when a config file is wrong. The full list is under [Exit codes](#exit-codes).
 
+A command marked *a person's command* below is refused with `person_only` (exit 3) when it runs in an agent's session, that is when `NORN_UNIT` or `NORN_RUN_ID` is set, as every launch sets them for the agent and all it starts. Its `do_instead` tells the agent to ask the person (`norn ask "…"`); the person runs it from their own shell, not from the agent's pane.
+
 ## Config
 
 `norn init` writes the config from what it detects (the tracker, the forge, the executor and the runner; a flag overrides each choice) and runs `norn doctor`. Three files hold it, and every file takes every key:
@@ -190,6 +192,8 @@ norn story create <title> [--body <text>] [--workflow <name>]
 
 Approve the gate a story waits at
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn story approve <key> [--gate <step>] [--reason <text>]
 ```
@@ -200,6 +204,8 @@ norn story approve <key> [--gate <step>] [--reason <text>]
 ##### `norn story reject`
 
 Reject the gate a story waits at, with the reason the next attempt gets
+
+A person's command: refused in an agent's session (`person_only`).
 
 ```sh
 norn story reject <key> --reason <text> [--gate <step>]
@@ -212,6 +218,8 @@ norn story reject <key> --reason <text> [--gate <step>]
 
 Answer the question a story's agent asked, or the permission or trust prompt in its pane
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn story answer <key> <text>   (a prompt in the pane: an option's number, yes or no)
 ```
@@ -219,6 +227,8 @@ norn story answer <key> <text>   (a prompt in the pane: an option's number, yes 
 ##### `norn story round`
 
 Start a story's next round on a workflow
+
+A person's command: refused in an agent's session (`person_only`).
 
 ```sh
 norn story round <key> --workflow <name> [--at <step>] [--force] [--reason <text>]
@@ -233,6 +243,8 @@ norn story round <key> --workflow <name> [--at <step>] [--force] [--reason <text
 
 Take a story's claim to this machine, so its next tick carries the story on
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn story take <key> [--force] [--reason <text>]
 ```
@@ -244,6 +256,8 @@ norn story take <key> [--force] [--reason <text>]
 
 Merge the base into a finished story's branch and push it, for its open change
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn story update-branch <key> [--reason <text>]
 ```
@@ -253,6 +267,8 @@ norn story update-branch <key> [--reason <text>]
 ##### `norn story close`
 
 Close a story and stop its runs
+
+A person's command: refused in an agent's session (`person_only`).
 
 ```sh
 norn story close <key>
@@ -266,6 +282,8 @@ Runs: start one manual mode holds, stop a live one, run a step again, bring one'
 
 Start the agent of a step manual mode holds, or of an attended step
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn run start <unit>
 ```
@@ -274,6 +292,8 @@ norn run start <unit>
 
 Stop a unit's live run
 
+A person's command: refused in an agent's session (`person_only`).
+
 ```sh
 norn run stop <unit>
 ```
@@ -281,6 +301,8 @@ norn run stop <unit>
 ##### `norn run rerun`
 
 Run a unit's step again, or move it to another step, counters reset
+
+A person's command: refused in an agent's session (`person_only`).
 
 ```sh
 norn run rerun <unit> [--step <step>] [--reset <counter>]... [--reason <text>]
@@ -387,6 +409,8 @@ norn help [<command>]
 ##### `norn tidy`
 
 Remove the worktrees and local branches of ended stories that no live claim holds, and close their runs' panes
+
+A person's command: refused in an agent's session (`person_only`).
 
 ```sh
 norn tidy [--dry-run]

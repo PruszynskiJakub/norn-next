@@ -7,7 +7,7 @@
  * follow, so a retried start records once.
  */
 import type { RunState, UnitJournal, WorkflowGraph } from "@norn/kernel";
-import { parseUnitId, RUN_ENV } from "@norn/plugin-api";
+import { parseUnitId } from "@norn/plugin-api";
 import type { RuntimeEnv } from "@norn/runtime";
 import { defineCommand, opt } from "../command.ts";
 import { type CliFailure, corruptError, failure, refuse, rendered, usageError } from "../output.ts";
@@ -75,6 +75,7 @@ async function refuseOldSlices(env: RuntimeEnv, key: string, graph: WorkflowGrap
 export const storyRoundCommand = defineCommand({
   name: "story round",
   acts: true,
+  personOnly: true,
   summary: "Start a story's next round on a workflow",
   usage: USAGE,
   options: {
@@ -97,8 +98,6 @@ export const storyRoundCommand = defineCommand({
     const at = opt.str(args, "at");
     const force = opt.bool(args, "force");
     const reason = opt.str(args, "reason")?.trim() || undefined;
-    // a step agent starting rounds would take the choice of what comes next away from the person
-    if (ctx.env[RUN_ENV.run]) throw refuse(`a step agent may not start a round (run ${ctx.env[RUN_ENV.run]})`, "a person starts it, outside any norn run", "agent_round");
     const ref = parseUnitId(key);
     if (!ref) throw refuse(`${key} is not a story key`, "norn story list", "unknown_story");
     if (ref.slice !== null) throw refuse(`a round is a story's, not a slice's (${key})`, `norn story round ${ref.story} --workflow ${name}`, "not_a_story");

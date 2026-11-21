@@ -44,6 +44,12 @@ export interface Command {
    * first builds its runtime env, so its own argument and env refusals still come first.
    */
   acts?: boolean;
+  /**
+   * Only a person runs it: a decision, a question's answer, or moving, starting, stopping or ending
+   * a story's work. Refused before its arguments are read when the process runs in an agent's
+   * session (`person-only.ts`), so the rule holds for every harness and runner and no flag lifts it.
+   */
+  personOnly?: boolean;
   run(ctx: CliContext, args: ParsedArgs): Promise<unknown>;
 }
 

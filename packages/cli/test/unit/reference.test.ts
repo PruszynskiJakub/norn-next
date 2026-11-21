@@ -22,6 +22,14 @@ describe("reference render", () => {
     for (const n of NOUNS) expect(fresh).toContain(`##### \`norn ${n.name}\` (noun)`);
   });
 
+  test("a person-only command says so under its heading, and no other command does", () => {
+    const line = "A person's command: refused in an agent's session (`person_only`).";
+    for (const c of [...COMMANDS, ...NOUNS.flatMap((n) => n.verbs)]) {
+      const marked = fresh.includes(`##### \`norn ${c.name}\`\n\n${c.summary}\n\n${line}\n`);
+      expect(marked, c.name).toBe(c.personOnly === true);
+    }
+  });
+
   test("every config key appears with its type, and the defaults come from the cli, the kernel and the runtime", () => {
     const { rows } = configKeys();
     for (const r of rows) expect(fresh).toMatch(new RegExp(`^\\| \`${r.key.replace(/[.<>]/g, "\\$&")}\` \\| `, "m"));

@@ -88,6 +88,6 @@ describe("norn tidy", () => {
     const m = withEnv(configured({}, []), runEnv());
     const r = await runCli(["tidy", "--json"], m.io);
     expect(r.exit).toBe(ExitCode.refused);
-    expect(json(r.stdout).code).toBe("agent_tidy");
+    expect(json(r.stdout).code).toBe("person_only");
   });
 });

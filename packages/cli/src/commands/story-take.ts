@@ -17,7 +17,7 @@
  * `--force`, as no takeover says the remote's record is the one to keep.
  */
 import type { ClaimRecord } from "@norn/plugin-api";
-import { parseUnitId, type PluginResult, RUN_ENV } from "@norn/plugin-api";
+import { parseUnitId, type PluginResult } from "@norn/plugin-api";
 import type { RuntimeEnv } from "@norn/runtime";
 import { defineCommand, opt } from "../command.ts";
 import { failure, refuse, rendered } from "../output.ts";
@@ -69,6 +69,7 @@ function droppedText(key: string, d: Dropped): string {
 export const storyTakeCommand = defineCommand({
   name: "story take",
   acts: true,
+  personOnly: true,
   summary: "Take a story's claim to this machine, so its next tick carries the story on",
   usage: USAGE,
   options: {
@@ -84,8 +85,6 @@ export const storyTakeCommand = defineCommand({
     const key = args.positionals[0] as string;
     const force = opt.bool(args, "force");
     const reason = opt.str(args, "reason")?.trim() || undefined;
-    // a step agent moving its story to another machine would cut its own run off mid-step
-    if (ctx.env[RUN_ENV.run]) throw refuse(`a step agent may not take a claim (run ${ctx.env[RUN_ENV.run]})`, "a person takes it, outside any norn run", "agent_take");
     const ref = parseUnitId(key);
     if (!ref) throw refuse(`${key} is not a story key`, "norn story list", "unknown_story");
     if (ref.slice !== null) throw refuse(`a claim is a story's, not a slice's (${key})`, `norn story take ${ref.story}`, "not_a_story");
