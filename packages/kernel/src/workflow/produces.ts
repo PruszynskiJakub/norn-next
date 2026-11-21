@@ -42,16 +42,34 @@ export function producedFiles(steps: Readonly<Record<string, WorkflowStepDoc>>):
   return [...new Set(Object.values(steps).flatMap((s) => Object.values(s.produces ?? {}).map((p) => p.file)))];
 }
 
-/** A path that stays inside the folder it is relative to: not absolute, and no `..` segment. */
-const inside = (file: string): boolean => !file.startsWith("/") && !file.split(/[\\/]/).includes("..");
+/**
+ * A path that stays inside the folder it is relative to on every host: not absolute, no `..` segment,
+ * no backslash (a separator on Windows, a plain character elsewhere) and no drive letter.
+ */
+const inside = (file: string): boolean => !file.startsWith("/") && !file.includes("\\") && !/^[A-Za-z]:/.test(file) && !file.split("/").includes("..");
 
-/** One agent step's `produces:` against its own outcomes and the host's input names. */
-export function produceErrors(step: WorkflowStepDoc, at: string, outcomes: readonly string[], host: readonly string[] | undefined): WorkflowError[] {
+/** The path as segments, `.` and empty ones dropped, lower-cased: a case-insensitive file system makes `Spec.md` the spec. */
+const segments = (file: string): string[] => file.split("/").filter((s) => s !== "" && s !== ".").map((s) => s.toLowerCase());
+
+/** Whether `file` is, or lies in, one of the paths norn writes in the spec folder itself (a folder ends in `/`). */
+function norns(file: string, specFiles: readonly string[]): boolean {
+  const at = segments(file);
+  return specFiles.some((f) => {
+    const own = segments(f);
+    return f.endsWith("/") ? own.every((s, i) => at[i] === s) : own.length === at.length && own.every((s, i) => at[i] === s);
+  });
+}
+
+/** One agent step's `produces:` against its own outcomes, the host's input names and the files the host writes in the spec folder. */
+export function produceErrors(step: WorkflowStepDoc, at: string, outcomes: readonly string[], host: readonly string[] | undefined, specFiles: readonly string[] = []): WorkflowError[] {
   const errors: WorkflowError[] = [];
   for (const [name, p] of Object.entries(step.produces ?? {})) {
     const where = `${at}/produces/${name}`;
     if (host?.includes(name)) errors.push({ path: where, message: `\`${name}\` is an input norn provides: a step produces a name of its own` });
-    if (!inside(p.file)) errors.push({ path: `${where}/file`, message: `\`${p.file}\` leaves the story's spec folder: name a path inside it, without \`..\`` });
+    if (!inside(p.file))
+      errors.push({ path: `${where}/file`, message: `\`${p.file}\` leaves the story's spec folder: name a path inside it, without \`..\`, with \`/\` between folders and no drive letter` });
+    else if (norns(p.file, specFiles))
+      errors.push({ path: `${where}/file`, message: `\`${p.file}\` is a file norn writes in the spec folder itself: name another (norn keeps ${specFiles.join(", ")})` });
     (p.on ?? []).forEach((o, i) => {
       if (outcomes.includes(o)) return;
       errors.push({

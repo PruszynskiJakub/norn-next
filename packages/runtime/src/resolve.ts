@@ -25,7 +25,7 @@ import {
   type Vcs,
 } from "@norn/plugin-api";
 import { parse } from "yaml";
-import { HOST_INPUTS } from "./inputs.ts";
+import { HOST_INPUTS, SPEC_FOLDER_FILES } from "./inputs.ts";
 import type { RuntimeConfig } from "./types.ts";
 
 export interface ResolvedSlots {
@@ -159,7 +159,7 @@ export function loadPackWorkflows(
       byName[name] = { ok: false, errors: [{ path: "", message: `${file} does not parse: ${doc.message}` }] };
       continue;
     }
-    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config, signals, inputs: HOST_INPUTS });
+    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config, signals, inputs: HOST_INPUTS, specFiles: SPEC_FOLDER_FILES });
     byName[name] = load.ok || sharedBroken.length === 0 ? load : { ok: false, errors: [...sharedBroken, ...load.errors] };
   }
   return ok(byName);

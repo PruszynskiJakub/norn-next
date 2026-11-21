@@ -68,7 +68,7 @@ describe:
   outcomes: { done: ship }
 ```
 
-- `file` is relative to the story's spec folder, `.agents/specs/<story>/`; a path that leaves it (absolute, or with `..`) is refused.
+- `file` is relative to the story's spec folder, `.agents/specs/<story>/`; a path that may leave it (absolute, with `..`, a backslash or a drive letter) is refused, and so is a file norn writes there itself: `.gitignore`, `spec.md`, or one under `handoffs/` or `slices/`.
 - `on:` lists the outcomes whose report needs the file. Without it, every outcome the step reports needs it but one that hands findings back (`hand_back: findings`), which sends the work back rather than forward. An outcome the step does not report is refused.
 - A produced name may not be an input norn provides, and every step producing one name writes the same file.
 - `norn done <outcome>` is refused (`produced_missing`) while a file due on that outcome is missing or empty in the worktree. The brief says which file each outcome needs.

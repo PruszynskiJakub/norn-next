@@ -32,6 +32,11 @@ export interface LoadWorkflowOptions {
    * refusing it now would leave the unit with no workflow to decide by.
    */
   inputs?: readonly string[];
+  /**
+   * the paths the host writes in a story's spec folder itself, a folder ending in `/`; a `produces:`
+   * file naming one, or lying in one, is refused. Left out with `inputs` for a pinned revision.
+   */
+  specFiles?: readonly string[];
 }
 
 type Fail = { ok: false; errors: WorkflowError[] };
@@ -45,7 +50,7 @@ const fail = (errors: WorkflowError[]): Fail => ({ ok: false, errors });
  * step, `$done` or `$stuck`; a step no route reaches; a route back that no counter bounds; and an
  * `on:` block on a step that does not wait, naming a signal no source reports, giving parameters the
  * signal does not take, or naming what `outcomes:` already routes; a `produces:` file outside the
- * spec folder, due on an outcome the step does not report, or named twice with two files; and, when
+ * spec folder or one the host writes there (`opts.specFiles`), due on an outcome the step does not report, or named twice with two files; and, when
  * `opts.inputs` is given, an agent step's input name neither the host provides nor a step produces, a
  * produced name the host already provides, and a produced name an input or a step kind's `reads`
  * names that some path from `start` reaches with no producer on it.
@@ -70,7 +75,7 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
   const produced = [...new Set(Object.values(flatSteps).flatMap((s) => Object.keys(s.produces ?? {})))];
   const fileOf = new Map<string, { step: string; file: string }>();
   for (const [name, step] of Object.entries(flatSteps)) {
-    const r = readStep(name, step, opts.stepKinds, signals, opts.inputs, produced);
+    const r = readStep(name, step, opts.stepKinds, signals, opts.inputs, produced, opts.specFiles);
     if (r.ok) read[name] = r.step;
     else errors.push(...r.errors.map(inShared));
     // the host hands a reader the file by its name, so every producer of a name writes the same file

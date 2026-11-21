@@ -51,13 +51,35 @@ describe("produces: what an agent step writes for the steps after it", () => {
     });
     expect(errorsOf(loadWorkflow(doc, opts()))).toEqual([
       { path: "/steps/a/produces/spec", message: "`spec` is an input norn provides: a step produces a name of its own" },
-      { path: "/steps/a/produces/up/file", message: "`../x.md` leaves the story's spec folder: name a path inside it, without `..`" },
-      { path: "/steps/a/produces/abs/file", message: "`/etc/x.md` leaves the story's spec folder: name a path inside it, without `..`" },
-      { path: "/steps/a/produces/mid/file", message: "`a/../../x.md` leaves the story's spec folder: name a path inside it, without `..`" },
+      { path: "/steps/a/produces/up/file", message: "`../x.md` leaves the story's spec folder: name a path inside it, without `..`, with `/` between folders and no drive letter" },
+      { path: "/steps/a/produces/abs/file", message: "`/etc/x.md` leaves the story's spec folder: name a path inside it, without `..`, with `/` between folders and no drive letter" },
+      { path: "/steps/a/produces/mid/file", message: "`a/../../x.md` leaves the story's spec folder: name a path inside it, without `..`, with `/` between folders and no drive letter" },
       { path: "/steps/a/produces/odd/on/0", message: "produces names 'stuck', a route the kernel takes, never one an agent reports" },
       { path: "/steps/a/produces/odd/on/1", message: "produces names outcome 'nope', but the step declares no route for it in outcomes" },
       { path: "/steps/b/produces/notes/file", message: "`notes` is produced as notes.md by step a and as other.md here: a produced name names one file" },
     ]);
+  });
+
+  test("a file with a backslash or a drive letter is refused as one that may leave the spec folder", () => {
+    const doc = wf({ a: agent({ done: "$done" }, { produces: { win: { file: "out\\x.md" }, drive: { file: "C:x.md" }, abs: { file: "c:/x.md" } } }) });
+    expect(errorsOf(loadWorkflow(doc, opts()))).toEqual([
+      { path: "/steps/a/produces/win/file", message: "`out\\x.md` leaves the story's spec folder: name a path inside it, without `..`, with `/` between folders and no drive letter" },
+      { path: "/steps/a/produces/drive/file", message: "`C:x.md` leaves the story's spec folder: name a path inside it, without `..`, with `/` between folders and no drive letter" },
+      { path: "/steps/a/produces/abs/file", message: "`c:/x.md` leaves the story's spec folder: name a path inside it, without `..`, with `/` between folders and no drive letter" },
+    ]);
+  });
+
+  test("a file norn itself writes in the spec folder, as the host names them, is refused; a pinned revision loads without the check", () => {
+    const specFiles = [".gitignore", "spec.md", "handoffs/", "slices/"];
+    const doc = wf({
+      a: agent(
+        { done: "$done" },
+        { produces: { ig: { file: ".gitignore" }, sp: { file: "./Spec.md" }, ho: { file: "handoffs/a.md" }, sl: { file: "slices" }, ok: { file: "slices-notes.md" } } },
+      ),
+    });
+    const refusal = (name: string, file: string) => ({ path: `/steps/a/produces/${name}/file`, message: `\`${file}\` is a file norn writes in the spec folder itself: name another (norn keeps .gitignore, spec.md, handoffs/, slices/)` });
+    expect(errorsOf(loadWorkflow(doc, opts({ specFiles })))).toEqual([refusal("ig", ".gitignore"), refusal("sp", "./Spec.md"), refusal("ho", "handoffs/a.md"), refusal("sl", "slices")]);
+    expect(loadWorkflow(doc, opts({ inputs: undefined })).ok).toBe(true);
   });
 
   test("produces is a key of an agent step only", () => {

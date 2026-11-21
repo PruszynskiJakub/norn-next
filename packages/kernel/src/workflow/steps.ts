@@ -62,6 +62,7 @@ export function readStep(
   signals: Readonly<Record<string, SignalDeclaration>>,
   inputs?: readonly string[],
   produced: readonly string[] = [],
+  specFiles: readonly string[] = [],
 ): { ok: true; step: ReadStep } | { ok: false; errors: WorkflowError[] } {
   const at = `/steps/${name}`;
   const raw = step as Record<string, unknown>;
@@ -106,7 +107,7 @@ export function readStep(
   if (head === "check" && step.timeout === undefined) errors.push({ path: at, message: "a check needs a timeout" });
 
   const ends = endsOf(head, step, plugin, outcomeRoutes, at, errors);
-  if (head === "agent") errors.push(...produceErrors(step, at, ends, inputs));
+  if (head === "agent") errors.push(...produceErrors(step, at, ends, inputs, specFiles));
   // a wait kind may answer by itself what the host also reports between its polls (await-merge's
   // `unpushed`): one route under on: serves both, so the name still sits in one block
   const onRoutes = waits ? ((step.on ?? {}) as Record<string, OnRoute>) : {};

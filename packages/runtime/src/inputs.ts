@@ -22,7 +22,7 @@ import type { RuntimeEnv } from "./env.ts";
 import { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 import { readStepRun } from "./step-runs.ts";
 import { baseSideOf, recordOf, type Resolved, resolutionOf, roundOf, standing, storyUnits } from "./input-history.ts";
-import { handoffArtifact, listStoryDocs, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
+import { HANDOFFS_DIR, handoffArtifact, listStoryDocs, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
 
 const AGENTS_DIR = ".agents";
 /** the folder of each story's documents in a worktree: `.agents/specs/<story>/` */
@@ -31,6 +31,7 @@ export const SPECS_DIR = `${AGENTS_DIR}/specs`;
 export const INPUTS_DIR = `${AGENTS_DIR}/inputs`;
 const BASE_DIR = `${INPUTS_DIR}/.base`;
 const IGNORE_ALL = "*\n";
+const IGNORE_FILE = ".gitignore";
 /** Text up to this long is shown in the brief itself as well as written to its file. */
 const INLINE_MAX = 1500;
 
@@ -67,6 +68,12 @@ const docsOf = (unit: string): Doc[] => [doc("spec", unit, SPEC_ARTIFACT), doc("
 
 /** The story's slice files are documents too: the slice step writes them here, and each slice reads its own. */
 const SLICES = "slices";
+
+/**
+ * What norn writes in a story's spec folder itself, a folder ending in `/`: the loader refuses a
+ * `produces:` file among them, as norn would overwrite it, or read it back as its own document.
+ */
+export const SPEC_FOLDER_FILES = [IGNORE_FILE, SPEC_ARTIFACT, `${HANDOFFS_DIR}/`, `${SLICES}/`] as const;
 const sliceDoc = (unit: string, artifact: string): Doc => doc(artifact, unit, artifact);
 
 /** The slice files in the worktree's spec folder, as documents to read back. */
@@ -289,8 +296,8 @@ export interface MaterializedInputs {
 export async function materializeInputs(env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, worktree = worktreeOf(env, record.unit)): Promise<PluginResult<MaterializedInputs>> {
   const unit = record.unit;
   try {
-    await env.ctx.files.write(`${worktree}/${INPUTS_DIR}/.gitignore`, IGNORE_ALL);
-    await env.ctx.files.write(`${worktree}/${specFolder(unit)}/.gitignore`, IGNORE_ALL);
+    await env.ctx.files.write(`${worktree}/${INPUTS_DIR}/${IGNORE_FILE}`, IGNORE_ALL);
+    await env.ctx.files.write(`${worktree}/${specFolder(unit)}/${IGNORE_FILE}`, IGNORE_ALL);
     await readBackDocs(env, unit, worktree, producedOf(record));
     const item = await storyItem(env, unit);
     const out: MaterializedInputs = { inputs: [] };
