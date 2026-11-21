@@ -6,7 +6,6 @@
  * once and a stale one is refused by the kernel rather than starting a later visit.
  */
 import type { UnitJournal } from "@norn/kernel";
-import { RUN_ENV } from "@norn/plugin-api";
 import { defineCommand } from "../command.ts";
 import { failure, refuse, rendered } from "../output.ts";
 import { roundOf } from "./gate-support.ts";
@@ -37,13 +36,12 @@ function whereAre(units: readonly UnitJournal[]): string {
 export const runStartCommand = defineCommand({
   name: "run start",
   acts: true,
+  personOnly: true,
   summary: "Start the agent of a step manual mode holds, or of an attended step",
   usage: "norn run start <unit>",
   positionals: { min: 1, max: 1 },
   async run(ctx, args) {
     const key = args.positionals[0] as string;
-    // a step agent starting runs would be the loop manual mode exists to keep a person in
-    if (ctx.env[RUN_ENV.run]) throw refuse(`a step agent may not start a run (run ${ctx.env[RUN_ENV.run]})`, "a person starts it, outside any norn run", "agent_start");
     const env = await ctx.runtimeEnv();
     const units = readable(await unitsOf(env, key), key);
     const held = units.filter(heldByManual);

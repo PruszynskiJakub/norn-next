@@ -14,7 +14,7 @@
  * under that intent rather than reading a branch that already holds its base as nothing to update.
  */
 import { outcomeReceiptId, type ReceiptDataOf, type UnitJournal } from "@norn/kernel";
-import { type ChangeRequest, fail, ok, parseUnitId, RUN_ENV, type Vcs } from "@norn/plugin-api";
+import { type ChangeRequest, fail, ok, parseUnitId, type Vcs } from "@norn/plugin-api";
 import { ulid } from "@norn/schema";
 import { acquireTickLock, baseRefOf, branchOf, ensureWorktree, newTickId, type RuntimeEnv, type TickLock } from "@norn/runtime";
 import { defineCommand, opt } from "../command.ts";
@@ -260,6 +260,7 @@ async function claimFor(env: RuntimeEnv, key: string): Promise<boolean> {
 export const storyUpdateBranchCommand = defineCommand({
   name: "story update-branch",
   acts: true,
+  personOnly: true,
   summary: "Merge the base into a finished story's branch and push it, for its open change",
   usage: USAGE,
   options: { reason: { type: "string" } },
@@ -268,8 +269,6 @@ export const storyUpdateBranchCommand = defineCommand({
   async run(ctx, args) {
     const key = args.positionals[0] as string;
     const reason = opt.str(args, "reason")?.trim() || undefined;
-    // a step agent's branch is its round's to update, through the workflow's update steps
-    if (ctx.env[RUN_ENV.run]) throw refuse(`a step agent may not update a story's branch (run ${ctx.env[RUN_ENV.run]})`, "a person runs it, outside any norn run", "agent_update");
     const ref = parseUnitId(key);
     if (!ref) throw refuse(`${key} is not a story key`, "norn story list", "unknown_story");
     if (ref.slice !== null) throw refuse(`a branch update is a story's, not a slice's (${key})`, `norn story update-branch ${ref.story}`, "not_a_story");

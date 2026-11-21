@@ -257,7 +257,7 @@ describe("story update-branch", () => {
     expect(refusal(await updateBranch(m))).toEqual({ exit: ExitCode.refused, code: "unknown_story" });
     await seedUnit(m, ended);
     expect(refusal(await runCli(["story", "update-branch", `${UNIT}/01`, "--json"], m.io))).toEqual({ exit: ExitCode.refused, code: "not_a_story" });
-    expect(refusal(await updateBranch(withEnv(m, runEnv())))).toEqual({ exit: ExitCode.refused, code: "agent_update" });
+    expect(refusal(await updateBranch(withEnv(m, runEnv())))).toEqual({ exit: ExitCode.refused, code: "person_only" });
     const env = await envOf(m);
     const pending = await env.journal.record(UNIT, { id: "01JCCCCCCCCCCCCCCCCCCCCCCC", data: { kind: "mode.changed", mode: "auto", by: "me@box" } });
     if (!pending.ok) throw new Error(pending.failure.message);

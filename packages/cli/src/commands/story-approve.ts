@@ -8,6 +8,7 @@ import { decideGate } from "./gate-support.ts";
 export const storyApproveCommand = defineCommand({
   name: "story approve",
   acts: true,
+  personOnly: true,
   summary: "Approve the gate a story waits at",
   usage: "norn story approve <key> [--gate <step>] [--reason <text>]",
   options: {
