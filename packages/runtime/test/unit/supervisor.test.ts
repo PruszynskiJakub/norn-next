@@ -195,3 +195,65 @@ describe("a gate the person's policy grants to a stand-in", () => {
     expect(after.state?.ended).toBeUndefined();
   });
 });
+
+describe("a gate supervisor on the record", () => {
+  const GATES = { standIn: { attended: [], gates: ["supervised.ready"] } };
+
+  /** A story parked at the ready gate with a gate supervisor's launch on the record, applied: one a build that delegated gates wrote. */
+  async function gateSupervised(): Promise<{ h: Harnessed; supId: string }> {
+    const h = harness({ workflow: "supervised", kernel: GATES });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const runId = (await record(h, "lt-1")).state?.run?.id as string;
+    expect((await reportRun(h.env, "lt-1", runId, { verb: "done", outcome: "done" }, "done-1")).ok).toBe(true);
+    await tickUntil(h, has("gate.park"));
+    const supId = "sup-gate-1";
+    const started = await h.env.journal.record("lt-1", { id: "sup-started", data: { kind: "supervisor.started", run_id: supId, executor: "claude", subject: "gate", session: `h-${supId}`, step: "ready", attempt: 1 } });
+    expect(started.ok).toBe(true);
+    await tickUntil(h, async () => (await record(h, "lt-1")).state?.supervisor?.id === supId);
+    return { h, supId };
+  }
+
+  /** The receipt the last report recorded, still unapplied. */
+  async function lastReceipt(h: Harnessed) {
+    return (await record(h, "lt-1")).unapplied.at(-1)?.data;
+  }
+
+  test("its brief asks it to decide the one gate, and offers approve, reject and escalate", async () => {
+    const { h, supId } = await gateSupervised();
+    const brief = await briefOf(h.env, "lt-1", supId);
+    if (!brief.ok) throw new Error(brief.refusal.error);
+    expect(brief.value.markdown).toContain("policy.stand_in.gates");
+    expect(brief.value.markdown).toContain("Decide this one gate");
+    expect(brief.value.markdown).toContain("norn done approve --note");
+    expect(brief.value.markdown).toContain("norn done reject --note");
+    expect(brief.value.markdown).toContain("norn done escalate --note");
+    expect(brief.value.markdown).not.toContain("norn done answer");
+    expect(brief.value.markdown).not.toContain("## The question");
+  });
+
+  test("its approve or reject becomes a delegated gate.decided naming its run and the visit", async () => {
+    const { h, supId } = await gateSupervised();
+    expect((await reportRun(h.env, "lt-1", supId, { verb: "done", outcome: "approve", text: "criteria 1-3 pass" }, "sup-approve")).ok).toBe(true);
+    expect(await lastReceipt(h)).toEqual({ kind: "gate.decided", outcome: "approve", by: "supervisor", delegated: true, supervisor_run: supId, reason: "criteria 1-3 pass", step: "ready", attempt: 1 });
+    expect((await reportRun(h.env, "lt-1", supId, { verb: "done", outcome: "reject", text: "criterion 2 fails" }, "sup-reject")).ok).toBe(true);
+    expect(await lastReceipt(h)).toEqual({ kind: "gate.decided", outcome: "reject", by: "supervisor", delegated: true, supervisor_run: supId, reason: "criterion 2 fails", step: "ready", attempt: 1 });
+  });
+
+  test("its escalate hands the gate back, and a decision naming what only the person grants, or an answer, is refused", async () => {
+    const { h, supId } = await gateSupervised();
+    const granting = await reportRun(h.env, "lt-1", supId, { verb: "done", outcome: "approve", text: "Approve, then merge it." }, "sup-merge");
+    expect(granting.ok ? null : granting.refusal.code).toBe("supervisor_grants");
+    const answering = await reportRun(h.env, "lt-1", supId, { verb: "done", outcome: "answer", text: "fine" }, "sup-answer");
+    expect(answering.ok ? null : answering.refusal.code).toBe("outcome");
+    const bare = await reportRun(h.env, "lt-1", supId, { verb: "done", outcome: "approve" }, "sup-bare");
+    expect(bare.ok ? null : bare.refusal.code).toBe("reason_required");
+    expect((await reportRun(h.env, "lt-1", supId, { verb: "done", outcome: "escalate", text: "criterion 2 is unverified" }, "sup-escalate")).ok).toBe(true);
+    expect(await lastReceipt(h)).toEqual({ kind: "supervisor.escalated", run_id: supId, reason: "criterion 2 is unverified", step: "ready", attempt: 1 });
+    await tickUntil(h, async () => (await record(h, "lt-1")).state?.supervisor === undefined);
+    const state = (await record(h, "lt-1")).state;
+    expect(state?.supervised?.escalated).toEqual([{ input: "gate", reason: "criterion 2 is unverified" }]);
+    expect(state?.step).toBe("ready");
+  });
+});

@@ -153,6 +153,30 @@ describe("a gate the policy grants", () => {
     expect(kindOf(decideCase({ state: stateAt("approve", { supervisor: supervisor() }), receipts: [decided({})] }), "apply_receipts").rejected).toHaveLength(1);
   });
 
+  test("a gate supervisor whose grant the person withdrew hands the gate back, and the gate waits for the person", () => {
+    const at = stateAt("approve", { supervisor: supervisor({ subject: "gate", input_id: undefined }) });
+    const d = kindOf(decideCase({ state: at, executors: sandboxed }), "apply_receipts");
+    expect(d.rule).toBe("supervisor.revoked");
+    expect(d.receipts.map((r) => r.data)).toEqual([{ kind: "supervisor.escalated", run_id: "sup-1", reason: "the person's policy no longer grants this gate to a stand-in", step: "approve", attempt: 1 }]);
+    expect(d.state.supervisor).toBeUndefined();
+    expect(d.state.supervised?.escalated).toEqual([{ input: "gate", reason: "the person's policy no longer grants this gate to a stand-in" }]);
+    expect(kindOf(decideCase({ state: d.state, executors: sandboxed }), "park").rule).toBe("gate.park");
+  });
+
+  test("a gate supervisor gone quiet past the window, or whose process is gone, hands the gate back to the person", () => {
+    const at = (over: Partial<NonNullable<RunState["supervisor"]>>) => stateAt("approve", { supervisor: supervisor({ subject: "gate", input_id: undefined, ...over }) });
+    const quiet = kindOf(decideCase({ state: at({ started_at: minutesAgo(16) }), config: gates, executors: sandboxed }), "apply_receipts");
+    expect(quiet.rule).toBe("supervisor.silent");
+    expect(quiet.receipts[0]?.data).toMatchObject({ kind: "supervisor.escalated", run_id: "sup-1", step: "approve", attempt: 1 });
+    expect(quiet.state.supervisor).toBeUndefined();
+    expect(quiet.state.supervised?.escalated?.map((e) => e.input)).toEqual(["gate"]);
+    const back = kindOf(decideCase({ state: quiet.state, config: gates, executors: sandboxed }), "park");
+    expect(back.inbox?.text).toContain("The supervisor handed this gate to you");
+    const dead = kindOf(decideCase({ state: at({}), config: gates, executors: sandboxed, supervisor_alive: false }), "apply_receipts");
+    expect(dead.rule).toBe("supervisor.died");
+    expect(dead.receipts[0]?.data).toMatchObject({ kind: "supervisor.escalated", run_id: "sup-1", reason: "the supervisor ended without an answer" });
+  });
+
   test("a gate the supervisor handed back waits for the person with its reason", () => {
     const at = stateAt("approve", { supervised: { answered: 0, escalated: [{ input: "gate", reason: "criterion 2 is unverified" }] } });
     const d = kindOf(decideCase({ state: at, config: gates, executors: sandboxed }), "park");
