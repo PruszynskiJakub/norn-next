@@ -50,8 +50,11 @@ describe("defineNornPlugin: step kinds", () => {
     expect(stepKindProblems("open-pr", null)).toEqual(["is not an object"]);
   });
 
-  test("`produces` is a step key, so no config key may take it", () => {
-    expect(stepKindProblems("open-pr", kind({ configSchema: Type.Object({ produces: Type.String() }) }))).toEqual(["config keys produces clash with step keys"]);
+  test("`produces` and `writes` are step keys (plugin API 1.20), so no step kind takes either as its name or a config key", () => {
+    for (const key of ["produces", "writes"]) {
+      expect(stepKindProblems("open-pr", kind({ configSchema: Type.Object({ [key]: Type.String() }) }))).toEqual([`config keys ${key} clash with step keys`]);
+      expect(stepKindProblems(key, kind({ name: key }))).toEqual(["is a name the kernel keeps for itself"]);
+    }
   });
 });
 
