@@ -1,10 +1,12 @@
 /**
  * A workflow as its file is written (`WorkflowFile`) and as a unit pins it (`WorkflowDocument`, the
- * flat form every outcome object is lowered to, so a pin's hash never depends on the spelling). A step holds exactly one head key: a kernel built-in (`agent`,
- * `check`, `gate`, `slices`), `use` (a shared file's steps) or `like` (a copy of a sibling), or a step
- * kind a plugin provides (`open-pr:`, `await-merge:`), whose extra keys its `configSchema` checks.
- * The schema checks the keys it knows and lets the rest through; `loadWorkflow` decides which key is
- * the head and refuses a step whose head is unknown.
+ * flat form every step written with `by:` and every outcome object is lowered to, so a pin's hash never
+ * depends on the spelling). A file writes a step with `by:` (an agent role, `person`, `shell`, or a
+ * step kind as `<namespace>.<kind>`), or, in the older form a pinned step keeps, with exactly one head
+ * key: a kernel built-in (`agent`, `check`, `gate`, `slices`) or a step kind's bare name (`open-pr:`),
+ * whose extra keys its `configSchema` checks. `use` brings in a shared file's steps and `like` copies a
+ * sibling. The schema checks the keys it knows and lets the rest through; `loadWorkflow` decides which
+ * key is the head and refuses a step whose head is unknown.
  */
 import { Duration, Mode, NonEmpty, OUTCOME_NAME_PATTERN, OutcomeName, PosInt, StepName, StepWrites, StoredCounterName, Target, Verdict } from "@norn/schema";
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
@@ -118,48 +120,84 @@ const FileProduces = Type.Union([ProducesMap, ProducesList]);
 const EXIT_CODE_PATTERN = "^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
 const SharedName = Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "A shared file's name, without `.yaml`" });
 
-function stepDoc<R extends TSchema, O extends TSchema, P extends TSchema>(route: R, onRoute: O, produces: P) {
+/**
+ * A signal as an `on:` block of a file names it: `<namespace>.<signal>` (`vcs.stale`), or bare in the
+ * older form; the loader resolves it to the bare name the pinned document keeps.
+ */
+const SignalSurfaceName = Type.String({ pattern: "^(?:[^.\\s]+\\.)?[a-z][a-z0-9_-]*$" });
+
+/** What bounds a step written with `by:`; the loader says which actor takes which. */
+const LimitsDoc = Type.Object(
+  { timeout: Type.Optional(Duration), deadline: Type.Optional(Duration), retries: Type.Optional(Type.Integer({ minimum: 0 })), nudges: Type.Optional(Type.Integer({ minimum: 0 })), asks: Type.Optional(Type.Integer({ minimum: 0 })) },
+  closed,
+);
+
+/** The keys only a step written with `by:` holds; the loader lowers them to the pinned document's. */
+const ACTOR_KEYS = {
+  do: Type.Optional(Type.String({ minLength: 1, pattern: "\\S", description: "An agent's instruction, a person's decision, or a shell command" })),
+  /** how the actor works: an agent's skills, a shell step's exits, a step kind's settings */
+  with: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+  reads: Type.Optional(Type.Array(StepInputDoc, { uniqueItems: true })),
+  allow: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1, uniqueItems: true })),
+  limits: Type.Optional(LimitsDoc),
+};
+
+function stepProps<R extends TSchema, O extends TSchema, P extends TSchema>(route: R, onRoute: O, produces: P) {
+  return {
+    // the built-in head keys; exactly one head per step is the loader's check, not the schema's
+    agent: Type.Optional(Type.String({ minLength: 1, pattern: "\\S", description: "The orientation: what the step is for" })),
+    check: Type.Optional(NonEmpty),
+    gate: Type.Optional(Type.String({ minLength: 1, pattern: "\\S", description: "What the person decides; shown in the inbox" })),
+    slices: Type.Optional(Type.Null({ description: "Takes no value" })),
+    use: Type.Optional(SharedName),
+    like: Type.Optional(StepName),
+    description: Type.Optional(Type.String()),
+    outcomes: Type.Optional(Type.Record(OutcomeName, route, closed)),
+    /** what may interrupt a waiting step from outside: signal name → route, in the order a tick weighs them */
+    on: Type.Optional(Type.Record(OutcomeName, onRoute, { ...closed, minProperties: 1 })),
+    means: Type.Optional(Type.Record(OutcomeName, Type.String({ minLength: 1 }), closed)),
+    verdict: Type.Optional(Type.Record(OutcomeName, Verdict, closed)),
+    skills: Type.Optional(Type.Array(NonEmpty, { uniqueItems: true })),
+    inputs: Type.Optional(Type.Array(StepInputDoc, { uniqueItems: true })),
+    /** what an agent step writes for later steps, by the name their `inputs:` (or a step kind's `reads`) use */
+    produces: Type.Optional(produces),
+    attended: Type.Optional(Type.Boolean({ description: "Worked with a person; always started by a person" })),
+    by: Type.Optional(Type.String({ minLength: 1, description: "The executor that runs the agent; default the config's" })),
+    model: Type.Optional(NonEmpty),
+    criteria: Type.Optional(Type.Literal("required")),
+    hand_back: Type.Optional(Type.Record(OutcomeName, HandBack, { ...closed, minProperties: 1 })),
+    writes: Type.Optional(StepWrites),
+    deadline: Type.Optional(Duration),
+    nudges: Type.Optional(Type.Integer({ minimum: 0 })),
+    retries: Type.Optional(Type.Integer({ minimum: 0 })),
+    timeout: Type.Optional(Duration),
+    exits: Type.Optional(Type.Record(Type.String({ pattern: EXIT_CODE_PATTERN }), OutcomeName, { ...closed, minProperties: 1 })),
+  };
+}
+
+// a plugin step kind's head and config keys are checked by the loader against the kind's configSchema
+const open = { additionalProperties: true } as const;
+
+/** A step as a file writes it: the pinned keys, the step form's, a signal by its surface name, and who stays alongside an agent. */
+function fileStepDoc<R extends TSchema, O extends TSchema>(route: R, onRoute: O) {
   return Type.Object(
     {
-      // the built-in head keys; exactly one head per step is the loader's check, not the schema's
-      agent: Type.Optional(Type.String({ minLength: 1, pattern: "\\S", description: "The orientation: what the step is for" })),
-      check: Type.Optional(NonEmpty),
-      gate: Type.Optional(Type.String({ minLength: 1, pattern: "\\S", description: "What the person decides; shown in the inbox" })),
-      slices: Type.Optional(Type.Null({ description: "Takes no value" })),
-      use: Type.Optional(SharedName),
-      like: Type.Optional(StepName),
-      description: Type.Optional(Type.String()),
-      outcomes: Type.Optional(Type.Record(OutcomeName, route, closed)),
-      /** what may interrupt a waiting step from outside: signal name → route, in the order a tick weighs them */
-      on: Type.Optional(Type.Record(OutcomeName, onRoute, { ...closed, minProperties: 1 })),
-      means: Type.Optional(Type.Record(OutcomeName, Type.String({ minLength: 1 }), closed)),
-      verdict: Type.Optional(Type.Record(OutcomeName, Verdict, closed)),
-      skills: Type.Optional(Type.Array(NonEmpty, { uniqueItems: true })),
-      inputs: Type.Optional(Type.Array(StepInputDoc, { uniqueItems: true })),
-      /** what an agent step writes for later steps, by the name their `inputs:` (or a step kind's `reads`) use */
-      produces: Type.Optional(produces),
-      attended: Type.Optional(Type.Boolean({ description: "Worked with a person; always started by a person" })),
-      by: Type.Optional(Type.String({ minLength: 1, description: "The executor that runs the agent; default the config's" })),
-      model: Type.Optional(NonEmpty),
-      criteria: Type.Optional(Type.Literal("required")),
-      hand_back: Type.Optional(Type.Record(OutcomeName, HandBack, { ...closed, minProperties: 1 })),
-      writes: Type.Optional(StepWrites),
-      deadline: Type.Optional(Duration),
-      nudges: Type.Optional(Type.Integer({ minimum: 0 })),
-      retries: Type.Optional(Type.Integer({ minimum: 0 })),
-      timeout: Type.Optional(Duration),
-      exits: Type.Optional(Type.Record(Type.String({ pattern: EXIT_CODE_PATTERN }), OutcomeName, { ...closed, minProperties: 1 })),
+      ...stepProps(route, onRoute, FileProduces),
+      ...ACTOR_KEYS,
+      on: Type.Optional(Type.Record(SignalSurfaceName, onRoute, { ...closed, minProperties: 1 })),
+      attended: Type.Optional(
+        Type.Union([Type.Boolean(), Type.Literal("person"), Type.Literal("agent"), Type.Literal("none")], { description: "Who stays alongside the agent; the older form's true is person" }),
+      ),
     },
-    // a plugin step kind's head and config keys are checked by the loader against the kind's configSchema
-    { additionalProperties: true },
+    open,
   );
 }
 
-export const WorkflowStepDoc = stepDoc(Route, OnRoute, ProducesMap);
+export const WorkflowStepDoc = Type.Object(stepProps(Route, OnRoute, ProducesMap), open);
 export type WorkflowStepDoc = Static<typeof WorkflowStepDoc>;
-export const WorkflowFileStepDoc = stepDoc(OutcomeDoc, OnRoute, FileProduces);
+export const WorkflowFileStepDoc = fileStepDoc(OutcomeDoc, OnRoute);
 export type WorkflowFileStepDoc = Static<typeof WorkflowFileStepDoc>;
-export const SharedStepDoc = stepDoc(SharedOutcomeDoc, SharedOnRoute, FileProduces);
+export const SharedStepDoc = fileStepDoc(SharedOutcomeDoc, SharedOnRoute);
 export type SharedStepDoc = Static<typeof SharedStepDoc>;
 
 const ResetEdge = Type.String({ pattern: "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$", description: "<step>.<outcome> whose edge resets the counter" });
@@ -184,28 +222,35 @@ export const BaseDoc = Type.Object(
 );
 export type BaseDoc = Static<typeof BaseDoc>;
 
-function workflowDoc<S extends TSchema>(step: S, title: string) {
-  return Type.Object(
-    {
-      $schema: Type.Optional(Type.String()),
-      name: Type.String({ pattern: "^[a-z][a-z0-9_-]*$" }),
-      description: Type.Optional(Type.String()),
-      mode: Type.Optional(Mode),
-      defaults: Type.Optional(StepDefaultsDoc),
-      start: StepName,
-      steps: Type.Record(StepName, step, { ...closed, minProperties: 1 }),
-      counters: Type.Optional(Type.Record(DocCounterName, CounterDoc, closed)),
-      base: Type.Optional(BaseDoc),
-    },
-    { ...closed, title },
-  );
+/** A signal's settings for the whole workflow: when `vcs.stale` fires, and the check that re-verifies a base move without a conflict. */
+const SignalSettingsDoc = Type.Object({ when: Type.Optional(BaseDoc.properties.stale), verify: Type.Optional(StepName) }, closed);
+
+/** What only a workflow file holds: `signals:` and `entries:`, lowered into the pinned document's `base:`. */
+const FILE_KEYS = {
+  signals: Type.Optional(Type.Record(SignalSurfaceName, SignalSettingsDoc, closed)),
+  /** a way back into the workflow by name (`update-branch`) → the step it enters */
+  entries: Type.Optional(Type.Record(Type.String({ pattern: "^[a-z][a-z0-9_-]*$" }), StepName, closed)),
+};
+
+function workflowProps<S extends TSchema>(step: S) {
+  return {
+    $schema: Type.Optional(Type.String()),
+    name: Type.String({ pattern: "^[a-z][a-z0-9_-]*$" }),
+    description: Type.Optional(Type.String()),
+    mode: Type.Optional(Mode),
+    defaults: Type.Optional(StepDefaultsDoc),
+    start: StepName,
+    steps: Type.Record(StepName, step, { ...closed, minProperties: 1 }),
+    counters: Type.Optional(Type.Record(DocCounterName, CounterDoc, closed)),
+    base: Type.Optional(BaseDoc),
+  };
 }
 
 /** The flat document a unit pins: routes only under `outcomes:`, what each outcome means and needs in the step's maps. */
-export const WorkflowDocument = workflowDoc(WorkflowStepDoc, "WorkflowDocument");
+export const WorkflowDocument = Type.Object(workflowProps(WorkflowStepDoc), { ...closed, title: "WorkflowDocument" });
 export type WorkflowDocument = Static<typeof WorkflowDocument>;
 /** A workflow file: a pinned document's form, or outcomes written as objects. */
-export const WorkflowFile = workflowDoc(WorkflowFileStepDoc, "WorkflowFile");
+export const WorkflowFile = Type.Object({ ...workflowProps(WorkflowFileStepDoc), ...FILE_KEYS }, { ...closed, title: "WorkflowFile" });
 export type WorkflowFile = Static<typeof WorkflowFile>;
 
 /** A file of shared steps a workflow brings in with `use:`, entered at `start` and left through its exits. */

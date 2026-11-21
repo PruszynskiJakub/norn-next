@@ -6,6 +6,7 @@
 import { BUILTIN_SIGNALS, type SignalDeclaration, type StepKindDefinition } from "@norn/plugin-api";
 import { check, parseDuration } from "@norn/schema";
 import type { KernelConfig } from "../model/config.ts";
+import { lowerWorkflowKeys } from "./actors.ts";
 import { type CountedStep, deriveCounters } from "./counters.ts";
 import { type CounterDoc, type OnRoute, type Route, type WorkflowDocument, WorkflowFile, type WorkflowStepDoc } from "./document.ts";
 import { type Flat, flatten } from "./flatten.ts";
@@ -47,8 +48,10 @@ type Fail = { ok: false; errors: WorkflowError[] };
 const fail = (errors: WorkflowError[]): Fail => ({ ok: false, errors });
 
 /**
- * Validate and compile `doc` (a parsed workflow file, or a pinned workflow's flat document). Refuses:
- * a step without exactly one head key; a head that is neither built in nor a registered step kind
+ * Validate and compile `doc` (a parsed workflow file, or a pinned workflow's flat document). A step
+ * written with `by:` is lowered to the pinned form first (`lowerActor`), a step kind's and a signal's
+ * surface name to the bare name it is registered by, and `signals:` and `entries:` to `base:`. Refuses:
+ * a step without exactly one head key or actor; a head that is neither built in nor a registered step kind
  * (`missing_kind` names it); a plugin step's extra keys failing its kind's configSchema; an outcome a
  * step can end with left unrouted (the overridable built-in outcomes excepted); a target that is not a
  * step, `$done` or `$stuck`; a step no route reaches; a route back that no counter bounds; and an
@@ -64,9 +67,11 @@ const fail = (errors: WorkflowError[]): Fail => ({ ok: false, errors });
 export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowLoad {
   const schema = check(WorkflowFile, doc);
   if (!schema.ok) return fail(schema.errors.map((e) => ({ path: e.path, message: e.message })));
-  const written = schema.value;
+  const lifted = lowerWorkflowKeys(schema.value);
+  if ("errors" in lifted) return fail(lifted.errors);
+  const written: WorkflowFile = lifted.doc;
   const signals: Record<string, SignalDeclaration> = { ...opts.signals, ...BUILTIN_SIGNALS };
-  const flat = flatten(written, opts.sharedFiles);
+  const flat = flatten(written, opts.sharedFiles, { stepKinds: opts.stepKinds, signals });
   if (!flat.ok) return flat;
   const { steps: flatSteps, included } = flat.flat;
   const inShared = (e: WorkflowError): WorkflowError => {

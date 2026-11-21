@@ -8,6 +8,7 @@ import { check, StepName } from "@norn/schema";
 import { type Route, SharedWorkflowDocument, type WorkflowDocument, type WorkflowFile, type WorkflowStepDoc } from "./document.ts";
 import type { ExitLeft } from "./counters.ts";
 import type { WorkflowError } from "./graph.ts";
+import { lowerActor, type SurfaceNames } from "./actors.ts";
 import { lowerOutcomes } from "./outcomes.ts";
 
 type Obj = Record<string, unknown>;
@@ -36,7 +37,7 @@ interface Included {
 
 const fileOf = (name: string) => `shared/${name}.yaml`;
 
-export function flatten(doc: WorkflowFile, sharedFiles: Readonly<Record<string, unknown>>): { ok: true; flat: Flat } | { ok: false; errors: WorkflowError[] } {
+export function flatten(doc: WorkflowFile, sharedFiles: Readonly<Record<string, unknown>>, names: SurfaceNames): { ok: true; flat: Flat } | { ok: false; errors: WorkflowError[] } {
   const written = doc.steps as Obj;
   const uses = Object.entries(written).filter((e): e is [string, Obj] => isObj(e[1]) && "use" in e[1]);
   const usedNames = [...new Set(uses.map(([, s]) => s.use).filter((u): u is string => typeof u === "string"))];
@@ -47,7 +48,7 @@ export function flatten(doc: WorkflowFile, sharedFiles: Readonly<Record<string, 
     const shared = sharedFiles[name];
     if (isObj(shared) && isObj(shared.steps)) for (const s of Object.keys(shared.steps)) elsewhere.set(s, fileOf(name));
   }
-  const own = resolveLikes(written, elsewhere, false);
+  const own = resolveLikes(written, elsewhere, false, names);
   if ("errors" in own) return { ok: false, errors: own.errors };
   if (!uses.length) return { ok: true, flat: { steps: own.steps as Record<string, WorkflowStepDoc>, start: doc.start, ...(doc.base && { base: doc.base }), exits: {}, included: {} } };
 
@@ -66,7 +67,7 @@ export function flatten(doc: WorkflowFile, sharedFiles: Readonly<Record<string, 
       errors.push({ path: `/steps/${by}/use`, message: `${fileOf(name)} is used twice, by \`${twice.by}\` and \`${by}\`` });
       continue;
     }
-    const inc = readShared(name, by, (step.outcomes as Obj | undefined) ?? {}, sharedFiles[name], workflowSteps);
+    const inc = readShared(name, by, (step.outcomes as Obj | undefined) ?? {}, sharedFiles[name], workflowSteps, names);
     if ("errors" in inc) errors.push(...inc.errors);
     else byName.set(name, inc);
   }
@@ -101,7 +102,7 @@ export function flatten(doc: WorkflowFile, sharedFiles: Readonly<Record<string, 
   return { ok: true, flat: { steps: steps as Record<string, WorkflowStepDoc>, start: enter(doc.start), ...(base && { base }), exits, included } };
 }
 
-function readShared(name: string, by: string, routes: Obj, value: unknown, workflowSteps: Map<string, string>): Included | { errors: WorkflowError[] } {
+function readShared(name: string, by: string, routes: Obj, value: unknown, workflowSteps: Map<string, string>, names: SurfaceNames): Included | { errors: WorkflowError[] } {
   const file = fileOf(name);
   const inFile = (path: string, message: string): WorkflowError => ({ path, message: `${file}: ${message}`, shared: name });
   if (value === undefined) return { errors: [{ path: `/steps/${by}/use`, message: `shared file \`${file}\` not found`, shared: name }] };
@@ -111,7 +112,7 @@ function readShared(name: string, by: string, routes: Obj, value: unknown, workf
   }
   const r = check(SharedWorkflowDocument, value);
   if (!r.ok) return { errors: r.errors.map((e) => inFile(e.path, e.message)) };
-  const own = resolveLikes(r.value.steps as Obj, workflowSteps, true);
+  const own = resolveLikes(r.value.steps as Obj, workflowSteps, true, names);
   if ("errors" in own) return { errors: own.errors.map((e) => inFile(e.path, e.message)) };
   const steps = own.steps;
   const errors: WorkflowError[] = [];
@@ -133,10 +134,11 @@ function readShared(name: string, by: string, routes: Obj, value: unknown, workf
 /**
  * Each `like` step of one file filled in from its target, shallowly: a key the copy writes replaces
  * the target's value whole. `elsewhere` names the file of a step that is not in this one, so a copy
- * across files is told why it cannot be. Every step's outcome objects are lowered after the copy, so
- * an `outcomes:` the copy writes replaces the target's means and products with it.
+ * across files is told why it cannot be. Every step is lowered to the pinned form after the copy, its
+ * actor first and its outcome objects then, so a copy may write either form's keys over its target's
+ * and an `outcomes:` the copy writes replaces the target's means and products with it.
  */
-function resolveLikes(steps: Obj, elsewhere: Map<string, string>, shared: boolean): { steps: Obj } | { errors: WorkflowError[] } {
+function resolveLikes(steps: Obj, elsewhere: Map<string, string>, shared: boolean, names: SurfaceNames): { steps: Obj } | { errors: WorkflowError[] } {
   const errors: WorkflowError[] = [];
   const out: Obj = {};
   for (const [name, step] of Object.entries(steps)) {
@@ -164,7 +166,12 @@ function resolveLikes(steps: Obj, elsewhere: Map<string, string>, shared: boolea
   }
   for (const [name, step] of Object.entries(out)) {
     if (!isObj(step)) continue;
-    const lowered = lowerOutcomes(name, step, shared);
+    const actor = "use" in step ? { step } : lowerActor(name, step, names);
+    if ("errors" in actor) {
+      errors.push(...actor.errors);
+      continue;
+    }
+    const lowered = lowerOutcomes(name, actor.step, shared);
     if ("errors" in lowered) errors.push(...lowered.errors);
     else out[name] = lowered.step;
   }
