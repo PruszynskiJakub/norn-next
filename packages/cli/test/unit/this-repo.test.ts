@@ -182,6 +182,8 @@ describe("this repo's workflows, as norn loads them", () => {
     // `on:` is compared with the outcomes: the released norn reads only the form that routes signals under
     // `outcomes:`, so the repo's copies keep it until a release reads `on:`, and both forms load to one graph
     // `produces:` and `writes:` likewise: the released norn refuses the keys, so the copies leave them out until a release reads them
+    // outcome objects likewise: the released norn refuses `means`, `verdict` or `produces` on an outcome, so the copies keep the
+    // step's sibling maps; both spellings pin one step, but the lowering appends those keys, so the kind keys compare as a set
     const NOT_KIND = new Set(["outcomes", "on", "skills", "inputs", "produces", "means", "hand_back", "writes", "timeout", "exits"]);
     // a counter's name follows the exit its edge leaves by, and the copies name their exits apart: compare its bound
     const bounded = (w: Written, outcomes: Record<string, unknown>) =>
