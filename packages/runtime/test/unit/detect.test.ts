@@ -125,6 +125,23 @@ describe("norn done on a run that may not keep code", () => {
     h.checkouts.changed[WT] = ["src/a.ts"];
     expect((await done(h, runId, "done")).ok).toBe(true);
   });
+
+  test("a tracked edit left uncommitted does not refuse it as a dirty worktree, as the check resets it", async () => {
+    const { h, runId } = await live("scratched");
+    h.dirty[WT] = ["src/a.ts"];
+    h.checkouts.changed[WT] = ["src/a.ts"];
+    expect((await done(h, runId, "done")).ok).toBe(true);
+  });
+
+  test("a file the run left untracked refuses it until deleted, as no check would reset it", async () => {
+    const { h, runId } = await live("granted");
+    h.untracked[WT] = ["tmp.txt"];
+    const r = await done(h, runId, "approve");
+    expect(r.ok ? null : r.refusal).toMatchObject({ code: "dirty_worktree", error: `${WT} holds files this run made: tmp.txt` });
+    expect(r.ok ? "" : r.refusal.do_instead).toContain("delete them (this step keeps no code: code:read)");
+    h.untracked[WT] = [];
+    expect((await done(h, runId, "approve", "r2")).ok).toBe(true);
+  });
 });
 
 describe("the check after a run that may not keep code reports", () => {
