@@ -4,7 +4,7 @@
  * signals, exit). Everything else runs in `runCli`, in-process and testable.
  */
 import { homedir } from "node:os";
-import { createNodeHost, nodeExec } from "@norn/host-node";
+import { createNodeHost, nodeAncestry, nodeExec } from "@norn/host-node";
 import { runCli } from "./cli.ts";
 import { importFromPluginsDir } from "./plugins/installed.ts";
 import { selfCommand } from "./self.ts";
@@ -56,7 +56,7 @@ const result = await runCli(process.argv.slice(2), {
   terminal,
   self,
   version: NORN_VERSION,
-  hosts: { host: createNodeHost, exec: nodeExec },
+  hosts: { host: createNodeHost, exec: nodeExec, ancestry: nodeAncestry },
   importer: importFromPluginsDir,
 });
 // exit does not wait for a pipe write that has not drained, so a value over the pipe buffer would be cut off

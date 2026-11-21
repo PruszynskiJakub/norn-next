@@ -8,7 +8,7 @@ Commands a person or an agent reads print markdown. Every command prints one JSO
 
 A refusal prints `{error, do_instead, code}` (as markdown without `--json`): what was refused, what to do instead and a stable code. The exit code says why: `refused` (3) when a rule says no, `usage` (2) for bad arguments, `corrupt` (4) when a file norn keeps fails validation, `busy` (5) when another process holds the lock or the claim, `config` (6) when a config file is wrong. The full list is under [Exit codes](#exit-codes).
 
-A command marked *a person's command* below is refused with `person_only` (exit 3) when it runs in an agent's session, that is when `NORN_UNIT` or `NORN_RUN_ID` is set, as every launch sets them for the agent and all it starts. Its `do_instead` tells the agent to ask the person (`norn ask "…"`); the person runs it from their own shell, not from the agent's pane.
+A command marked *a person's command* below is refused with `person_only` (exit 3) when it runs in an agent's session, that is when `NORN_UNIT` or `NORN_RUN_ID` is set, in its own env or in the env any process above it was started with, as every launch sets them for the agent and all it starts. Clearing them in the agent's shell (`env -u NORN_UNIT …`) does not lift the refusal; a process list norn cannot read refuses too. Its `do_instead` tells the agent to ask the person (`norn ask "…"`); the person runs it from their own shell, not from the agent's pane.
 
 ## Config
 

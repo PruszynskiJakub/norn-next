@@ -32,6 +32,17 @@ export interface HostFactory {
   host(opts: { root: string; dataDir: string }): HostContext;
   /** runs git before the repo is known, to find it */
   exec: HostContext["exec"];
+  /**
+   * This process's ancestors, its parent first, each with the values of `names` in the environment it
+   * was started with (`env` null when the OS would not show it); rejects when the ancestry cannot be
+   * read. Absent on a host with no process tree to read.
+   */
+  ancestry?(names: readonly string[]): Promise<AncestorProcess[]>;
+}
+
+export interface AncestorProcess {
+  pid: number;
+  env: Record<string, string> | null;
 }
 
 export async function wireRepo(home: string, cwd: string, hosts: HostFactory): Promise<WiredRepo> {

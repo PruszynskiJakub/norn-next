@@ -124,6 +124,23 @@ export async function norn(w: World, args: string[], env: Record<string, string>
   return { code: r.code, body, stdout: r.stdout, stderr: r.stderr };
 }
 
+/**
+ * One norn call as an agent forging a person's command would make it: below a process started with
+ * `mark` as a launch starts the agent, through `env -u` clearing the launch env for the call itself.
+ */
+export async function nornBelowAgent(w: World, args: string[], mark: Record<string, string>): Promise<NornOut> {
+  const argv = ["env", "-u", "NORN_UNIT", "-u", "NORN_RUN_ID", "bun", MAIN, ...args];
+  const parent = `const p = Bun.spawn(${JSON.stringify(argv)}, { stdout: "inherit", stderr: "inherit" });\nprocess.exit(await p.exited);\n`;
+  const r = await nodeExec(["bun", "-e", parent], { cwd: w.root, env: { ...w.env, ...mark }, timeoutMs: NORN_TIMEOUT_MS });
+  let body: Record<string, unknown> = {};
+  try {
+    body = JSON.parse(r.stdout) as Record<string, unknown>;
+  } catch {
+    // markdown or nothing: the caller reads stdout
+  }
+  return { code: r.code, body, stdout: r.stdout, stderr: r.stderr };
+}
+
 export interface SetUpOptions {
   /** how stories run (default auto) */
   mode?: "auto" | "manual";

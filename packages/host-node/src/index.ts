@@ -8,3 +8,4 @@ export { nodeFiles, TEMP_SUFFIX } from "./files.ts";
 export { createNodeHost } from "./host.ts";
 export { type NodeHostOptions } from "./options.ts";
 export { nodeProcesses, type Probe, probeMatches, readStartProbe, startMarker } from "./spawn.ts";
+export { type AncestorProcess, chainOf, envFromEnviron, nodeAncestry, parentFromStat, readParents, readPsEnvs } from "./ancestry.ts";

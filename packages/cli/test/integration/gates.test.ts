@@ -7,7 +7,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { agentNotes, machineOf, type NornOut, norn, plans, reports, setUp, sh, unitOf, type World, world } from "./world.ts";
+import { agentNotes, machineOf, type NornOut, norn, nornBelowAgent, plans, reports, setUp, sh, unitOf, type World, world } from "./world.ts";
 
 const KEY = "lt-1";
 const SLOW = 240_000;
@@ -126,6 +126,7 @@ describe("a person's decision at a gate", () => {
   let machine: string;
   let noReason: NornOut;
   let asAgent: NornOut;
+  let envCleared: NornOut;
   let rejected: NornOut;
   let afterReject: StorySeen;
   let secondAtBuild: NornOut;
@@ -148,6 +149,7 @@ describe("a person's decision at a gate", () => {
     await ticks.until(atGate("ready", 1));
     noReason = await norn(w, ["story", "reject", KEY, "--json"]);
     asAgent = await norn(w, ["story", "approve", KEY, "--json"], { NORN_RUN_ID: "01ARZ3NDEKTSV4RRFFQ69G5FAV" });
+    envCleared = await nornBelowAgent(w, ["story", "approve", KEY, "--json"], { NORN_UNIT: KEY, NORN_RUN_ID: "01ARZ3NDEKTSV4RRFFQ69G5FAV" });
     rejected = await norn(w, ["story", "reject", KEY, "--reason", "Make the button blue.", "--json"]);
     await ticks.until((u) => u?.step === "build");
     afterReject = await view(w);
@@ -171,6 +173,11 @@ describe("a person's decision at a gate", () => {
 
   test("an approve under a run's env is refused as person_only", () => {
     expect(refusal(asAgent)).toMatchObject({ code: 3, code_name: "person_only" });
+  });
+
+  test("an approve that clears the run's env below the agent's process is refused as person_only all the same", () => {
+    expect(refusal(envCleared)).toMatchObject({ code: 3, code_name: "person_only" });
+    expect(String(envCleared.body.error)).toContain("01ARZ3NDEKTSV4RRFFQ69G5FAV");
   });
 
   test("a reject with a reason sends the unit back to build, its counter bumped", () => {

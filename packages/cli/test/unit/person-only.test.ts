@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { RUN_ENV } from "@norn/plugin-api";
 import { COMMANDS, NOUNS } from "../../src/commands/index.ts";
 import { ExitCode, runCli } from "../../src/index.ts";
+import type { TestMachine } from "./support.ts";
 import { AGENT_STEP, configured, GATE_STEP, RUN, receiptsOf, runEnv, seedUnit, UNIT, withEnv } from "./units.ts";
 
 const json = (stdout: string) => Bun.JSONL.parse(stdout)[0] as { error?: string; do_instead?: string; code?: string };
@@ -20,6 +21,13 @@ const PERSON_ONLY: Record<string, string[]> = {
   "run rerun": ["run", "rerun", UNIT],
   tidy: ["tidy", "--dry-run"],
 };
+
+type Ancestor = { pid: number; env: Record<string, string> | null };
+
+/** The machine with this process's ancestors as the host reads them, nearest first; `asked` gets the names each read asked for. */
+function withAncestry(m: TestMachine, read: () => Promise<Ancestor[]>, asked: string[][] = []): TestMachine {
+  return { ...m, io: { ...m.io, hosts: { ...m.io.hosts, ancestry: async (names) => (asked.push([...names]), read()) } } };
+}
 
 const all = [...COMMANDS, ...NOUNS.flatMap((n) => n.verbs)];
 
@@ -91,5 +99,66 @@ describe("person-only commands", () => {
     // a report reaches the record, as the agent's own commands are what the session is for
     const reported = (await receiptsOf(m)).flatMap((x) => (x.data.kind === "run.reported" ? [x.data.verb] : []));
     expect(reported).toEqual(verb === null ? [] : [verb]);
+  });
+
+  describe("an agent that clears the launch env", () => {
+    test("is still refused when an ancestor process was started with it, as clearing a shell's env cannot reach its parents'", async () => {
+      const m = configured();
+      await seedUnit(m, { step: GATE_STEP, run: null });
+      const asked: string[][] = [];
+      const ancestors: Ancestor[] = [
+        { pid: 300, env: {} },
+        { pid: 200, env: { [RUN_ENV.unit]: UNIT, [RUN_ENV.run]: RUN } },
+        { pid: 100, env: null },
+      ];
+      const r = await runCli(["story", "approve", UNIT, "--json"], withAncestry(m, async () => ancestors, asked).io);
+      expect(r.exit).toBe(ExitCode.refused);
+      const body = json(r.stdout);
+      expect(body.code).toBe("person_only");
+      expect(body.error).toContain("norn story approve");
+      expect(body.error).toContain(RUN);
+      expect(body.error).toContain("200");
+      expect(body.do_instead).toContain('norn ask "');
+      expect(asked).toEqual([[RUN_ENV.unit, RUN_ENV.run]]);
+      expect(await receiptsOf(m)).toEqual([]);
+    });
+
+    test("an ancestry with no launch env, or a blank one, or one the OS would not show, lets a person run the command", async () => {
+      const m = configured();
+      await seedUnit(m, { step: GATE_STEP, run: null });
+      const ancestors: Ancestor[] = [
+        { pid: 300, env: {} },
+        { pid: 200, env: { [RUN_ENV.unit]: " ", [RUN_ENV.run]: "" } },
+        { pid: 100, env: null },
+      ];
+      const r = await runCli(["story", "approve", UNIT, "--json"], withAncestry(m, async () => ancestors).io);
+      expect(r.exit).toBe(ExitCode.ok);
+      expect((await receiptsOf(m)).map((x) => x.data.kind)).toEqual(["gate.decided"]);
+    });
+
+    test("an ancestry the host cannot read refuses the command rather than guessing it is a person's", async () => {
+      const m = configured();
+      await seedUnit(m, { step: GATE_STEP, run: null });
+      const r = await runCli(
+        ["story", "approve", UNIT, "--json"],
+        withAncestry(m, async () => {
+          throw new Error("ps: not found");
+        }).io,
+      );
+      expect(r.exit).toBe(ExitCode.refused);
+      const body = json(r.stdout);
+      expect(body.code).toBe("person_only");
+      expect(body.error).toContain("ps: not found");
+      expect(await receiptsOf(m)).toEqual([]);
+    });
+
+    test("a command anyone may run never reads the ancestry", async () => {
+      const m = configured();
+      await seedUnit(m, { step: AGENT_STEP, run: RUN });
+      const asked: string[][] = [];
+      const r = await runCli(["status", "--json"], withAncestry(m, async () => [{ pid: 200, env: { [RUN_ENV.run]: RUN } }], asked).io);
+      expect(r.exit).toBe(ExitCode.ok);
+      expect(asked).toEqual([]);
+    });
   });
 });
