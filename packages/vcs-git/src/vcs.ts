@@ -6,6 +6,7 @@ import { mergeInto } from "./merge.ts";
 import { publishHead } from "./heads.ts";
 import { fetchRemote, pushBranch } from "./push.ts";
 import { changedPaths, deleteBranch, isAncestor, mergeBase, remoteIfAny, revParse, trialConflicts, uncommitted, unfinished, untracked, worktreeList } from "./refs.ts";
+import { changedSince, restore, snapshot } from "./snapshot.ts";
 import { gitWorktrees } from "./worktree.ts";
 
 export const DEFAULT_REMOTE = "origin";
@@ -35,6 +36,9 @@ export function createGitVcs(ctx: HostContext, config: GitVcsConfig): Vcs {
     conflictMarkers: (base, head) => conflictMarkers(ctx, root, base, head),
     changedPaths: (a, b) => changedPaths(ctx, root, a, b),
     deleteBranch: (branch) => deleteBranch(ctx, root, branch),
+    snapshot: (path) => snapshot(ctx, path),
+    changedSince: (path, tree) => changedSince(ctx, path, tree),
+    restore: (path, to, paths) => restore(ctx, path, to, paths),
     async merge(branch, from, opts) {
       const list = await worktreeList(ctx, root);
       if (!list.ok) return list;

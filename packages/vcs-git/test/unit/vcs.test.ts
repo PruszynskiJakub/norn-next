@@ -510,3 +510,24 @@ describe("git vcs deleteBranch", () => {
     expect(used?.ok ? null : used?.failure.message).toContain("used by worktree");
   });
 });
+
+describe("git vcs snapshots", () => {
+  test("a snapshot git cannot take is a failure naming the call, never a partial snapshot", async () => {
+    const h = gitHost([
+      ["rev-parse --path-format=absolute --git-common-dir", { stdout: "/repo/.git\n" }],
+      ["rev-parse --verify --quiet --end-of-options HEAD^{commit}", { stdout: `${SHA}\n` }],
+      ["stash create", { code: 128, stderr: "fatal: index file corrupt" }],
+    ]);
+    const r = await vcsOf(h.ctx).snapshot?.("/wt");
+    expect(r?.ok ? null : r?.failure.message).toBe("git stash: fatal: index file corrupt");
+    expect(h.cwds.every((c) => c === "/wt")).toBe(true);
+  });
+
+  test("a tree or commit git would read as an option is refused before git runs", async () => {
+    const h = gitHost([]);
+    const vcs = vcsOf(h.ctx);
+    expect((await vcs.changedSince?.("/wt", "--output=x"))?.ok).toBe(false);
+    expect((await vcs.restore?.("/wt", { head: "-x", tree: SHA }, ["a"]))?.ok).toBe(false);
+    expect(h.calls).toEqual([]);
+  });
+});

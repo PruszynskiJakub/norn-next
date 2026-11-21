@@ -34,6 +34,23 @@ export interface VcsConflictMarker {
   line: number;
 }
 
+/**
+ * What a step's agent could change in a checkout and the repo behind it, noted before the agent starts
+ * and compared once it reports (plugin API 1.25). Each digest is opaque, compared only for equality.
+ */
+export interface VcsSnapshot {
+  /** the commit the checkout is at, or null before its first commit */
+  head: string | null;
+  /** a tree of the tracked files as the checkout holds them, staged and unstaged changes included */
+  tree: string;
+  /** a digest of the refs a person or agent moves: every ref but the remote-tracking ones and norn's own (`refs/norn/`) */
+  refs: string;
+  /** a digest of the repo's own config */
+  config: string;
+  /** a digest of the repo's hooks: each one's name and content */
+  hooks: string;
+}
+
 export interface VcsMergeOptions {
   /**
    * on a conflict, abort the merge so the branch and its worktree are as they were before it began;
@@ -140,6 +157,20 @@ export interface Vcs {
    * push of the branch itself.
    */
   publishHead?(branch: string): Promise<PluginResult<{ pushed: boolean }>>;
+  /**
+   * what an agent could change from the checkout at `path`, as `VcsSnapshot`. Optional (plugin API
+   * 1.25), with `changedSince` and `restore`; without them a host cannot detect what a step that may
+   * not keep code changed, and such a step parks before its agent starts.
+   */
+  snapshot?(path: string): Promise<PluginResult<VcsSnapshot>>;
+  /** the tracked paths whose content in the checkout at `path` differs from `tree` (a snapshot's), both sides of a rename, sorted */
+  changedSince?(path: string, tree: string): Promise<PluginResult<string[]>>;
+  /**
+   * put the checkout at `path` back as a snapshot found it: its branch moved back to `to.head`, dropping
+   * any commit made since, and each of `paths` given its content in `to.tree`, a path the tree lacks
+   * removed. Safe to repeat: a checkout already back is left as it is.
+   */
+  restore?(path: string, to: { head: string; tree: string }, paths: readonly string[]): Promise<PluginResult<void>>;
   push(branch: string, opts?: VcsPushOptions): Promise<PluginResult<void>>;
   fetch(): Promise<PluginResult<void>>;
 }
