@@ -62,5 +62,5 @@ steps:
       changes_requested:
         to: resolve
         max: 2
-        means: "blocking findings on the resolution, handed back with --findings <file>"
+        means: "blocking findings on the resolution, handed back as findings"
         produces: [findings]

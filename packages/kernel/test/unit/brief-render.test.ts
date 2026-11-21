@@ -26,18 +26,43 @@ describe("renderBrief", () => {
     expect(md).toContain('`norn stuck "<reason>"`');
   });
 
-  test("a step that needs a criteria report puts --criteria on the outcomes that need it and says what the report holds", () => {
-    const required = renderBrief(input({ outcomes: ["pass", "fail"], means: {}, criteria: { required: true, verdict: { pass: "pass", fail: "fail" } } }));
-    expect(required).toContain("- `norn done pass --criteria <file>`");
-    expect(required).toContain("- `norn done fail --criteria <file>`");
-    expect(required).toContain("This step requires `--criteria <file>`");
-    expect(required).toContain("`pass` only when it is `pass`, `fail` only when it is `fail`");
+  const outputs = (md: string) => md.slice(md.indexOf("## Outputs"), md.indexOf("## Finish with exactly one of"));
+
+  test("a step that needs a criteria report names under Outputs where it goes, what it holds and the outcomes that need it; done takes no file", () => {
+    const required = renderBrief(input({ outcomes: ["pass", "fail"], means: {}, criteria: { required: true, verdict: { pass: "pass", fail: "fail" } }, outDir: ".agents/run/out" }));
+    expect(required).toContain("- `norn done pass`\n");
+    expect(required).toContain("- `norn done fail`\n");
+    const out = outputs(required);
+    expect(out).toContain("- `criteria` → `$NORN_OUT/criteria.json` (`.agents/run/out/criteria.json`), before `norn done pass` or `norn done fail`: a JSON array with one verdict per acceptance criterion");
+    expect(out).toContain("covering exactly the unit's frontmatter `criteria`");
+    expect(out).toContain("`pass` only when it is `pass`, `fail` only when it is `fail`");
+    expect(out).toContain("- `evidence` → `$NORN_OUT/evidence/` (`.agents/run/out/evidence/`): the files a criteria verdict's evidence names");
     // only an outcome gated by a verdict needs the report when the step does not require one
-    const gated = renderBrief(input({ outcomes: ["done", "unsure"], means: {}, criteria: { required: false, verdict: { unsure: "unverified" } } }));
-    expect(gated).toContain("- `norn done done`\n");
-    expect(gated).toContain("- `norn done unsure --criteria <file>`");
-    expect(gated).toContain("An outcome gated by a verdict requires `--criteria <file>`");
+    const gated = outputs(renderBrief(input({ outcomes: ["done", "unsure"], means: {}, criteria: { required: false, verdict: { unsure: "unverified" } } })));
+    expect(gated).toContain("- `criteria` → `$NORN_OUT/criteria.json`, before `norn done unsure`:");
+    expect(renderBrief(input())).not.toContain("criteria.json");
     expect(renderBrief(input())).not.toContain("--criteria");
+  });
+
+  test("an outcome that hands back findings names them under Outputs with their place and shape, and what else may carry the rework", () => {
+    const md = renderBrief(input({ outcomes: ["approve", "changes_requested"], means: {}, handBack: { changes_requested: "findings" } }));
+    expect(md).toContain("- `norn done changes_requested`\n");
+    expect(outputs(md)).toContain(
+      '- `findings` → `$NORN_OUT/findings.json`, before `norn done changes_requested`: {"findings": [...]} or the array alone, each finding with a "title" and a "severity"',
+    );
+    expect(outputs(md)).toContain("a `--note` saying what to rework");
+    expect(md).not.toContain("--findings");
+  });
+
+  test("a produced file is named under Outputs with its path and the outcomes it is due on", () => {
+    const md = renderBrief(input({ produced: [{ name: "pr_body", path: ".agents/specs/gh-12/pr.md", outcomes: ["done"] }] }));
+    expect(outputs(md)).toContain("- `pr_body` → `.agents/specs/gh-12/pr.md`, before `norn done done`: a report without it, or with it empty, is refused.");
+  });
+
+  test("Outputs say once that the handoff is every agent step's and that a person's rejection reaches the step it sends back as findings", () => {
+    const out = outputs(renderBrief(input()));
+    expect(out).toContain("- `handoff` → `handoffs/03.md`, with every outcome: this unit's current state, kept current (see Handoff).");
+    expect(out).toContain("A person's rejection at a gate needs no report from you: its reason reaches the step it sends the work back to as findings.");
   });
 
   test("says to commit the work before reporting done, as a done over uncommitted changes is refused", () => {

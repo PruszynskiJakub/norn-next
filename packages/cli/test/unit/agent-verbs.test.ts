@@ -341,12 +341,12 @@ describe("done at a step with criteria: required", () => {
     expect(r.out).toMatchObject({ code: "invalid_criteria", error: expect.stringContaining("criteria of .agents/specs/lt-1/spec.md do not validate") });
   });
 
-  test("the brief names --criteria on every outcome and the verdict each one needs", async () => {
+  test("the brief names where the criteria report goes, the outcomes that need it and the verdict each one needs", async () => {
     const m = await atQa();
     const md = (await runCli(["brief"], m.io)).stdout;
-    expect(md).toContain("- `norn done pass --criteria <file>`");
-    expect(md).toContain("- `norn done unverified --criteria <file>`");
-    expect(md).toContain("This step requires `--criteria <file>`");
+    expect(md).toContain("- `norn done pass`");
+    expect(md).toContain("- `criteria` → `$NORN_OUT/criteria.json` (`.agents/run/out/criteria.json`), before `norn done pass` or ");
+    expect(md).not.toContain("--criteria");
     expect(md).toContain("`partial` only when it is `person`");
   });
 });
@@ -495,12 +495,13 @@ describe("done at a step whose outcome hands back findings", () => {
     expect((await receiptsOf(m)).map((x) => x.data)).toEqual([{ kind: "run.reported", step: REVIEW, attempt: 1, run_id: RUN, verb: "done", outcome: "approve" }]);
   });
 
-  test("the brief names --findings on the outcome that hands findings back", async () => {
+  test("the brief names where the findings go and the outcome that hands them back", async () => {
     const m = await atReview();
     const md = (await runCli(["brief"], m.io)).stdout;
-    expect(md).toContain("- `norn done changes_requested --findings <file>`");
+    expect(md).toContain("- `norn done changes_requested`");
     expect(md).toContain("- `norn done approve` —");
-    expect(md).toContain('`--findings <file>` is a JSON file, `{"findings": [...]}` or an array');
+    expect(md).toContain('- `findings` → `$NORN_OUT/findings.json` (`.agents/run/out/findings.json`), before `norn done changes_requested`: {"findings": [...]} or the array alone');
+    expect(md).not.toContain("--findings");
   });
 });
 
@@ -552,7 +553,7 @@ describe("done at a step that produces a file", () => {
   test("describe's done is refused while pr.md is missing, naming the file, and recorded once it is written; the brief asks for it", async () => {
     const m = configured({ env: runEnv() });
     await seedUnit(m, { step: "describe" });
-    expect((await runCli(["brief"], m.io)).stdout).toContain("- Before `norn done done`, write `pr_body` to `.agents/specs/lt-1/pr.md`: a report without it, or with it empty, is refused.");
+    expect((await runCli(["brief"], m.io)).stdout).toContain("- `pr_body` → `.agents/specs/lt-1/pr.md`, before `norn done done`: a report without it, or with it empty, is refused.");
     const missing = await runCli(["done", "done", "--json"], m.io);
     expect(missing.exit).toBe(ExitCode.refused);
     expect(json(missing.stdout)).toEqual({

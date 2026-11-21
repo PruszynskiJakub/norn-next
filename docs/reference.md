@@ -134,11 +134,23 @@ qa:
 
 An entry of a `produces:` list is a report norn takes with the outcome, written bare, or a file:
 
-- `criteria`: a criteria report, `norn done <outcome> --criteria <file>`. An outcome with a `verdict` produces it, and one without a verdict produces it only when every outcome of the step does.
-- `findings` (or `evidence`): handed back with the outcome; an outcome hands back one of them. Findings become the next step's open findings ([Inputs](#inputs)). A person's `reject` at a gate produces findings from its reason without saying so.
+- `criteria`: a criteria report ([Reports](#reports)). An outcome with a `verdict` produces it, and one without a verdict produces it only when every outcome of the step does.
+- `findings` (or `evidence`): handed back with the outcome ([Reports](#reports)); an outcome hands back one of them. Findings become the next step's open findings ([Inputs](#inputs)). A person's `reject` at a gate produces findings from its reason without saying so.
 - `{ name: <name>, file: <path> }`: a file the agent writes in the spec folder (below), declared once in the step and named bare in any other list of it.
 
 `means`, `verdict` and `produces` belong to an agent step's outcomes; on a person's, a shell step's or a step kind's they are refused, and so is one on a route the kernel takes (`stuck`, `timeout`, …). A step says each of them one way: an outcome object's `means` with a step's `means:` map, or an outcome's `produces` with `criteria:` or `hand_back:`, is refused with the spelling to use. Outcome objects are how a file is written; a unit pins its workflow with the older keys (`means:`, `verdict:`, `criteria: required`, `hand_back:`, `produces: {<name>: {file, on}}`), which a file may still use, so the two spellings of one workflow pin the same document and hash.
+
+### Reports
+
+A report is a registered type with one place in the run folder's `out/`, which the launch names in the agent's env as `$NORN_OUT` (`.agents/run/out/` in the worktree, ignored by git) and empties before every run, so it holds only what this run wrote. `norn done <outcome>` collects each report there, validates it and keeps it on the run's receipt; a report that does not validate is refused with its path and its shape, at any outcome, and a missing one is refused where its outcome needs it.
+
+| Type | Where | What it holds |
+|---|---|---|
+| `criteria` | `$NORN_OUT/criteria.json` | a JSON array with one verdict per acceptance criterion (`pass` with `evidence`, `fail` with `repro`, `person` with `how`, `unverified` with `reason` and `how`), covering exactly the unit's frontmatter `criteria` |
+| `findings` | `$NORN_OUT/findings.json` | `{"findings": [...]}` or the array alone, each with a `title` and a `severity` (`blocking`, `major`, `minor`, `nit`), and where it can `file`, `line`, `criterion`, `detail` and `repro` |
+| `evidence` | `$NORN_OUT/evidence/` | the files a criteria verdict's `evidence` names; norn keeps the report that names them, not the files |
+
+The brief lists every report and file the step produces under Outputs, each with where it goes, what it holds and the outcomes that need it, beside the handoff, which every agent step keeps whether or not its workflow lists it. `norn done --criteria <file>` and `--findings <file>` still read a report from elsewhere, in place of its file in `$NORN_OUT`.
 
 ### Produced files
 
@@ -168,7 +180,7 @@ An agent step's `allow:` says where its agent may write, as the worktree hooks h
 | `allow:` | The agent may write | Needs |
 |---|---|---|
 | left out, or with `code:write` (`writes: worktree`) | its unit's worktree, and the temp folders (`$TMPDIR`, `/tmp`) | nothing |
-| `[docs:write]` (`writes: docs`) | the story's spec folder in the worktree (`.agents/specs/<story>/`), and the temp folders | an executor whose harness can refuse a tool call (`denyTool`); on any other the unit parks `stuck` with `agent.unguarded` before an agent starts |
+| `[docs:write]` (`writes: docs`) | the story's spec folder in the worktree (`.agents/specs/<story>/`), the run folder's `out/` (`$NORN_OUT`), and the temp folders | an executor whose harness can refuse a tool call (`denyTool`); on any other the unit parks `stuck` with `agent.unguarded` before an agent starts |
 
 Every step is refused a write into norn's run state. Only the agent tool's file writes are judged; a shell command is not. `allow:` (or `writes:`) on a step that is not an agent step is refused when the workflow loads, and so is a capability other than `code:write` and `docs:write`.
 

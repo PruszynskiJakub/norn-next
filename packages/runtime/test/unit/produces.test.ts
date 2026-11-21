@@ -26,7 +26,7 @@ async function brief(h: Harnessed): Promise<string> {
 describe("a step's produced files", () => {
   test("the brief says which file each outcome needs, and norn done is refused while it is missing or empty, naming the file", async () => {
     const { h, runId } = await at("write");
-    expect(await brief(h)).toContain("- Before `norn done done`, write `notes` to `.agents/specs/lt-1/notes/out.md`: a report without it, or with it empty, is refused.");
+    expect(await brief(h)).toContain("- `notes` → `.agents/specs/lt-1/notes/out.md`, before `norn done done`: a report without it, or with it empty, is refused.");
     const missing = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
     expect(missing).toEqual({
       ok: false,

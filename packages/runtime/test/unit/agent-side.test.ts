@@ -664,6 +664,16 @@ describe("brief", () => {
     expect(md).toContain("norn stuck");
   });
 
+  test("every agent step reads and keeps its handoff, though its workflow lists none, and its brief names where the run's reports go", async () => {
+    const { h } = await running();
+    const r = await briefOf(h.env, UNIT);
+    if (!r.ok) throw new Error(r.refusal.error);
+    const md = r.value.markdown;
+    expect(md).toContain("- `handoff` — this unit's handoff, which you keep current: `.agents/specs/lt-1/handoffs/lt-1.md`");
+    expect(md).toContain("- `handoff` → `.agents/specs/lt-1/handoffs/lt-1.md`, with every outcome");
+    expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`)).toContain("# Handoff: lt-1");
+  });
+
   test("an agent launched since the last tick gets its brief, is held to its report and may report, before a tick applies its launch", async () => {
     const h = harness({ workflow: "agented" });
     h.items.push(trackerItem(1));

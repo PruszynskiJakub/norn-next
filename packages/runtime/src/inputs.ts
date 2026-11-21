@@ -351,6 +351,8 @@ export async function materializeInputs(env: RuntimeEnv, record: UnitJournal, br
       }
       out.inputs.push(await materializeOne(env, record, brief, worktree, input, item, out));
     }
+    // every agent step keeps the unit's handoff current, so a workflow never has to list it
+    if (!brief.inputs.includes("handoff")) out.inputs.push(await materializeOne(env, record, brief, worktree, "handoff", item, out));
     // a signal's detail reaches the agent step after it whether or not the step lists it: the workflow
     // author routes the signal, and cannot know which source's evidence the next step will need
     if (!brief.inputs.includes(SIGNAL_INPUT)) {

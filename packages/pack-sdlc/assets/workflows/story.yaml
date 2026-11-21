@@ -70,7 +70,7 @@ steps:
         to: implement
         counter: qa_loop
         verdict: fail
-        means: "a criterion fails; its repro in the criteria report, and the findings handed back with --findings <file>"
+        means: "a criterion fails; its repro in the criteria report, and the findings handed back as findings"
         produces: [criteria, findings]
       partial:
         to: human-qa
@@ -111,7 +111,7 @@ steps:
         means: "the rework does what the findings and the story ask and nothing else, no blocking findings"
       changes_requested:
         to: implement
-        means: "blocking findings, handed back with --findings <file>"
+        means: "blocking findings, handed back as findings"
         produces: [findings]
   describe:
     by: writer

@@ -169,7 +169,7 @@ describe("a signal's detail", () => {
     expect((await stateOf(h)).signals_fired).toEqual([{ type: "ticked", id: "t1" }]);
     // a later agent visit works from what the first made of the signal, so it no longer gets it
     const later = await materializeInputs(h.env, await record(h, "lt-1"), { ...run.brief, inputs: [] }, run.worktree);
-    expect(later.ok && later.value.inputs.map((i) => i.name)).toEqual([]);
+    expect(later.ok && later.value.inputs.map((i) => i.name)).toEqual(["handoff"]);
   });
 });
 

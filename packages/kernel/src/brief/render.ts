@@ -4,7 +4,7 @@
  * harness-neutral, so every harness gets the same text and the CLI's `brief` prints exactly what a
  * launch sent.
  */
-import type { HandBack, Verdict } from "@norn/schema";
+import { type HandBack, OUT_ENV, type ReportName, REPORT_TYPES, reportPath, type Verdict } from "@norn/schema";
 import type { BriefInputs } from "../model/actions.ts";
 
 /** The most a handoff may hold, in bytes once trimmed: past it, the current state has turned into a log every later brief carries. */
@@ -80,6 +80,8 @@ export interface BriefRenderInput {
   handBack?: Readonly<Record<string, HandBack>>;
   /** the files the step produces for later steps: each one's name, path relative to the worktree, and the outcomes it is due on */
   produced?: readonly BriefProduced[];
+  /** the run folder's `out/`, relative to the worktree, shown beside `$NORN_OUT` */
+  outDir?: string;
   /** a person works in the session: questions go to them, and `done` waits for their agreement */
   attended?: boolean;
   /** answers given to earlier sessions of this step, which a fresh session would otherwise never see */
@@ -169,32 +171,58 @@ function answeredLines(answered: readonly AnsweredAsk[]): string[] {
   return answered.map((a) => (a.question ? `- Asked: ${indent(a.question)}\n  Answered: ${indent(a.answer)}` : `- Answered: ${indent(a.answer)}`));
 }
 
-const CRITERIA_FLAG = "--criteria <file>";
-const FINDINGS_FLAG = "--findings <file>";
+function before(c: BriefCommands, outcomes: readonly string[]): string {
+  return `before ${outcomes.map((o) => `\`${c.done} ${o}\``).join(" or ")}`;
+}
 
-const FINDINGS_LINE = `- \`${FINDINGS_FLAG}\` is a JSON file, \`{"findings": [...]}\` or an array, each finding with a \`title\` and a \`severity\` (\`blocking\`, \`major\`, \`minor\`, \`nit\`), and where it can \`file\`, \`line\`, \`criterion\`, \`detail\` and \`repro\`; the step the work goes back to reads them. An outcome named with it needs findings, a \`--note\` saying what to rework, or a criteria report with a verdict short of \`pass\`: without one of them it is refused.`;
+/** Where a report goes: `$NORN_OUT/<path>`, and its path in the worktree when the host named the folder. */
+function reportAt(input: BriefRenderInput, name: ReportName): string {
+  const rel = REPORT_TYPES[name].path;
+  return `\`${reportPath(name)}\`${input.outDir ? ` (\`${input.outDir}/${rel}\`)` : ""}`;
+}
 
-function criteriaLine(criteria: NonNullable<BriefRenderInput["criteria"]>): string {
+function criteriaLines(input: BriefRenderInput, c: BriefCommands): string[] {
+  const criteria = input.criteria;
+  if (!criteria) return [];
+  const due = input.outcomes.filter((o) => criteria.required || criteria.verdict[o] !== undefined);
+  if (due.length === 0) return [];
   const gated = Object.entries(criteria.verdict).map(([o, v]) => `\`${o}\` only when it is \`${v}\``);
   const rule = gated.length > 0 ? ` The worst verdict decides the outcome (fail > unverified > person > pass): ${gated.join(", ")}.` : "";
-  const need = criteria.required ? "This step requires" : "An outcome gated by a verdict requires";
-  return `- ${need} \`${CRITERIA_FLAG}\`: a JSON array with one entry per acceptance criterion, \`{"id", "verdict", ...}\` (\`pass\` needs \`evidence\`, \`fail\` \`repro\`, \`person\` \`how\`, \`unverified\` \`reason\` and \`how\`), covering exactly the unit's frontmatter \`criteria\`.${rule} A report without it, or that contradicts it, is refused.`;
+  return [
+    `- \`criteria\` → ${reportAt(input, "criteria")}, ${before(c, due)}: ${REPORT_TYPES.criteria.shape}, covering exactly the unit's frontmatter \`criteria\`.${rule} A report without it, or that contradicts it, is refused.`,
+    `- \`evidence\` → ${reportAt(input, "evidence")}: ${REPORT_TYPES.evidence.shape}; norn keeps the criteria report that names them, not the files.`,
+  ];
+}
+
+function findingsLines(input: BriefRenderInput, c: BriefCommands): string[] {
+  const due = input.outcomes.filter((o) => input.handBack?.[o] === "findings");
+  if (due.length === 0) return [];
+  return [
+    `- \`findings\` → ${reportAt(input, "findings")}, ${before(c, due)}: ${REPORT_TYPES.findings.shape}; the step the work goes back to reads them. Such an outcome needs findings, a \`--note\` saying what to rework, or a criteria report with a verdict short of \`pass\`: without one of them it is refused.`,
+  ];
+}
+
+/** Every product of the step per outcome, where it goes and what it holds; the handoff and a gate's rejection need no listing in a workflow. */
+function outputLines(input: BriefRenderInput, c: BriefCommands): string[] {
+  const reports = [...criteriaLines(input, c), ...findingsLines(input, c)];
+  const files = (input.produced ?? []).flatMap((p) => {
+    const due = p.outcomes.filter((o) => input.outcomes.includes(o));
+    return due.length > 0 ? [`- \`${p.name}\` → \`${p.path}\`, ${before(c, due)}: a report without it, or with it empty, is refused.`] : [];
+  });
+  const out: string[] = [];
+  if (reports.length > 0) out.push(`\`${c.done}\` collects the reports from \`$${OUT_ENV}\`, which holds only what this run wrote, and refuses one that does not validate, saying why.`, "");
+  out.push(...reports, ...files);
+  if (input.handoff) out.push(`- \`handoff\` → \`${input.handoff}\`, with every outcome: this unit's current state, kept current (see Handoff).`);
+  if (out.length > 0) out.push("");
+  out.push("A person's rejection at a gate needs no report from you: its reason reaches the step it sends the work back to as findings.");
+  return out;
 }
 
 function finishLines(input: BriefRenderInput, c: BriefCommands): string[] {
   const out: string[] = [];
-  const criteria = input.criteria;
   for (const o of input.outcomes) {
     const means = input.means?.[o];
-    const flag = criteria && (criteria.required || criteria.verdict[o] !== undefined) ? ` ${CRITERIA_FLAG}` : "";
-    const findings = input.handBack?.[o] === "findings" ? ` ${FINDINGS_FLAG}` : "";
-    out.push(`- \`${c.done} ${o}${flag}${findings}\`${means ? ` — ${means}` : ""}`);
-  }
-  if (criteria) out.push(criteriaLine(criteria));
-  if (input.outcomes.some((o) => input.handBack?.[o] === "findings")) out.push(FINDINGS_LINE);
-  for (const p of input.produced ?? []) {
-    const due = p.outcomes.filter((o) => input.outcomes.includes(o));
-    if (due.length > 0) out.push(`- Before ${due.map((o) => `\`${c.done} ${o}\``).join(" or ")}, write \`${p.name}\` to \`${p.path}\`: a report without it, or with it empty, is refused.`);
+    out.push(`- \`${c.done} ${o}\`${means ? ` — ${means}` : ""}`);
   }
   if (input.outcomes.length === 0) out.push(`- \`${c.done}\` — the step's work is finished`);
   if (input.attended) out.push("- A question goes to the person in this session, never through `" + c.ask + "`.");
@@ -261,9 +289,10 @@ export function renderBrief(input: BriefRenderInput): string {
     out.push(
       "## Handoff",
       "",
-      `\`${input.handoff}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary, and refresh it right before you report. \`${c.done}\` refuses one over ${HANDOFF_MAX_BYTES / 1024} KB: long repros and logs go in the findings \`${c.done} --findings\` hands back, or in a file of their own in the spec folder above it, named there.`,
+      `\`${input.handoff}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary, and refresh it right before you report. \`${c.done}\` refuses one over ${HANDOFF_MAX_BYTES / 1024} KB: long repros and logs go in the findings (\`${reportPath("findings")}\`), or in a file of their own in the spec folder above it, named there.`,
       "",
     );
+  out.push("## Outputs", "", ...outputLines(input, c), "");
   if (input.history && input.history.length > 0) out.push("## History", "", "What this unit's steps did this round, oldest first:", "", ...input.history.map((l) => `- ${l}`), "");
   out.push("## Rules", "", ...RULES.map((r) => `- ${r}`), "");
   out.push("## Finish with exactly one of", "", ...finishLines(input, c), "");

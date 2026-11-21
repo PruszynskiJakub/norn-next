@@ -32,7 +32,7 @@ steps:
         means: "all criteria met, no blocking findings"
       changes_requested:
         to: implement
-        means: "blocking findings, handed back with --findings <file>"
+        means: "blocking findings, handed back as findings"
         produces: [findings]
   integrate:
     by: vcs.integrate
