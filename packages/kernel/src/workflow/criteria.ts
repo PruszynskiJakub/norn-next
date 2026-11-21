@@ -3,7 +3,7 @@
  * reads the report and the unit's declared criteria and asks; decide never reads the prose
  * Acceptance section, only frontmatter `criteria` and the report.
  */
-import type { Criterion, CriterionVerdict, Verdict } from "@norn/schema";
+import { type Criterion, type CriterionVerdict, reportPath, type Verdict } from "@norn/schema";
 import type { AgentStepSpec } from "./graph.ts";
 
 /** `fail` > `unverified` > `person` > `pass`. */
@@ -67,7 +67,7 @@ export function wantsCriteria(spec: Pick<AgentStepSpec, "criteria" | "verdict">)
 export function checkCriteriaReport(input: CriteriaCheckInput): CriteriaCheck {
   const { spec, outcome, report } = input;
   const done = input.done ?? "norn done";
-  const withReport = (o: string) => `${done} ${o} --criteria <file>`;
+  const withReport = (o: string) => `${done} ${o}`;
   const gated = spec.verdict[outcome];
   const no = (code: CriteriaRefusalCode, error: string, do_instead: string): CriteriaCheck => ({ ok: false, refusal: { code, error, do_instead } });
   const expected = input.criteria ? [...new Set(input.criteria.map((c) => c.id))] : null;
@@ -79,7 +79,7 @@ export function checkCriteriaReport(input: CriteriaCheckInput): CriteriaCheck {
         spec.criteria
           ? `step ${input.step} produces criteria with every outcome: one verdict per criterion`
           : `outcome '${outcome}' is gated by verdict '${gated}': it needs a criteria report to check against`,
-        `write the report (a JSON array of {id, verdict, ...}${expected ? ` covering ${expected.join(", ")}` : ""}) and run: ${withReport(outcome)}`,
+        `write the report (a JSON array of {id, verdict, ...}${expected ? ` covering ${expected.join(", ")}` : ""}) to ${reportPath("criteria")}, then run: ${withReport(outcome)}`,
       );
     return { ok: true, worst: null, coverage: null };
   }

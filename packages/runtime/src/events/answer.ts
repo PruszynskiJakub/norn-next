@@ -5,13 +5,14 @@
  * context. Nothing to say is null, which a harness renders as allow.
  *
  * - guard: deny a write outside the run's worktree, or to norn's run state, as the old hook did; on
- *   a `writes: docs` step, also a write in the worktree outside the story's spec folder;
+ *   a `writes: docs` step, also a write in the worktree outside the story's spec folder and the run's `out/`;
  * - stop: block while the run has not reported and its step needs a report, the reason telling the
  *   agent how to report once, at most MAX_STOP_BLOCKS times a run: past that the turn ends, and the
  *   step's bounded nudges and retries take over from a block that would otherwise never end;
  * - context: the outbox's pending entries, which the caller marks delivered once the answer is out.
  */
 import type { HarnessAnswer, HarnessCapabilities, HarnessEvent } from "@norn/plugin-api";
+import { reportPath } from "@norn/schema";
 import type { Injection } from "./outbox.ts";
 
 export interface AnswerContext {
@@ -35,16 +36,17 @@ export interface AnswerContext {
    */
   writableRoots?: readonly string[];
   /**
-   * Set when the run's step is `writes: docs`: inside the worktree a write may land only in `dir`, the
-   * story's spec folder; `done` is how the report command is spelled, for the reason a denial gives.
+   * Set when the run's step is `writes: docs`: inside the worktree a write may land only in one of
+   * `dirs`, the story's spec folder and the run folder's `out/`; `done` is how the report command is
+   * spelled, for the reason a denial gives.
    */
-  docs?: { step?: string; dir: string; done: string };
+  docs?: { step?: string; dirs: readonly string[]; done: string };
   /**
    * The same paths with their symlinks followed: `writes` maps each write's folded path to its real
    * one. A write whose real path lands in run state is denied though its folded path is in the worktree,
    * and on a docs-only step one whose real path leaves the spec folder (`docs`) for the rest of the worktree.
    */
-  real?: { worktree: string; protectedPaths: readonly string[]; writes: Readonly<Record<string, string>>; docs?: string };
+  real?: { worktree: string; protectedPaths: readonly string[]; writes: Readonly<Record<string, string>>; docs?: readonly string[] };
   /**
    * What to restate when a session starts again having lost its brief (a resume, a compaction);
    * absent on the first start, where the brief itself is about to be read.
@@ -94,10 +96,10 @@ function guard(events: readonly HarnessEvent[], ctx: AnswerContext): HarnessAnsw
         reason: `norn: \`${path}\` is outside this unit's worktree \`${worktree}\`. Work only in this worktree: another one is another unit's live work.`,
       };
     if (ctx.docs && under(worktree, path)) {
-      const dir = resolvePath(worktree, ctx.docs.dir);
+      const dirs = ctx.docs.dirs.map((d) => resolvePath(worktree, d));
       // a link in the spec folder can carry a write into the code: where it really lands is judged too
-      const escaped = real?.docs !== undefined && landed !== undefined && under(real.worktree, landed) && !under(real.docs, landed);
-      if (!under(dir, path) || escaped) return { kind: "deny", reason: docsOnlyReason(ctx.docs, dir, path) };
+      const escaped = real?.docs !== undefined && landed !== undefined && under(real.worktree, landed) && !real.docs.some((d) => under(d, landed));
+      if (!dirs.some((d) => under(d, path)) || escaped) return { kind: "deny", reason: docsOnlyReason(ctx.docs, dirs[0] as string, path) };
     }
   }
   return null;
@@ -106,7 +108,7 @@ function guard(events: readonly HarnessEvent[], ctx: AnswerContext): HarnessAnsw
 function docsOnlyReason(docs: NonNullable<AnswerContext["docs"]>, dir: string, path: string): string {
   return (
     `norn: ${docs.step !== undefined ? `step \`${docs.step}\`` : "this step"} is docs-only (\`writes: docs\`): it writes only the story's documents in \`${dir}\` and files outside the repo, never \`${path}\`. ` +
-    `Do not edit code in this step: report what needs changing as findings, \`${docs.done} <outcome> --findings <file>\` with the file outside the repo (under $TMPDIR).`
+    `Do not edit code in this step: write what needs changing as findings to \`${reportPath("findings")}\`, then \`${docs.done} <outcome>\`.`
   );
 }
 

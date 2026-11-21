@@ -12,12 +12,13 @@
 import { type BriefInputs, checkCriteriaReport, HANDOFF_MAX_BYTES, producedOn, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
 import type { HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
 import { parseUnitId, STORE_ID_PATTERN } from "@norn/plugin-api";
-import type { CriterionVerdict, Finding, Note, Verdict } from "@norn/schema";
+import { type CriterionVerdict, type Finding, type Note, REPORT_TYPES, reportPath, type Verdict } from "@norn/schema";
 import { branchOf, baseRefOf, cutFrom } from "./branches.ts";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
 import { baseConflictOf } from "./input-history.ts";
 import { producedOf, readBackDocs, RUN_DIR, specFolder, worktreeOf } from "./inputs.ts";
+import { collectReports } from "./reports.ts";
 import { handoffArtifact } from "./story-docs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
@@ -149,6 +150,11 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   }
   if (req.verb === "ask" && !textOf(req)) return refuse("an ask without a question", "ask one self-contained question", "invalid");
   if (req.verb === "done") {
+    const collected = await collectReports(env, unit, { criteria: req.criteria !== undefined, findings: req.findings !== undefined });
+    if (!collected.ok) return refuse(collected.error, collected.do_instead, collected.code);
+    req = { ...req, ...collected.value, ...(req.criteria !== undefined && { criteria: req.criteria }), ...(req.findings !== undefined && { findings: req.findings }) };
+  }
+  if (req.verb === "done") {
     const handBack = handBackRefusal(live, req);
     if (handBack) return handBack;
     const missing = await producedRefusal(env, record, live, req.outcome);
@@ -234,9 +240,8 @@ export async function claimHeldElsewhere(env: RuntimeEnv, unit: string): Promise
   return holder === undefined || isOwnHolder(env, holder) ? null : holder;
 }
 
-/** The findings file `norn done --findings` reads, as a refusal names it. */
-export const FINDINGS_SHAPE =
-  'a JSON file {"findings": [{"severity": "blocking" | "major" | "minor" | "nit", "title": "...", "detail"?, "file"?, "line"?, "criterion"?, "repro"?}]} with at least one finding';
+/** The findings report, as a refusal names it. */
+export const FINDINGS_SHAPE = REPORT_TYPES.findings.shape;
 
 /**
  * Why a `done` whose outcome hands findings back cannot be recorded as it is, or null when it can:
@@ -248,10 +253,9 @@ function handBackRefusal(live: LiveStep, req: Extract<ReportRequest, { verb: "do
   if (live.handBack[req.outcome] !== "findings") return null;
   const carries = (req.findings?.length ?? 0) > 0 || textOf(req) !== undefined || (req.criteria ?? []).some((c) => c.verdict !== "pass");
   if (carries) return null;
-  const criteria = live.criteria || live.verdict[req.outcome] !== undefined ? " --criteria <file>" : "";
   return refuse(
     `step ${live.step} hands back findings with outcome ${req.outcome} (hand_back), and this report has none`,
-    `write ${FINDINGS_SHAPE}, then run: norn done ${req.outcome}${criteria} --findings <file>`,
+    `write the findings to ${reportPath("findings")}: ${FINDINGS_SHAPE}; at least one finding; then run: norn done ${req.outcome}`,
     "hand_back_required",
   );
 }
@@ -308,7 +312,7 @@ async function handoffSizeRefusal(env: RuntimeEnv, unit: string): Promise<Refusa
   const kb = (n: number) => `${Math.ceil(n / 1024)} KB`;
   return refuse(
     `the handoff ${file} is ${kb(bytes)}; it may hold at most ${kb(HANDOFF_MAX_BYTES)}`,
-    `rewrite it as the unit's current state (State, Notes): drop what the brief's history already says and the attempts that led nowhere, move long repros and logs into the findings of \`norn done --findings\` when the outcome hands findings back, or into a file of their own under ${specFolder(unit)}/, and name it there, then report again`,
+    `rewrite it as the unit's current state (State, Notes): drop what the brief's history already says and the attempts that led nowhere, move long repros and logs into the findings (\`${reportPath("findings")}\`) when the outcome hands findings back, or into a file of their own under ${specFolder(unit)}/, and name it there, then report again`,
     "handoff_too_large",
   );
 }

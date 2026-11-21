@@ -71,3 +71,4 @@ export type * from "./types.ts";
 export { loadPinned, tickWorkflows } from "./workflows.ts";
 export { criteriaOf, declaredCriteria, frontmatterOf } from "./criteria.ts";
 export { CHECK_WAKE_WRITER, newWakeWriter, readWake, stampingReceipts, WAKE_FILE, wakePath, wakeWriterOf } from "./wake.ts";
+export { type CollectedReports, CRITERIA_HINT, collectReports, FINDINGS_HINT, parseCriteria, parseFindings } from "./reports.ts";

@@ -203,20 +203,20 @@ describe("guard hook on a docs-only step", () => {
     expect(start?.writes).toBe("docs");
   });
 
-  test("a write to the story's documents, relative or absolute, or under a writable root, is allowed", async () => {
+  test("a write to the story's documents or the run's reports, relative or absolute, or under a writable root, is allowed", async () => {
     const { h, runId } = await docsOnly();
-    for (const p of [".agents/specs/lt-1/handoffs/story.md", `${WORKTREE}/.agents/specs/lt-1/spec.md`, ".agents/specs/lt-1/slices/01-a.md", "/tmp/findings.json"])
+    for (const p of [".agents/specs/lt-1/handoffs/story.md", `${WORKTREE}/.agents/specs/lt-1/spec.md`, ".agents/specs/lt-1/slices/01-a.md", ".agents/run/out/findings.json", `${WORKTREE}/.agents/run/out/evidence/a.txt`, "/tmp/findings.json"])
       expect({ p, out: reasonOf(await hook(h, runId, "PreToolUse", preWrite(p))) }).toEqual({ p, out: null });
   });
 
   test("a write to code in the worktree is denied: the step is docs-only, and the reason says to hand back findings instead", async () => {
     const { h, runId } = await docsOnly();
-    for (const p of ["src/x.ts", `${WORKTREE}/README.md`, ".agents/specs/lt-2/spec.md", ".agents/specs/lt-1/../../../src/x.ts"]) {
+    for (const p of ["src/x.ts", `${WORKTREE}/README.md`, ".agents/specs/lt-2/spec.md", ".agents/specs/lt-1/../../../src/x.ts", ".agents/run/in/last_check.md"]) {
       const out = reasonOf(await hook(h, runId, "PreToolUse", preWrite(p)));
       expect({ p, decision: out?.permissionDecision }).toEqual({ p, decision: "deny" });
       expect(out.permissionDecisionReason).toContain("writes: docs");
       expect(out.permissionDecisionReason).toContain("norn done");
-      expect(out.permissionDecisionReason).toContain("--findings");
+      expect(out.permissionDecisionReason).toContain("$NORN_OUT/findings.json");
     }
   });
 
@@ -532,7 +532,7 @@ describe("reporting", () => {
     const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
     expect(r).toMatchObject({
       ok: false,
-      refusal: { code: "handoff_too_large", error: expect.stringMatching(/handoffs\/lt-1\.md is 10 KB; it may hold at most 8 KB$/), do_instead: expect.stringMatching(/current state.*State, Notes.*norn done --findings.*under \.agents\/specs\/lt-1\/.*report again/) },
+      refusal: { code: "handoff_too_large", error: expect.stringMatching(/handoffs\/lt-1\.md is 10 KB; it may hold at most 8 KB$/), do_instead: expect.stringMatching(/current state.*State, Notes.*\$NORN_OUT\/findings\.json.*under \.agents\/specs\/lt-1\/.*report again/) },
     });
     expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
     expect(await reportRun(h.env, UNIT, runId, { verb: "ask", question: "may the repro stay?" }, "r2")).toMatchObject({ ok: true });

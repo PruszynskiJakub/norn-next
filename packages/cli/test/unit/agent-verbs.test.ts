@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { INPUTS_DIR, reportReceiptId, SPEC_ARTIFACT, worktreeOf, writeStoryDoc } from "@norn/runtime";
+import { INPUTS_DIR, OUT_DIR, reportReceiptId, SPEC_ARTIFACT, worktreeOf, writeStoryDoc } from "@norn/runtime";
 import type { RunState } from "@norn/kernel";
 import type { CriterionVerdict } from "@norn/schema";
 import { ExitCode, runCli } from "../../src/index.ts";
@@ -201,16 +201,46 @@ describe("done at a step with criteria: required", () => {
     return { exit: r.exit, out: json(r.stdout) as Record<string, unknown> };
   }
 
-  test("without --criteria it is refused with the full command, and nothing is recorded", async () => {
+  /** Write a report where the run's out/ folder collects it. */
+  async function out(m: TestMachine, name: string, report: unknown): Promise<string> {
+    const path = `${worktreeOf(await envOf(m), UNIT)}/${OUT_DIR}/${name}`;
+    await m.files.write(path, typeof report === "string" ? report : JSON.stringify(report));
+    return path;
+  }
+
+  test("without a criteria report it is refused naming where the run writes it, and nothing is recorded", async () => {
     const m = await atQa();
     const r = await done(m, ["pass"]);
     expect(r.exit).toBe(ExitCode.refused);
     expect(r.out).toEqual({
       error: "step qa produces criteria with every outcome: one verdict per criterion",
-      do_instead: "write the report (a JSON array of {id, verdict, ...} covering AC1, 01.AC2) and run: norn done pass --criteria <file>",
+      do_instead: "write the report (a JSON array of {id, verdict, ...} covering AC1, 01.AC2) to $NORN_OUT/criteria.json, then run: norn done pass",
       code: "criteria_required",
     });
     expect(await receiptsOf(m)).toEqual([]);
+  });
+
+  test("a report the run wrote to $NORN_OUT/criteria.json is collected by a done that names no file", async () => {
+    const m = await atQa();
+    await out(m, "criteria.json", pass);
+    const r = await done(m, ["pass"]);
+    expect(r.out).toMatchObject({ outcome: "pass", criteria: { worst: "pass", coverage: "checked" } });
+    expect((await receiptsOf(m)).map((x) => x.data)).toEqual([{ kind: "run.reported", step: QA, attempt: 1, run_id: RUN, verb: "done", outcome: "pass", criteria: pass }]);
+  });
+
+  test("a report in $NORN_OUT that does not validate is refused, naming its path and its shape", async () => {
+    const m = await atQa();
+    await out(m, "criteria.json", [{ id: "AC1", verdict: "pass" }]);
+    const r = await done(m, ["pass"]);
+    expect(r.exit).toBe(ExitCode.refused);
+    expect(r.out).toMatchObject({ code: "invalid_criteria", error: expect.stringContaining(".agents/run/out/criteria.json: /0"), do_instead: expect.stringContaining("pass needs evidence") });
+    expect(await receiptsOf(m)).toEqual([]);
+  });
+
+  test("a --criteria file is still read, in place of what $NORN_OUT holds", async () => {
+    const m = await atQa();
+    await out(m, "criteria.json", "not json{");
+    expect((await done(m, ["pass", "--criteria", "criteria.json"], pass)).out).toMatchObject({ outcome: "pass", criteria: { worst: "pass" } });
   });
 
   test("a report that is not JSON, or does not validate, is refused before anything is read or recorded", async () => {
@@ -249,7 +279,7 @@ describe("done at a step with criteria: required", () => {
       exit: ExitCode.refused,
       out: {
         error: "outcome 'pass' needs the worst verdict to be 'pass', but it is 'fail' (01.AC2); the matching outcome is 'fail'",
-        do_instead: "norn done fail --criteria <file>",
+        do_instead: "norn done fail",
         code: "outcome_contradicts_verdicts",
       },
     });
@@ -358,7 +388,7 @@ describe("done at a step whose outcome hands back findings", () => {
     ],
   };
 
-  test("an outcome that hands back findings, reported with none and no note, is refused naming --findings; nothing is recorded", async () => {
+  test("an outcome that hands back findings, reported with none and no note, is refused naming where the run writes them; nothing is recorded", async () => {
     const m = await atReview();
     const r = await done(m, ["changes_requested"]);
     expect(r).toEqual({
@@ -366,7 +396,7 @@ describe("done at a step whose outcome hands back findings", () => {
       out: {
         error: "step review hands back findings with outcome changes_requested (hand_back), and this report has none",
         do_instead:
-          'write a JSON file {"findings": [{"severity": "blocking" | "major" | "minor" | "nit", "title": "...", "detail"?, "file"?, "line"?, "criterion"?, "repro"?}]} with at least one finding, then run: norn done changes_requested --findings <file>',
+          'write the findings to $NORN_OUT/findings.json: {"findings": [...]} or the array alone, each finding with a "title" and a "severity" (blocking | major | minor | nit), and where it can "file", "line", "criterion", "detail" and "repro"; at least one finding; then run: norn done changes_requested',
         code: "hand_back_required",
       },
     });
@@ -404,6 +434,20 @@ describe("done at a step whose outcome hands back findings", () => {
         ],
       },
     ]);
+  });
+
+  test("findings the run wrote to $NORN_OUT/findings.json are collected by a done that names no file, normalized as a --findings file is", async () => {
+    const m = await atReview();
+    await m.files.write(`${worktreeOf(await envOf(m), UNIT)}/${OUT_DIR}/findings.json`, JSON.stringify(REVIEW_FILE));
+    expect((await done(m, ["changes_requested"])).exit).toBe(ExitCode.ok);
+    expect((await receiptsOf(m)).map((x) => x.data)).toMatchObject([{ outcome: "changes_requested", findings: [{ id: "F1", detail: "the expiry is never read\nAxis: spec\nSuggestion: compare expires_at" }, { id: "F2" }] }]);
+  });
+
+  test("findings in $NORN_OUT that do not validate are refused, naming the file", async () => {
+    const m = await atReview();
+    await m.files.write(`${worktreeOf(await envOf(m), UNIT)}/${OUT_DIR}/findings.json`, JSON.stringify([{ title: "no severity" }]));
+    expect((await done(m, ["changes_requested"])).out).toMatchObject({ code: "invalid_findings", error: "finding 1 in .agents/run/out/findings.json needs a title and a severity (blocking | major | minor | nit)" });
+    expect(await receiptsOf(m)).toEqual([]);
   });
 
   test("a note alone still hands the work back", async () => {

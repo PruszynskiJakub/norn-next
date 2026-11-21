@@ -494,11 +494,11 @@ norn brief
 Report the step done with an outcome
 
 ```sh
-norn done <outcome> [--criteria <file>] [--findings <file>] [--note <text>] [--report-id <id>]
+norn done <outcome> [--note <text>] [--report-id <id>] [--criteria <file>] [--findings <file>]
 ```
 
-- `--criteria <file>`: the criteria report: a JSON array with one verdict per acceptance criterion; a step that produces criteria with every outcome, or an outcome gated by a verdict, needs it
-- `--findings <file>`: the findings to hand back: a JSON file, {"findings": [...]} or an array, each with a `title` and a `severity` (blocking, major, minor, nit); a step whose outcome hands back findings needs them or a note
+- `--criteria <file>`: a criteria report written elsewhere than $NORN_OUT/criteria.json, read in its place
+- `--findings <file>`: findings written elsewhere than $NORN_OUT/findings.json, read in their place
 - `--note <text>`: what the next step should know
 - `--report-id <id>`: the report's id; a retry with the same id records it once
 

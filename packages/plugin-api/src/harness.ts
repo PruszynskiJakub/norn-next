@@ -3,6 +3,7 @@
  * A harness translates and renders; it never classifies a session or decides an answer, so every
  * harness gets the same classification from the kernel.
  */
+import { OUT_ENV } from "@norn/schema";
 import type { HarnessEvent } from "./events.ts";
 import type { RunnerKey } from "./runner.ts";
 
@@ -45,7 +46,7 @@ export const RUN_ENV = Object.freeze({ unit: "NORN_UNIT", run: "NORN_RUN_ID" } a
  * worktree where the run reads the inputs norn rewrote for it (`in`) and writes the reports `norn
  * done` collects (`out`), so a skill names a report's place without knowing the layout.
  */
-export const RUN_DIRS_ENV = Object.freeze({ in: "NORN_IN", out: "NORN_OUT" } as const);
+export const RUN_DIRS_ENV = Object.freeze({ in: "NORN_IN", out: OUT_ENV } as const);
 
 /** The kernel's ruling on a tool call about to run. */
 export type GuardAnswer = { kind: "allow" } | { kind: "deny"; reason: string };

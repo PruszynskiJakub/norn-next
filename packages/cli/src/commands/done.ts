@@ -1,10 +1,11 @@
 /**
- * `norn done <outcome> [--criteria <file>] [--findings <file>] [--note <text>] [--report-id <id>]`:
- * report the step done with an outcome. The unit and run come from NORN_UNIT and NORN_RUN_ID. A
- * findings file is read and normalized here and copied into the receipt; the runtime refuses an
- * outcome whose `hand_back` is findings when the report carries nothing to rework. A criteria report is
- * validated against `CriteriaReport` here; the runtime checks it against the step (`criteria:
- * required`, the outcome's `verdict`) and the unit's declared criteria, and keeps it on the receipt.
+ * `norn done <outcome> [--note <text>] [--report-id <id>]`: report the step done with an outcome. The
+ * unit and run come from NORN_UNIT and NORN_RUN_ID. The runtime collects the run's reports from its
+ * `$NORN_OUT` (`criteria.json`, `findings.json`), validates them and copies them into the receipt; it
+ * refuses an outcome whose `hand_back` is findings when the report carries nothing to rework, and
+ * checks a criteria report against the step (`criteria: required`, the outcome's `verdict`) and the
+ * unit's declared criteria. `--criteria <file>` and `--findings <file>` still name a report elsewhere,
+ * read here, for a skill written before the run folder; each takes the place of its file in `$NORN_OUT`.
  * The runtime also refuses a done while a merge waits to be concluded in the unit's worktree or a
  * step sent to merge the base has not merged it (`merge_unfinished`), while the worktree holds
  * uncommitted work (`dirty_worktree`), while the unit's commits leave a conflict unresolved
@@ -12,90 +13,43 @@
  * only renders those refusals.
  */
 import { isAbsolute, resolve } from "node:path";
-import { parseJson } from "@norn/plugin-api";
-import { FINDINGS_SHAPE, reportRun } from "@norn/runtime";
-import { CriteriaReport, type CriterionVerdict, type Finding } from "@norn/schema";
-import { Type } from "@sinclair/typebox";
+import { CRITERIA_HINT, FINDINGS_HINT, parseCriteria, parseFindings, reportRun } from "@norn/runtime";
+import type { CriterionVerdict, Finding } from "@norn/schema";
 import { defineCommand, opt } from "../command.ts";
 import type { CliContext } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
 import { agentRunOf, fromRefusal, reportIdOf } from "./agent-support.ts";
 
-const REPORT_SHAPE =
-  'write the report as a JSON array, one entry per criterion: [{"id": "AC1", "verdict": "pass", "evidence": "..."}, ...]; pass needs evidence, fail repro, person how, unverified reason and how; then report again';
-
-/** Read and validate a `--criteria` file, relative to where the command runs. */
-async function readCriteria(ctx: CliContext, file: string): Promise<CriterionVerdict[]> {
-  const path = isAbsolute(file) ? file : resolve(ctx.io.cwd, file);
-  let text: string | null;
-  try {
-    text = await (await ctx.host()).files.read(path);
-  } catch (e) {
-    throw refuse(`criteria file ${file} cannot be read: ${(e as Error).message}`, REPORT_SHAPE, "invalid_criteria");
-  }
-  if (text === null) throw refuse(`criteria file not found: ${file}`, REPORT_SHAPE, "invalid_criteria");
-  const v = parseJson(CriteriaReport, text, `criteria file ${file}`);
-  if (!v.ok) throw refuse(v.failure.message, REPORT_SHAPE, "invalid_criteria");
-  return v.value;
-}
-
-const FINDINGS_HINT = `write ${FINDINGS_SHAPE}, or the findings array alone, then report again`;
-/** An array of findings or `{findings: [...]}`; each entry is checked and normalized one by one, so a refusal names the entry. */
-const FindingsFile = Type.Union([Type.Array(Type.Unknown()), Type.Object({ findings: Type.Array(Type.Unknown()) })]);
-const SEVERITIES: ReadonlySet<string> = new Set(["blocking", "major", "minor", "nit"]);
-const text = (v: unknown): string | undefined => (typeof v === "string" && v.trim() ? v.trim() : undefined);
-
-/**
- * Normalize a findings file: a JSON array of findings, or `{findings: [...]}` as the review and qa
- * skills write it. Keys the receipt does not keep (a review's `axis`, `suggestion`) fold into
- * `detail`, so nothing the reviewer wrote is lost on the way to the rework.
- */
-export function parseFindings(raw: string, file: string): Finding[] {
-  const parsed = parseJson(FindingsFile, raw, `findings file ${file}`);
-  if (!parsed.ok) throw refuse(parsed.failure.message, FINDINGS_HINT, "invalid_findings");
-  const held: unknown[] = Array.isArray(parsed.value) ? parsed.value : parsed.value.findings;
-  return held.map((x, i) => {
-    const o = (typeof x === "object" && x !== null ? x : {}) as Record<string, unknown>;
-    const severity = text(o.severity)?.toLowerCase();
-    const title = text(o.title) ?? text(o.summary);
-    if (severity === undefined || !SEVERITIES.has(severity) || title === undefined)
-      throw refuse(`finding ${i + 1} in ${file} needs a title and a severity (blocking | major | minor | nit)`, FINDINGS_HINT, "invalid_findings");
-    const id = text(o.id);
-    const where = text(o.file);
-    const criterion = text(o.criterion) ?? (typeof o.criterion === "number" ? String(o.criterion) : undefined);
-    const repro = text(o.repro);
-    const detail = [text(o.detail), text(o.axis) && `Axis: ${text(o.axis)}`, text(o.suggestion) && `Suggestion: ${text(o.suggestion)}`].filter((d) => d).join("\n");
-    return {
-      ...(id !== undefined && { id }),
-      severity: severity as Finding["severity"],
-      ...(criterion !== undefined && { criterion }),
-      ...(where !== undefined && { file: where }),
-      ...(typeof o.line === "number" && Number.isInteger(o.line) && o.line > 0 && { line: o.line }),
-      title,
-      ...(detail !== "" && { detail }),
-      ...(repro !== undefined && { repro }),
-    };
-  });
-}
-
-/** Read a `--findings` file, relative to where the command runs. */
-async function readFindings(ctx: CliContext, file: string): Promise<Finding[]> {
+/** Read a file the command line names, relative to where the command runs; null when it is not there. */
+async function readNamed(ctx: CliContext, file: string, what: string, hint: string, code: string): Promise<string> {
   const path = isAbsolute(file) ? file : resolve(ctx.io.cwd, file);
   let raw: string | null;
   try {
     raw = await (await ctx.host()).files.read(path);
   } catch (e) {
-    throw refuse(`findings file ${file} cannot be read: ${(e as Error).message}`, FINDINGS_HINT, "invalid_findings");
+    throw refuse(`${what} file ${file} cannot be read: ${(e as Error).message}`, hint, code);
   }
-  if (raw === null) throw refuse(`findings file not found: ${file}`, FINDINGS_HINT, "invalid_findings");
-  return parseFindings(raw, file);
+  if (raw === null) throw refuse(`${what} file not found: ${file}`, hint, code);
+  return raw;
+}
+
+async function readCriteria(ctx: CliContext, file: string): Promise<CriterionVerdict[]> {
+  const v = parseCriteria(await readNamed(ctx, file, "criteria", CRITERIA_HINT, "invalid_criteria"), file);
+  if (!v.ok) throw refuse(v.error, v.do_instead, v.code);
+  return v.value;
+}
+
+async function readFindings(ctx: CliContext, file: string): Promise<Finding[]> {
+  const v = parseFindings(await readNamed(ctx, file, "findings", FINDINGS_HINT, "invalid_findings"), file);
+  if (!v.ok) throw refuse(v.error, v.do_instead, v.code);
+  return v.value;
 }
 
 export const doneCommand = defineCommand({
   name: "done",
   acts: true,
   summary: "Report the step done with an outcome",
-  usage: "norn done <outcome> [--criteria <file>] [--findings <file>] [--note <text>] [--report-id <id>]",
+  usage: "norn done <outcome> [--note <text>] [--report-id <id>] [--criteria <file>] [--findings <file>]",
   options: {
     criteria: { type: "string" },
     findings: { type: "string" },
@@ -103,8 +57,8 @@ export const doneCommand = defineCommand({
     "report-id": { type: "string" },
   },
   optionHelp: {
-    "--criteria <file>": "the criteria report: a JSON array with one verdict per acceptance criterion; a step that produces criteria with every outcome, or an outcome gated by a verdict, needs it",
-    "--findings <file>": 'the findings to hand back: a JSON file, {"findings": [...]} or an array, each with a `title` and a `severity` (blocking, major, minor, nit); a step whose outcome hands back findings needs them or a note',
+    "--criteria <file>": "a criteria report written elsewhere than $NORN_OUT/criteria.json, read in its place",
+    "--findings <file>": "findings written elsewhere than $NORN_OUT/findings.json, read in their place",
     "--note <text>": "what the next step should know",
     "--report-id <id>": "the report's id; a retry with the same id records it once",
   },
