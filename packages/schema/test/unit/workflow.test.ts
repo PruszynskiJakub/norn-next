@@ -156,7 +156,8 @@ describe("workflow schema", () => {
     ["edge with unknown property", (w: any) => (w.steps.merge.outcomes.done = { to: "integrate", when: "x" })],
     ["edge without to", (w: any) => (w.steps.merge.outcomes.done = { counter: "x" })],
     ["counter max 0", (w: any) => (w.counters.test_loop.max = 0)],
-    ["unknown input kind", (w: any) => (w.steps.implement.inputs = ["everything"])],
+    // which names a step may read is the loader's check: a produced name or a source is the workflow's own
+    ["an input that is no name", (w: any) => (w.steps.implement.inputs = ["Every thing"])],
     ["negative nudges", (w: any) => (w.steps.implement.nudges = -1)],
     ["missing start", (w: any) => delete w.start],
     ["unknown top-level property", (w: any) => (w.lifecycle = "story")],
@@ -340,6 +341,13 @@ describe("a step written with by: in the workflow-source and workflow-shared sch
       const step = { ...ACTORS[actor], ...extra };
       expect({ actor, extra, ok: validate("workflow-source", source({ a: step })).ok }).toEqual({ actor, extra, ok: false });
     }
+  });
+
+  test("an agent step reads a produced name or a source, bare or with a trailing ? for optional, and the open findings as findings?", () => {
+    const wf = source({ a: { ...ACTORS.agent, reads: ["spec", "findings?", "brand", "notes?"] } }, { sources: { brand: { type: "folder" }, adr: { type: "folder", path: "docs/adr" } } });
+    expect(errorsOf(wf)).toEqual([]);
+    expect(validate("workflow-source", source({ a: ACTORS.shell }, { sources: { brand: { type: "url" } } })).ok).toBe(false);
+    expect(validate("workflow-source", source({ a: { ...ACTORS.agent, reads: ["Brand"] } })).ok).toBe(false);
   });
 
   test("a workflow file holds signals: and entries:, which neither a shared file nor the pinned workflow holds", () => {

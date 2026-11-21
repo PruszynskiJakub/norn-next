@@ -87,6 +87,10 @@ export const InputKind = Type.Union([
 export type InputKind = Static<typeof InputKind>;
 export const StepInput = Type.Union([
   InputKind,
+  Type.String({
+    pattern: "^[a-z][a-z0-9_]*\\??$",
+    description: "a name an earlier step produces, a source the workflow names, or findings, the open findings; a trailing ? makes it optional",
+  }),
   Type.Object({ file: NonEmpty, label: Type.Optional(NonEmpty) }, { additionalProperties: false }),
 ]);
 export type StepInput = Static<typeof StepInput>;
@@ -410,6 +414,21 @@ export const Workflow = Type.Object(
     steps: Type.Record(StepName, Step, { minProperties: 1, additionalProperties: false }),
     counters: Type.Optional(Type.Record(StoredCounterName, CounterSpec, { additionalProperties: false })),
     base: Type.Optional(BaseSync),
+    /** Places the steps read that are neither norn's nor the repo's code, by a name of the workflow's own */
+    sources: Type.Optional(
+      Type.Record(
+        OutcomeName,
+        Type.Object(
+          {
+            type: Type.Union([Type.Literal("folder"), Type.Literal("file")]),
+            path: Type.Optional(Type.String({ minLength: 1, pattern: "\\S", description: "Relative to the repo's root; the config's sources binding wins" })),
+            description: Type.Optional(Type.String()),
+          },
+          { additionalProperties: false },
+        ),
+        { additionalProperties: false, description: "A source a step reads by name; one with no path is bound in the config's sources" },
+      ),
+    ),
   },
   {
     $id: "https://norn.dev/schema/workflow.json",

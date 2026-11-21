@@ -6,7 +6,7 @@
 import { loadWorkflow, type RunState } from "../../src/index.ts";
 import type { GoldenCase } from "../../test/golden.ts";
 import { STEP_KINDS } from "../../test/shipped.ts";
-import { capabilities, caseOf, claim, config, DEPLOY_DOC, executor, item, ROUTED_DOC, type Seed, seed, shippedFiles, type WorldSetup, world } from "./catalog.ts";
+import { capabilities, caseOf, claim, config, DEPLOY_DOC, executor, item, ROUTED_DOC, type Seed, seed, shippedFiles, SOURCED_DOC, type WorldSetup, world } from "./catalog.ts";
 import type { Scenario } from "./journeys.ts";
 import { session, vcsSignal, type World } from "./world.ts";
 
@@ -260,6 +260,13 @@ export const MATRIX: Scenario[] = [
     { files: shippedFiles("slice"), capabilities: capabilities({ executors: { claude: executor({ denyTool: false }) } }) },
     (w) => seed(w, "gh-116", { workflow: "slice", step: "review" }),
     ["agent.unguarded"],
+  ),
+  scenario(
+    "source-unbound",
+    "A ready step reads a workflow source that neither the workflow nor this machine's config binds: the story waits for a person to bind it rather than run the agent on a place that is not there.",
+    { files: { sourced: SOURCED_DOC }, config: config({ workflow: "sourced" }) },
+    (w) => seed(w, "gh-117", { workflow: "sourced", step: "design" }),
+    ["source.unbound"],
   ),
   scenario(
     "agent-not-headless",

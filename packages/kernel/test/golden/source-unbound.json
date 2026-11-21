@@ -1,0 +1,295 @@
+{
+  "name": "source-unbound",
+  "description": "A ready step reads a workflow source that neither the workflow nor this machine's config binds: the story waits for a person to bind it rather than run the agent on a place that is not there.",
+  "step_kinds": {
+    "update-branch": {
+      "outcomes": [
+        "done",
+        "conflict",
+        "clean",
+        "resolved"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "integrate": {
+      "outcomes": [
+        "done",
+        "conflict"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "open-pr": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "push": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "await-merge": {
+      "outcomes": [
+        "merged",
+        "unpushed"
+      ],
+      "mode": "wait",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "sourced": {
+        "name": "sourced",
+        "description": "A design step that reads the brand assets, a source each machine binds.",
+        "start": "design",
+        "sources": {
+          "brand": {
+            "type": "folder"
+          }
+        },
+        "steps": {
+          "design": {
+            "agent": "Design the page from the brand assets.",
+            "inputs": [
+              "spec",
+              "brand"
+            ],
+            "outcomes": {
+              "done": "$done"
+            }
+          }
+        }
+      }
+    },
+    "pinned": []
+  },
+  "config": {
+    "counterDefaults": {
+      "checkFail": 5,
+      "gateReject": 2,
+      "conflict": 2,
+      "stale": 10,
+      "agentBack": 3
+    },
+    "silentAfterMs": 900000,
+    "maxNudges": 2,
+    "maxRetries": 1,
+    "deadlineMs": 3600000,
+    "mode": "auto",
+    "executor": "claude",
+    "workflow": "sourced",
+    "intakeWorkflowLabelPrefix": "norn:wf:",
+    "sliceWorkflow": "slice",
+    "base": "main",
+    "claimTtlMs": 600000,
+    "claimRenewBeforeMs": 400000
+  },
+  "facts": {
+    "tick_id": "01JD5G00000MR9XA8KKK8P87K1",
+    "now": "2026-11-17T09:00:00.000Z",
+    "holder": "machine-a",
+    "capabilities": {
+      "tracker": {
+        "assign": true,
+        "labels": true,
+        "comment": true,
+        "create": true,
+        "close": true
+      },
+      "forge": {
+        "draft": true,
+        "checks": true,
+        "raw_urls": true
+      },
+      "store": {
+        "shared": false,
+        "claims": "local",
+        "mailbox": true,
+        "artifacts": true
+      },
+      "executors": {
+        "claude": {
+          "blockStop": true,
+          "denyTool": true,
+          "injectContext": true,
+          "subagents": true,
+          "limits": true,
+          "paneInput": false,
+          "headless": true,
+          "attended": true
+        }
+      }
+    },
+    "stories": [
+      {
+        "key": "gh-117",
+        "item": {
+          "id": 117,
+          "key": "gh-117",
+          "title": "Story 117",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-117",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-117",
+            "state": {
+              "format": 1,
+              "unit": "gh-117",
+              "story": "gh-117",
+              "workflow": {
+                "name": "sourced",
+                "hash": "f31ff9895dffd53ddcaf0e1c2e6b0a4260ead79565ea739fa47fa7b217fe9f51",
+                "doc": {
+                  "name": "sourced",
+                  "description": "A design step that reads the brand assets, a source each machine binds.",
+                  "sources": {
+                    "brand": {
+                      "type": "folder"
+                    }
+                  },
+                  "start": "design",
+                  "steps": {
+                    "design": {
+                      "agent": "Design the page from the brand assets.",
+                      "inputs": [
+                        "spec",
+                        "brand"
+                      ],
+                      "outcomes": {
+                        "done": "$done"
+                      }
+                    }
+                  }
+                }
+              },
+              "step": "design",
+              "attempt": 1,
+              "counters": {},
+              "retries_used": 0,
+              "run": null,
+              "applied_through": 0,
+              "visits": {
+                "design": 1
+              }
+            },
+            "version": 1,
+            "receipts": [],
+            "session": null
+          }
+        ],
+        "mailbox": []
+      }
+    ],
+    "intake": []
+  },
+  "decisions": [
+    {
+      "kind": "park",
+      "unit": "gh-117",
+      "rule": "source.unbound",
+      "reason": "source.unbound",
+      "inbox": {
+        "kind": "stuck",
+        "unit": "gh-117",
+        "step": "design",
+        "since": "2026-11-17T09:00:00.000Z",
+        "text": "step 'design' reads the source `brand`, which nothing binds on this machine: bind it with `norn config set sources.brand <path>`, or give it a path: in the workflow"
+      },
+      "intent": {
+        "id": "01JD5G0000C73G79TPA9EMCVD5",
+        "data": {
+          "kind": "unit.parked",
+          "reason": "source.unbound",
+          "step": "design",
+          "attempt": 1
+        }
+      },
+      "state": {
+        "format": 1,
+        "unit": "gh-117",
+        "story": "gh-117",
+        "workflow": {
+          "name": "sourced",
+          "hash": "f31ff9895dffd53ddcaf0e1c2e6b0a4260ead79565ea739fa47fa7b217fe9f51",
+          "doc": {
+            "name": "sourced",
+            "description": "A design step that reads the brand assets, a source each machine binds.",
+            "sources": {
+              "brand": {
+                "type": "folder"
+              }
+            },
+            "start": "design",
+            "steps": {
+              "design": {
+                "agent": "Design the page from the brand assets.",
+                "inputs": [
+                  "spec",
+                  "brand"
+                ],
+                "outcomes": {
+                  "done": "$done"
+                }
+              }
+            }
+          }
+        },
+        "step": "design",
+        "attempt": 1,
+        "counters": {},
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 1,
+        "visits": {
+          "design": 1
+        },
+        "parked": {
+          "reason": "source.unbound",
+          "since": "2026-11-17T09:00:00.000Z"
+        }
+      },
+      "expect_version": 1
+    }
+  ]
+}

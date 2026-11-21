@@ -136,6 +136,38 @@ describe("the run folder", () => {
   });
 });
 
+describe("a workflow's sources", () => {
+  async function designing(sources?: Record<string, string>): Promise<Harnessed> {
+    const h = harness({ workflow: "sourced", ...(sources && { kernel: { sources } }) });
+    h.items.push(trackerItem(1, ITEM));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    return h;
+  }
+
+  test("the brief names each source the step reads, at the workflow's path or the config's binding, which wins, and says it is read-only", async () => {
+    const h = await designing({ brand: "/assets/brand", adr: "/elsewhere/adr" });
+    const md = await brief(h);
+    expect(md).toContain("- `adr` — the source `adr` (a folder), read-only: `/elsewhere/adr`");
+    expect(md).toContain("- `brand` — the source `brand` (a folder), read-only: `/assets/brand`");
+    expect(md).toContain("- `tone` — the source `tone` (a file), read-only. nothing binds it on this machine, and the step reads it only when bound");
+    // the open findings, read as `findings?`, are norn's last_findings
+    expect(md).toContain("- `last_findings` — the last findings. no findings sent this work back");
+  });
+
+  test("a source only the workflow binds is at its path in the worktree", async () => {
+    const h = await designing({ brand: "/assets/brand" });
+    expect(await brief(h)).toContain("- `adr` — the source `adr` (a folder), read-only: `docs/adr`");
+  });
+
+  test("a step reading a source nothing binds never starts: it parks for a person to bind it", async () => {
+    const h = harness({ workflow: "sourced" });
+    h.items.push(trackerItem(1, ITEM));
+    await tickUntil(h, has("source.unbound"));
+    expect(h.launcher.of("start")).toEqual([]);
+  });
+});
+
 describe("an input name the host does not provide", () => {
   const TYPO = (WORKFLOWS["handed.yaml"] as string).replace("inputs: [spec, handoff, last_findings, diff]", "inputs: [spec, handoff, last_findings, diff, mystery]");
 

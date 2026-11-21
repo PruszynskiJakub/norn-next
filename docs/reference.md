@@ -80,14 +80,14 @@ A plugin declares more under `provides.signals`, named `<slot>.<signal>` when it
 
 ## Inputs
 
-An agent step's `reads:` (`inputs:` in the older form) lists what its brief gives it. norn writes each one under `.agents/` in the unit's worktree, and the brief names its path; an input norn holds nothing for yet is listed with a note.
+An agent step's `reads:` (`inputs:` in the older form) lists what its brief gives it. norn writes each one under `.agents/` in the unit's worktree (its own inputs in the run folder's `in/`, `$NORN_IN`), and the brief names its path; an input norn holds nothing for yet is listed with a note. Every agent step reads and keeps its unit's handoff, whether or not it lists it.
 
 | Input | What the agent gets |
 |---|---|
 | `spec` | the story's spec, `.agents/specs/<story>/spec.md`: its tracker item, mirrored, and the sections later steps added |
 | `handoff` | this unit's handoff, `.agents/specs/<story>/handoffs/<unit>.md`, which the agent keeps current |
 | `last_check` | the last check's exit, outcome and the end of its output |
-| `last_findings` | the open findings (below): a rejected gate's reason, or the report of a step whose outcome produced findings |
+| `findings?` (`last_findings`) | the open findings (below): a rejected gate's reason, or the report of a step whose outcome produced findings |
 | `signal` | the signal that moved the story from where it waited, with what its source reported; the agent step right after a signal gets it whether or not it lists it |
 | `diff` | the `git diff` command that shows the change so far |
 | `slice` | this slice's file, `slices/<nn>-<slug>.md` in the story's spec folder |
@@ -96,7 +96,7 @@ An agent step's `reads:` (`inputs:` in the older form) lists what its brief give
 | `resolution` | the resolution to review: each merge's remerge-diff and the conflicts this round recorded |
 | `base_side` | the base side of a conflict: the base commit to merge and what it changed in each conflicting path |
 
-**The open findings.** `last_findings` names one report, never a history:
+**The open findings.** `findings?` names one report, never a history, and pins as `last_findings`, the name the older form gives it:
 
 1. the report that sent this visit back (a rejected gate, or an outcome that produced findings), when one did;
 2. otherwise the latest one this round that no clean outcome has settled since: a gate's `approve`, or the producing step reporting an outcome without findings (a review of the rework reads the findings that sent implement back);
@@ -104,7 +104,27 @@ An agent step's `reads:` (`inputs:` in the older form) lists what its brief give
 
 A red check is passed over in the search, never a stop: it carries no findings, and the ones before it are still what the rework answers. Two producers sending findings into one step (QA's `fail` and a person's `reject` at `human-qa` both reach `implement`) need no naming: the one that sent this visit back is open.
 
-An entry may also be a file in the repo, `{file: <path>, label: <text>}`, which the brief names as it is, or a name an earlier step produces (below). A workflow file naming any other input is refused when it loads, at the step and the entry (`/steps/review/reads/2`), with the names above. A unit's pinned workflow loads without this check, so a pinned workflow that names one keeps running, and its brief notes that norn provides no input of that name.
+An entry may also be a file in the repo, `{file: <path>, label: <text>}`, which the brief names as it is, a name an earlier step produces (below), or a source the workflow names ([Sources](#sources)). A trailing `?` makes a produced name or a source optional: no producer need come before the step, and a source nothing binds does not hold it; on one of norn's own inputs it changes nothing, as norn notes any input it holds nothing for. A workflow file naming any other input is refused when it loads, at the step and the entry (`/steps/review/reads/2`), with the names above. A unit's pinned workflow loads without this check, so a pinned workflow that names one keeps running, and its brief notes that norn provides no input of that name.
+
+### Sources
+
+A source is a place the steps read that is neither norn's nor the repo's code: design assets, decision records, a style guide. The workflow names it portably under `sources:`, and each machine binds it in its config, which wins over the workflow's own `path:`:
+
+```yaml
+sources:
+  adr:   { type: folder, path: docs/adr }   # bound by the workflow, relative to the repo's root
+  brand: { type: folder }                   # bound by each machine: norn config set sources.brand <path>
+steps:
+  design:
+    by: builder
+    do: "Design the page from the brand assets."
+    reads: [spec, adr, brand?]
+```
+
+- `type` is `folder` or `file`; the brief names the path, read-only, and norn copies nothing.
+- A step that reads a source without `?` that nothing binds parks `stuck` (`source.unbound`) before an agent starts, with the command that binds it, and `norn doctor` names it beforehand. Binding it lifts the park on the next tick.
+- A source takes a name of its own: not one of norn's inputs, not a name a step produces. A `path:` that leaves the repo is refused; bind a place outside it in the config.
+- A workflow with `sources:` pins them, so its pin's hash covers them; a workflow without pins as it did before sources existed.
 
 ## Outcomes
 
@@ -608,6 +628,7 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `kernel.counters.agent_back` | integer ≥ 1 | `3` |
 | `trace.retain` | duration or `"keep"` | `"7d"` |
 | `checks.<name>` | string | derived: `checks.test` is "bun test", which the shipped workflows' test steps run; init detects the repo's own |
+| `sources.<name>` | string | none |
 
 Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner` take the keys of the plugin they name; that plugin checks them.
 

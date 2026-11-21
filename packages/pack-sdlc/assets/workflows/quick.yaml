@@ -26,7 +26,7 @@ steps:
       the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
       changing any code, then fix the cause.
     with: { skills: [norn-implement] }
-    reads: [spec, handoff, last_check, last_findings]
+    reads: [spec, handoff, last_check, findings?]
     outcomes:
       done:
         to: update
@@ -44,7 +44,7 @@ steps:
     do: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
     with: { skills: [norn-review] }
     allow: [docs:write]
-    reads: [spec, diff, last_findings]
+    reads: [spec, diff, findings?]
     outcomes:
       approve:
         to: describe

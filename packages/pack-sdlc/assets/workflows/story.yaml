@@ -92,7 +92,7 @@ steps:
     by: builder
     do: "Rework the story in its worktree: the failing check, QA repro, CI failure or person's rejection the inputs name. Each rework point gets a test that fails before the code changes."
     with: { skills: [norn-implement] }
-    reads: [spec, handoff, last_check, last_findings]
+    reads: [spec, handoff, last_check, findings?]
     outcomes:
       done:
         to: review
@@ -104,7 +104,7 @@ steps:
     do: "Review the story-level rework against the findings it answers and the spec: it fixes what they ask and nothing else."
     with: { skills: [norn-review] }
     allow: [docs:write]
-    reads: [spec, diff, last_findings]
+    reads: [spec, diff, findings?]
     outcomes:
       approve:
         to: test

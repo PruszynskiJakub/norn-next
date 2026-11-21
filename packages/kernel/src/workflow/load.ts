@@ -11,7 +11,7 @@ import { type CountedStep, deriveCounters } from "./counters.ts";
 import { type CounterDoc, type OnRoute, type Route, type WorkflowDocument, WorkflowFile, type WorkflowStepDoc } from "./document.ts";
 import { type Flat, flatten } from "./flatten.ts";
 import type { AgentStepSpec, CompiledCounter, CompiledRoute, CompiledStep, PinnedWorkflow, WorkflowError, WorkflowGraph, WorkflowLoad } from "./graph.ts";
-import { flowErrors, producesOn, readersOf } from "./produces.ts";
+import { flowErrors, inside, producesOn, readersOf } from "./produces.ts";
 import { checkGraph } from "./shape.ts";
 import { type ReadStep, readStep } from "./steps.ts";
 
@@ -83,9 +83,12 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
   const read: Record<string, ReadStep> = {};
   const errors: WorkflowError[] = [];
   const produced = [...new Set(Object.values(flatSteps).flatMap((s) => Object.keys(s.produces ?? {})))];
+  const sources = Object.keys(written.sources ?? {});
+  for (const step of Object.values(flatSteps)) if (step.inputs) step.inputs = lowerReads(step.inputs, [...produced, ...sources]);
+  errors.push(...sourceErrors(written.sources ?? {}, opts.inputs, produced));
   const fileOf = new Map<string, { step: string; file: string }>();
   for (const [name, step] of Object.entries(flatSteps)) {
-    const r = readStep(name, step, opts.stepKinds, signals, opts.inputs, produced, opts.specFiles);
+    const r = readStep(name, step, opts.stepKinds, signals, opts.inputs, produced, opts.specFiles, sources);
     if (r.ok) read[name] = r.step;
     else errors.push(...r.errors.map(inShared));
     // the host hands a reader the file by its name, so every producer of a name writes the same file
@@ -229,7 +232,7 @@ function compile(
       routes: routes[name] ?? {},
     };
     if (s.signals.length) step.signals = s.signals.map((x) => ({ name: x.name, ...(x.params && { params: structuredClone(x.params) }) }));
-    if (s.kind === "agent") step.agent = agentSpec(written, d, config);
+    if (s.kind === "agent") step.agent = agentSpec(written, d, config, Object.keys(doc.sources ?? {}));
     else if (s.kind === "check") step.check = { command: written.check as string, timeout_ms: parseDuration(written.timeout as string), exits: { ...(written.exits ?? {}) } };
     else if (s.kind === "gate") step.gate = { prompt: written.gate as string };
     else if (s.config) step.config = s.config;
@@ -244,15 +247,52 @@ function compile(
     steps,
     counters,
     ...(doc.base && { base: doc.base }),
+    ...(doc.sources && { sources: structuredClone(doc.sources) }),
   };
 }
 
-function agentSpec(s: WorkflowStepDoc, d: NonNullable<WorkflowDocument["defaults"]>, config: LoadWorkflowOptions["config"]): AgentStepSpec {
+/** The name an input entry reads, without its optional mark. */
+const readOf = (input: string): string => (input.endsWith("?") ? input.slice(0, -1) : input);
+
+/**
+ * A step's reads as the pinned document keeps them: `findings` is the open findings, which norn
+ * provides as `last_findings`, and the optional mark stays only on a produced name or a source, where
+ * it means something; norn notes any input of its own it holds nothing for. So a read spelt either way
+ * pins one document.
+ */
+function lowerReads(inputs: WorkflowStepDoc["inputs"] & {}, optional: readonly string[]): NonNullable<WorkflowStepDoc["inputs"]> {
+  return inputs.map((input) => {
+    if (typeof input !== "string") return input;
+    const name = readOf(input);
+    if (name === OPEN_FINDINGS) return "last_findings";
+    return input.endsWith("?") && optional.includes(name) ? input : name;
+  });
+}
+const OPEN_FINDINGS = "findings";
+
+/** A source is named apart from what norn provides and what steps produce, and a path it gives stays in the repo. */
+function sourceErrors(sources: Readonly<Record<string, { path?: string }>>, host: readonly string[] | undefined, produced: readonly string[]): WorkflowError[] {
+  const errors: WorkflowError[] = [];
+  for (const [name, s] of Object.entries(sources)) {
+    if (host?.includes(name) || name === OPEN_FINDINGS) errors.push({ path: `/sources/${name}`, message: `\`${name}\` is an input norn provides: a source takes a name of its own` });
+    else if (produced.includes(name)) errors.push({ path: `/sources/${name}`, message: `\`${name}\` is a name a step produces: a source takes a name of its own` });
+    if (s.path !== undefined && !inside(s.path))
+      errors.push({
+        path: `/sources/${name}/path`,
+        message: `\`${s.path}\` leaves the repo: a source's path is relative to the repo's root, without \`..\`, with \`/\` between folders and no drive letter; bind a place outside the repo in the config's sources`,
+      });
+  }
+  return errors;
+}
+
+function agentSpec(s: WorkflowStepDoc, d: NonNullable<WorkflowDocument["defaults"]>, config: LoadWorkflowOptions["config"], sources: readonly string[]): AgentStepSpec {
   const deadline = s.deadline ?? d.deadline;
+  const required = (s.inputs ?? []).filter((i): i is string => typeof i === "string" && sources.includes(i));
   return {
     instructions: s.agent as string,
     skills: [...(s.skills ?? [])],
     inputs: [...(s.inputs ?? [])],
+    ...(required.length > 0 && { sources: required }),
     executor: s.by ?? null,
     ...(s.model !== undefined && { model: s.model }),
     attended: s.attended ?? false,

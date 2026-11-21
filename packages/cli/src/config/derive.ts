@@ -51,6 +51,7 @@ export function kernelConfigOf(config: NornConfig, executor: string): KernelConf
     base: config.base,
     claimTtlMs: k.claim_ttl ? durationMs(k.claim_ttl) : d.claimTtlMs,
     claimRenewBeforeMs: k.claim_renew_before ? durationMs(k.claim_renew_before) : d.claimRenewBeforeMs,
+    ...(config.sources !== undefined && Object.keys(config.sources).length > 0 && { sources: { ...config.sources } }),
   };
 }
 

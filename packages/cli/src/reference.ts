@@ -81,7 +81,7 @@ function typeName(s: Schema): string {
 }
 
 /** Keys that open a map: a record's keys are names a person picks, shown as a placeholder. */
-const RECORD_KEY: Record<string, string> = { executors: "<name>", plugins: "<name>", checks: "<name>" };
+const RECORD_KEY: Record<string, string> = { executors: "<name>", plugins: "<name>", checks: "<name>", sources: "<name>" };
 
 /**
  * Every key a config file can hold, walked from the file's schema: a map's own keys nest

@@ -63,6 +63,7 @@ export function readStep(
   inputs?: readonly string[],
   produced: readonly string[] = [],
   specFiles: readonly string[] = [],
+  sources: readonly string[] = [],
 ): { ok: true; step: ReadStep } | { ok: false; errors: WorkflowError[] } {
   const at = `/steps/${name}`;
   const raw = step as Record<string, unknown>;
@@ -98,10 +99,12 @@ export function readStep(
     if (!r.ok) errors.push(...r.errors.map((e) => ({ path: `${at}${e.path}`, message: `${head}: ${e.message}` })));
   }
   if (head === "agent" && inputs !== undefined) {
-    const known = [...inputs, ...produced.filter((p) => !inputs.includes(p))];
+    const known = [...new Set([...inputs, ...produced, ...sources])];
+    const also = [produced.length ? "a step produces" : "", sources.length ? "the workflow's sources name" : ""].filter(Boolean).join(" or ");
     (step.inputs ?? []).forEach((input, i) => {
-      if (typeof input === "string" && !known.includes(input))
-        errors.push({ path: `${at}/inputs/${i}`, message: `\`${input}\` is not an input norn provides${produced.length ? " or a step produces" : ""}: name one of ${known.join(", ")}, or a file as {file: <path>}` });
+      const name = typeof input === "string" && input.endsWith("?") ? input.slice(0, -1) : input;
+      if (typeof name === "string" && !known.includes(name))
+        errors.push({ path: `${at}/inputs/${i}`, message: `\`${name}\` is not an input norn provides${also ? ` or ${also}` : ""}: name one of ${known.join(", ")}, or a file as {file: <path>}` });
     });
   }
   if (head === "check" && step.timeout === undefined) errors.push({ path: at, message: "a check needs a timeout" });

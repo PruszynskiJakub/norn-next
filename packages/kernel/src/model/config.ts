@@ -48,6 +48,11 @@ export const KernelConfig = Type.Object(
      * branch did not land the story. Absent: a change merged into any branch lands it.
      */
     base: Type.Optional(NonEmpty),
+    /**
+     * Each workflow source this machine binds → its path, which wins over the workflow's own `path:`;
+     * a step reading a source neither binds parks `source.unbound`. Absent: none.
+     */
+    sources: Type.Optional(Type.Record(NonEmpty, NonEmpty)),
     /** how long a claim holds, and how long before it expires the holder renews it */
     claimTtlMs: PosInt,
     claimRenewBeforeMs: PosInt,

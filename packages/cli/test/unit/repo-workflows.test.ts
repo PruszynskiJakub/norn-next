@@ -116,3 +116,18 @@ describe("the repo's own workflows in .agents/workflows", () => {
     expect(checks.find((c) => c.name === "workflows")).toEqual(expect.objectContaining({ ok: false, code: "repo_workflow_invalid", error: expect.stringContaining("`last_finding`") }));
   });
 });
+
+describe("a repo workflow's sources", () => {
+  const SOURCED = ["name: sourced", "start: design", "sources:", "  brand: { type: folder }", "steps:", "  design:", "    by: builder", "    do: Design it.", "    reads: [spec, brand]", "    outcomes: { done: $done }", ""].join("\n");
+
+  test("doctor warns, before any step runs, about a source a workflow reads that nothing binds, and how to bind it; bound in the config, it says nothing", async () => {
+    const m = repoWith({ "sourced.yaml": SOURCED });
+    const check = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; ok: boolean; warning?: string; do_instead?: string }>).find((c) => c.name === "workflows");
+    expect(check?.ok).toBe(true);
+    expect(check?.warning).toContain("workflow sourced reads the source brand (step design), which nothing binds on this machine");
+    expect(check?.do_instead).toBe("norn config set sources.brand <path>");
+    expect((await runCli(["config", "set", "sources.brand", "/assets/brand", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    const again = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; warning?: string }>).find((c) => c.name === "workflows");
+    expect(again).not.toHaveProperty("warning");
+  });
+});

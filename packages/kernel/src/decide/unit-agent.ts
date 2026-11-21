@@ -73,7 +73,22 @@ function unguarded(v: UnitView, spec: AgentStepSpec, executor: string, caps: Exe
   return parkDecision(v, "agent.unguarded", "stuck", { text: `step '${v.state.step}' is writes: docs, but executor '${executor}' cannot deny a tool, so its writes would go unguarded; run it on an executor whose harness can (by:)` });
 }
 
+/**
+ * A source the step reads that nothing binds, the workflow by its `path:` or this machine's config:
+ * the agent would read a place that is not there, so no agent starts, fresh or retried, until a person
+ * binds it. Derived each tick, so the binding alone lifts the park.
+ */
+function unboundSource(v: UnitView, spec: AgentStepSpec): Decision | null {
+  const unbound = (spec.sources ?? []).find((s) => v.graph.sources?.[s]?.path === undefined && v.ctx.config.sources?.[s] === undefined);
+  if (unbound === undefined) return null;
+  return parkDecision(v, "source.unbound", "stuck", {
+    text: `step '${v.state.step}' reads the source \`${unbound}\`, which nothing binds on this machine: bind it with \`norn config set sources.${unbound} <path>\`, or give it a path: in the workflow`,
+  });
+}
+
 function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
+  const unbound = unboundSource(v, spec);
+  if (unbound) return unbound;
   // an attended step waits for the person who works beside it to start it (`run.requested`), in either mode
   if (spec.attended && v.state.requested === undefined) return parkDecision(v, "agent.ready.attended", "attended", { text: spec.instructions });
   const executor = executorOf(v, spec);
@@ -262,6 +277,8 @@ function quiet(v: UnitView, spec: AgentStepSpec, run: RunInfo, base: string): De
 function retry(v: UnitView, spec: AgentStepSpec, run: RunInfo, rule: string): Decision {
   const caps = capsOf(v, run.executor);
   if (!caps?.headless) return parkDecision(v, "agent.retry.no_headless", "stuck", { text: `run ${run.id} needs a fresh session; executor '${run.executor}' cannot run headless` });
+  const unbound = unboundSource(v, spec);
+  if (unbound) return unbound;
   const guardless = unguarded(v, spec, run.executor, caps);
   if (guardless) return guardless;
   const run_id = v.ctx.nextId();

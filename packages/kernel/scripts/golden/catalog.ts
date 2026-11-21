@@ -37,6 +37,17 @@ export const ROUTED_DOC = {
   },
 };
 
+/** A workflow whose design step reads a source the workflow gives no path, which a machine binds in its config. */
+export const SOURCED_DOC = {
+  name: "sourced",
+  description: "A design step that reads the brand assets, a source each machine binds.",
+  start: "design",
+  sources: { brand: { type: "folder" } },
+  steps: {
+    design: { agent: "Design the page from the brand assets.", inputs: ["spec", "brand"], outcomes: { done: "$done" } },
+  },
+};
+
 /** A workflow whose step names a step kind no configured plugin provides. */
 export const DEPLOY_DOC = {
   name: "deploy",

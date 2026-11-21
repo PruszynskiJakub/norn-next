@@ -274,6 +274,16 @@ describe("the runtime config derived from the person's", () => {
     expect(planSet(c, LOCAL_CONFIG, "local", "checks.Test", "x").ok).toBe(false);
   });
 
+  test("sources: each binding of a workflow source reaches the kernel, the local file's over the user's; a name or an empty path it refuses", async () => {
+    const r = runtimeConfigOf(await loaded({ user: "sources: { brand: /assets/brand, adr: /old/adr }\n", local: `${LOCAL_CONFIG}sources: { adr: docs/decisions }\n` }), "me@box");
+    expect(r.kernel.sources).toEqual({ brand: "/assets/brand", adr: "docs/decisions" });
+    expect("sources" in runtimeConfigOf(await loaded({ local: LOCAL_CONFIG }), "me@box").kernel).toBe(false);
+    const c = await loaded({ local: LOCAL_CONFIG });
+    expect(planSet(c, LOCAL_CONFIG, "local", "sources.brand", "/assets/brand").ok).toBe(true);
+    expect(planSet(c, LOCAL_CONFIG, "local", "sources.brand", "").ok).toBe(false);
+    expect(planSet(c, LOCAL_CONFIG, "local", "sources.Brand", "x").ok).toBe(false);
+  });
+
   test("durations", () => {
     expect([durationMs("250ms"), durationMs("30s"), durationMs("15m"), durationMs("2h"), durationMs("7d")]).toEqual([250, 30_000, 900_000, 7_200_000, 604_800_000]);
     expect(() => durationMs("15 m")).toThrow();

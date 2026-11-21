@@ -75,6 +75,7 @@ export const RULE_IDS: readonly string[] = [
   "agent.start",
   "agent.no_executor",
   "agent.unguarded",
+  "source.unbound",
   "agent.ready.attended",
   "agent.ready.manual",
   "agent.ready.no_headless",

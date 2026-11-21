@@ -66,6 +66,26 @@ export function toolsNeeded(config: NornConfig | null): Array<{ tool: string; wh
   return out;
 }
 
+/**
+ * The sources a loaded workflow's steps read that neither the workflow nor this machine's config
+ * binds: such a step parks `source.unbound` when it is reached, so doctor names it before any runs.
+ */
+function unboundSourceWarning(env: RuntimeEnv): { warning: string; do_instead: string } | null {
+  const bound = env.config.kernel.sources ?? {};
+  const found: { workflow: string; source: string; step: string }[] = [];
+  for (const [name, load] of Object.entries(env.workflows).sort(([a], [b]) => a.localeCompare(b))) {
+    if (!load.ok) continue;
+    const graph = load.workflow.graph;
+    for (const step of Object.values(graph.steps))
+      for (const source of step.agent?.sources ?? []) if (graph.sources?.[source]?.path === undefined && bound[source] === undefined) found.push({ workflow: name, source, step: step.name });
+  }
+  if (found.length === 0) return null;
+  return {
+    warning: found.map((f) => `workflow ${f.workflow} reads the source ${f.source} (step ${f.step}), which nothing binds on this machine`).join("; "),
+    do_instead: [...new Set(found.map((f) => `norn config set sources.${f.source} <path>`))].join(", "),
+  };
+}
+
 /** Which workflows load, and which of them are the repo's own files rather than the pack's. */
 function workflowsDetail(env: RuntimeEnv): string {
   const names = Object.keys(env.workflows).sort();
@@ -266,8 +286,10 @@ export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Prom
         if (workflows.check) checks.push(workflows.check);
         else {
           const legacy = legacySignalWarning(env.value);
-          const warning = [await unseenSkillWarning(env.value), legacy?.warning].filter((w) => w).join("; ");
-          checks.push({ ...passed("workflows", workflowsDetail(env.value)), ...(warning ? { warning } : {}), ...(legacy ? { do_instead: legacy.do_instead } : {}) });
+          const unbound = unboundSourceWarning(env.value);
+          const warning = [await unseenSkillWarning(env.value), legacy?.warning, unbound?.warning].filter((w) => w).join("; ");
+          const doInstead = [legacy?.do_instead, unbound?.do_instead].filter((w) => w).join("; ");
+          checks.push({ ...passed("workflows", workflowsDetail(env.value)), ...(warning ? { warning } : {}), ...(doInstead ? { do_instead: doInstead } : {}) });
         }
         if (!opts.repoOnly) {
           checks.push(await labelsCheck(env.value), await hooksCheck(ctx, cwd, env.value.slots.executors), await skillsCheck(env.value));

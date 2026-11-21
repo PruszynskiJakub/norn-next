@@ -40,6 +40,26 @@ describe("a ready agent step", () => {
     expect(d.inbox?.text).toContain("writes: docs");
   });
 
+  test("a step that reads a source nothing binds parks stuck with how to bind it, fresh or retried", () => {
+    const wf = loaded({ ...graph({ build: { agent: agentSpec({ inputs: ["spec", "brand"], sources: ["brand"] }) } }), sources: { brand: { type: "folder" } } });
+    const d = kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf] }), "park");
+    expect(d.rule).toBe("source.unbound");
+    expect(d.intent.data).toMatchObject({ kind: "unit.parked", reason: "source.unbound" });
+    expect(d.inbox?.kind).toBe("stuck");
+    expect(d.inbox?.text).toBe("step 'build' reads the source `brand`, which nothing binds on this machine: bind it with `norn config set sources.brand <path>`, or give it a path: in the workflow");
+    const retried = kindOf(decideCase({ state: stateAt("build", { run: run() }, wf), workflows: [wf], session: session("ended") }), "park");
+    expect(retried.rule).toBe("source.unbound");
+  });
+
+  test("a source the workflow gives a path, or the config binds, starts the step; an optional read of one never holds it", () => {
+    const pathed = loaded({ ...graph({ build: { agent: agentSpec({ inputs: ["brand"], sources: ["brand"] }) } }), sources: { brand: { type: "folder", path: "assets/brand" } } });
+    expect(decideCase({ state: stateAt("build", {}, pathed), workflows: [pathed] })?.rule).toBe("agent.start");
+    const bound = loaded({ ...graph({ build: { agent: agentSpec({ inputs: ["brand"], sources: ["brand"] }) } }), sources: { brand: { type: "folder" } } });
+    expect(decideCase({ state: stateAt("build", {}, bound), workflows: [bound], config: { sources: { brand: "/assets/brand" } } })?.rule).toBe("agent.start");
+    const optional = loaded({ ...graph({ build: { agent: agentSpec({ inputs: ["brand?"] }) } }), sources: { brand: { type: "folder" } } });
+    expect(decideCase({ state: stateAt("build", {}, optional), workflows: [optional] })?.rule).toBe("agent.start");
+  });
+
   test("a docs-only step starts where the harness denies a tool, and a step that writes its worktree starts either way", () => {
     const docs = loaded(graph({ build: { agent: agentSpec({ writes: "docs" }) } }));
     expect(decideCase({ state: stateAt("build", {}, docs), workflows: [docs] })?.rule).toBe("agent.start");

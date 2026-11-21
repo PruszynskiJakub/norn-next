@@ -69,6 +69,9 @@ export const KernelKnobs = Type.Object(
 /** A check's command by the name a workflow's check step spells as `{checks.<name>}`. */
 export const Checks = Type.Record(Name, NonEmpty, closed);
 
+/** Where this machine keeps each workflow source, by the name the workflow gives it: an absolute path, or one relative to the repo's root. */
+export const Sources = Type.Record(Type.String({ pattern: "^[a-z][a-z0-9_]*$" }), NonEmpty, closed);
+
 export const CONFIG_FORMAT = 1;
 
 /** The merged config every command runs on. */
@@ -95,6 +98,8 @@ export const NornConfig = Type.Object(
     trace: Type.Optional(TraceKnobs),
     /** the commands a workflow's check step names as `{checks.<name>}`; the shipped test steps name `test` */
     checks: Type.Optional(Checks),
+    /** where this machine keeps the sources a workflow names, which win over a workflow's own `path:` */
+    sources: Type.Optional(Sources),
   },
   { ...closed, title: "NornConfig" },
 );
@@ -132,6 +137,7 @@ export const ConfigLayer = Type.Object(
     kernel: Type.Optional(KernelKnobs),
     trace: Type.Optional(TraceKnobs),
     checks: Type.Optional(Checks),
+    sources: Type.Optional(Sources),
   },
   { ...closed, title: "NornConfigLayer" },
 );

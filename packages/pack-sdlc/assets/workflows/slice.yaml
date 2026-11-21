@@ -10,7 +10,7 @@ steps:
     by: builder
     do: "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps."
     with: { skills: [norn-implement] }
-    reads: [slice, spec, handoff, last_check, last_findings]
+    reads: [slice, spec, handoff, last_check, findings?]
     outcomes:
       done:
         to: test
@@ -25,7 +25,7 @@ steps:
     do: "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch."
     with: { skills: [norn-review] }
     allow: [docs:write]
-    reads: [slice, spec, diff, last_findings]
+    reads: [slice, spec, diff, findings?]
     outcomes:
       approve:
         to: integrate

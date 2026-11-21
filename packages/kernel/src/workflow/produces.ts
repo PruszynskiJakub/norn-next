@@ -46,7 +46,7 @@ export function producedFiles(steps: Readonly<Record<string, WorkflowStepDoc>>):
  * A path that stays inside the folder it is relative to on every host: not absolute, no `..` segment,
  * no backslash (a separator on Windows, a plain character elsewhere) and no drive letter.
  */
-const inside = (file: string): boolean => !file.startsWith("/") && !file.includes("\\") && !/^[A-Za-z]:/.test(file) && !file.split("/").includes("..");
+export const inside = (file: string): boolean => !file.startsWith("/") && !file.includes("\\") && !/^[A-Za-z]:/.test(file) && !file.split("/").includes("..");
 
 /** The path as segments, `.` and empty ones dropped, lower-cased: a case-insensitive file system makes `Spec.md` the spec. */
 const segments = (file: string): string[] => file.split("/").filter((s) => s !== "" && s !== ".").map((s) => s.toLowerCase());

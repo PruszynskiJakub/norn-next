@@ -5,7 +5,7 @@
  */
 import { Mode, NonEmpty, NonNegInt, OutcomeName, PosInt, StepName, StepWrites, Target, Verdict } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
-import { BaseDoc, DocCounterName, HandBack, StepInputDoc, WorkflowDocument } from "./document.ts";
+import { BaseDoc, DocCounterName, HandBack, SourcesDoc, StepInputDoc, WorkflowDocument } from "./document.ts";
 
 const closed = { additionalProperties: false } as const;
 const Sha256 = Type.String({ pattern: "^[0-9a-f]{64}$" });
@@ -63,6 +63,8 @@ export const AgentStepSpec = Type.Object(
     instructions: NonEmpty,
     skills: Type.Array(NonEmpty),
     inputs: Type.Array(StepInputDoc),
+    /** the sources the step reads without a `?`: one nothing binds holds the step before it starts */
+    sources: Type.Optional(Type.Array(OutcomeName)),
     /** the executor named by `by:`; null takes the config's */
     executor: Type.Union([NonEmpty, Type.Null()]),
     model: Type.Optional(NonEmpty),
@@ -135,6 +137,7 @@ export const WorkflowGraph = Type.Object(
     steps: Type.Record(StepName, CompiledStep),
     counters: Type.Record(GraphCounterName, CompiledCounter),
     base: Type.Optional(BaseDoc),
+    sources: Type.Optional(SourcesDoc),
   },
   { ...closed, title: "WorkflowGraph" },
 );

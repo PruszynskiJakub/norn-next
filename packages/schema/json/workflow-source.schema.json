@@ -180,6 +180,11 @@
                         ]
                       },
                       {
+                        "pattern": "^[a-z][a-z0-9_]*\\??$",
+                        "description": "a name an earlier step produces, a source the workflow names, or findings, the open findings; a trailing ? makes it optional",
+                        "type": "string"
+                      },
+                      {
                         "additionalProperties": false,
                         "type": "object",
                         "required": [
@@ -868,6 +873,11 @@
                             "type": "string"
                           }
                         ]
+                      },
+                      {
+                        "pattern": "^[a-z][a-z0-9_]*\\??$",
+                        "description": "a name an earlier step produces, a source the workflow names, or findings, the open findings; a trailing ? makes it optional",
+                        "type": "string"
                       },
                       {
                         "additionalProperties": false,
@@ -2163,6 +2173,43 @@
         "verify": {
           "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
           "type": "string"
+        }
+      }
+    },
+    "sources": {
+      "additionalProperties": false,
+      "description": "A source a step reads by name; one with no path is bound in the config's sources",
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_-]*$": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "anyOf": [
+                {
+                  "const": "folder",
+                  "type": "string"
+                },
+                {
+                  "const": "file",
+                  "type": "string"
+                }
+              ]
+            },
+            "path": {
+              "minLength": 1,
+              "pattern": "\\S",
+              "description": "Relative to the repo's root; the config's sources binding wins",
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
         }
       }
     },

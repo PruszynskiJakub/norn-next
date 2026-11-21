@@ -16,7 +16,7 @@
  * A copy of what norn last wrote sits in `.agents/run/.base/`, and only a file that differs from it
  * is read back, so a worktree that kept a stale, untouched copy never overwrites a newer document.
  */
-import { type BriefInputs, type BriefInputView, type BriefStory, type KernelReceipt, producedFiles, type UnitJournal, type WorkflowStepDoc } from "@norn/kernel";
+import { type BriefInputs, type BriefInputView, type BriefStory, type KernelReceipt, producedFiles, type SourceDoc, type UnitJournal, type WorkflowStepDoc } from "@norn/kernel";
 import { type HostFiles, ok, type PluginResult, parseStoryKey, parseUnitId, RUN_DIRS_ENV, type TrackerItem } from "@norn/plugin-api";
 import type { CriterionVerdict, Finding } from "@norn/schema";
 import { baseRefOf, cutFrom } from "./branches.ts";
@@ -381,12 +381,16 @@ export const HOST_INPUTS = ["spec", "handoff", "last_check", "last_findings", SI
 type HostInput = (typeof HOST_INPUTS)[number];
 const isHostInput = (name: string): name is HostInput => (HOST_INPUTS as readonly string[]).includes(name);
 
-async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, worktree: string, name: string, item: TrackerItem | null, out: MaterializedInputs): Promise<BriefInputView> {
+async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, worktree: string, read: string, item: TrackerItem | null, out: MaterializedInputs): Promise<BriefInputView> {
   const unit = record.unit;
   const [spec, handoff] = docsOf(unit) as [Doc, Doc];
+  // the optional mark only says the step may run without it; what it names is read the same way
+  const name = read.endsWith("?") ? read.slice(0, -1) : read;
   if (!isHostInput(name)) {
-    const steps = record.state?.workflow.doc.steps ?? {};
-    const producer = Object.entries(steps).find(([, s]) => s.produces?.[name] !== undefined);
+    const doc = record.state?.workflow.doc;
+    const source = doc?.sources?.[name];
+    if (source) return sourceView(env, name, source);
+    const producer = Object.entries(doc?.steps ?? {}).find(([, s]) => s.produces?.[name] !== undefined);
     if (producer) return materializeProduced(env, worktree, unit, name, producer[0], producer[1]);
     // a pinned revision is loaded without the input check, so it may still name one: noted, never failed
     return { name, note: "norn provides no input of this name" };
@@ -442,6 +446,16 @@ async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: Brief
     case "base_side":
       return resolvedInput(env, worktree, name, "the base side of the conflict: the base commit to merge and what it changed in each conflicting path", await baseSideOf(env, record));
   }
+}
+
+/**
+ * A workflow source, where this machine's config binds it, else at the workflow's path, which is
+ * relative to the repo and so to the worktree. norn copies nothing: the agent reads it in place.
+ */
+function sourceView(env: RuntimeEnv, name: string, source: SourceDoc): BriefInputView {
+  const label = `the source \`${name}\` (a ${source.type}), read-only`;
+  const path = env.config.kernel.sources?.[name] ?? source.path;
+  return path === undefined ? { name, label, note: "nothing binds it on this machine, and the step reads it only when bound" } : { name, label, path };
 }
 
 /** A file an earlier step produced, from the story's documents, so a step in another worktree reads it too. */

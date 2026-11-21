@@ -54,11 +54,13 @@ export type HandBack = Static<typeof HandBack>;
 
 /**
  * An input the brief gives the agent: a named kind (`spec`, `diff`, `last_findings`, ...) the host's
- * brief builder resolves (the loader, given the host's names, refuses any other), or a file. Decide
- * passes them through and never opens them.
+ * brief builder resolves (the loader, given the host's names, refuses any other), a name an earlier
+ * step produces, a source the workflow names, or a file. A trailing `?` marks a produced name or a
+ * source as optional: no producer need come first, and an unbound source does not hold the step.
+ * Decide passes them through and never opens them.
  */
 export const StepInputDoc = Type.Union([
-  Type.String({ pattern: OUTCOME_NAME_PATTERN }),
+  Type.String({ pattern: `${OUTCOME_NAME_PATTERN.slice(0, -1)}\\??$` }),
   Type.Object({ file: NonEmpty, label: Type.Optional(NonEmpty) }, closed),
 ]);
 export type StepInputDoc = Static<typeof StepInputDoc>;
@@ -230,6 +232,22 @@ export type BaseDoc = Static<typeof BaseDoc>;
 /** A signal's settings for the whole workflow: when `vcs.stale` fires, and the check that re-verifies a base move without a conflict. */
 const SignalSettingsDoc = Type.Object({ when: Type.Optional(BaseDoc.properties.stale), verify: Type.Optional(StepName) }, closed);
 
+/**
+ * A place a workflow's steps read that is neither norn's nor the repo's code: named portably in the
+ * workflow, and bound to a path by `path:` (relative to the repo's root) or by the machine's config,
+ * which wins. A step reads it by name; one nothing binds holds the step for a person.
+ */
+export const SourceDoc = Type.Object(
+  {
+    type: Type.Union([Type.Literal("folder"), Type.Literal("file")]),
+    path: Type.Optional(Type.String({ minLength: 1, pattern: "\\S", description: "Relative to the repo's root; the config's binding wins" })),
+    description: Type.Optional(Type.String()),
+  },
+  closed,
+);
+export type SourceDoc = Static<typeof SourceDoc>;
+export const SourcesDoc = Type.Record(Type.String({ pattern: OUTCOME_NAME_PATTERN }), SourceDoc, closed);
+
 /** What only a workflow file holds: `signals:` and `entries:`, lowered into the pinned document's `base:`. */
 const FILE_KEYS = {
   signals: Type.Optional(Type.Record(SignalSurfaceName, SignalSettingsDoc, closed)),
@@ -248,6 +266,7 @@ function workflowProps<S extends TSchema>(step: S) {
     steps: Type.Record(StepName, step, { ...closed, minProperties: 1 }),
     counters: Type.Optional(Type.Record(DocCounterName, CounterDoc, closed)),
     base: Type.Optional(BaseDoc),
+    sources: Type.Optional(SourcesDoc),
   };
 }
 
