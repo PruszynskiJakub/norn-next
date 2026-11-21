@@ -18,6 +18,7 @@ import {
   readSentPrompt,
   shellQuote,
   shimScript,
+  WRITES_ENV,
 } from "../../src/index.ts";
 
 const START = "2026-11-17T09:00:00.000Z";
@@ -246,6 +247,18 @@ describe("harness launcher start of a docs-only step", () => {
     expect(refused).toMatchObject({ ok: false, failure: { code: "invalid", retryable: false } });
     expect(!refused.ok && refused.failure.message).toContain("writes: docs");
     expect([s.bgHarness.installs, s.bgHarness.launches, s.bg.starts]).toEqual([[], [], []]);
+  });
+
+  test("its launch, and a resume of it, carry the step's writes in the env, so the hook guard holds it with the record unreadable", async () => {
+    const s = setup({ bgHarness: { resume: true } });
+    const runId = "01JRUN0000000000000000000B";
+    const started = await s.launcher.start(run({ executor: "bg", attended: false, run_id: runId, writes: "docs" }));
+    if (!started.ok) throw new Error("start failed");
+    expect([s.bgHarness.launches[0]?.env[WRITES_ENV], s.bg.starts[0]?.env[WRITES_ENV]]).toEqual(["docs", "docs"]);
+    await appendEvents(s.ctx, "gh-12/03", runId, [{ type: "session.started", run_id: runId, seq: 0, at: START, harness_session: "sess-1" }]);
+    s.bg.live.clear();
+    expect(await s.launcher.answer(started.value.handle, "q1", "go left")).toEqual(ok(undefined));
+    expect([s.bgHarness.launches[1]?.env[WRITES_ENV], s.bg.starts[1]?.env[WRITES_ENV]]).toEqual(["docs", "docs"]);
   });
 
   test("starts on a harness that denies a tool, and a step that writes its worktree starts on either", async () => {

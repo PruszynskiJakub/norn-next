@@ -13,7 +13,7 @@
 import { type BriefCommands, DEFAULT_BRIEF_COMMANDS, type Journal, type ReportHintInput, reduceSession, renderReportHint, renderStepReminder } from "@norn/kernel";
 import { type Harness, type HarnessAnswer, type HarnessEvent, type HostContext, type NativeReply, RUN_ENV } from "@norn/plugin-api";
 import { specFolder } from "../inputs.ts";
-import { liveStepOf, reportOnRecord, runWrites } from "../live-run.ts";
+import { liveStepOf, reportOnRecord, runWrites, WRITES_ENV } from "../live-run.ts";
 import { type AnswerContext, answerFor, MAX_STOP_BLOCKS, owesReportBlock, resolvePath } from "./answer.ts";
 import { appendEvents, readEvents } from "./log.ts";
 import { realPath } from "./real-path.ts";
@@ -212,7 +212,9 @@ export async function ingestHook(deps: IngestDeps, input: IngestInput): Promise<
     const worktree = deps.worktreeOf(unit);
     const protectedPaths = deps.protectedPaths ?? [ctx.repo.dataDir];
     const own = record !== null ? runWrites(record, runId) : null;
-    const docs = own?.writes === "docs" ? { step: own.step, dir: specFolder(unit), done: (deps.commands ?? DEFAULT_BRIEF_COMMANDS).done } : undefined;
+    // the record has the last word; without it the launch env's rule holds, so an unreadable record never opens the code to a docs-only run
+    const docsOnly = own !== null ? own.writes === "docs" : input.env[WRITES_ENV] === "docs";
+    const docs = docsOnly ? { ...(own && { step: own.step }), dir: specFolder(unit), done: (deps.commands ?? DEFAULT_BRIEF_COMMANDS).done } : undefined;
     const real = await realPaths(ctx, worktree, protectedPaths, fresh, docs?.dir);
     const computed = answerFor(fresh, {
       worktree,

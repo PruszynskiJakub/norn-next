@@ -38,7 +38,7 @@ export interface AnswerContext {
    * Set when the run's step is `writes: docs`: inside the worktree a write may land only in `dir`, the
    * story's spec folder; `done` is how the report command is spelled, for the reason a denial gives.
    */
-  docs?: { step: string; dir: string; done: string };
+  docs?: { step?: string; dir: string; done: string };
   /**
    * The same paths with their symlinks followed: `writes` maps each write's folded path to its real
    * one. A write whose real path lands in run state is denied though its folded path is in the worktree,
@@ -105,7 +105,7 @@ function guard(events: readonly HarnessEvent[], ctx: AnswerContext): HarnessAnsw
 
 function docsOnlyReason(docs: NonNullable<AnswerContext["docs"]>, dir: string, path: string): string {
   return (
-    `norn: step \`${docs.step}\` is docs-only (\`writes: docs\`): it writes only the story's documents in \`${dir}\` and files outside the repo, never \`${path}\`. ` +
+    `norn: ${docs.step !== undefined ? `step \`${docs.step}\`` : "this step"} is docs-only (\`writes: docs\`): it writes only the story's documents in \`${dir}\` and files outside the repo, never \`${path}\`. ` +
     `Do not edit code in this step: report what needs changing as findings, \`${docs.done} <outcome> --findings <file>\` with the file outside the repo (under $TMPDIR).`
   );
 }

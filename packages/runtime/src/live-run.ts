@@ -72,6 +72,13 @@ export function liveStepOf(state: RunState | null, unapplied: readonly KernelRec
 }
 
 /**
+ * Set to `docs` in a docs-only run's launch env, resumes too. The hook guard reads the step's rule
+ * from the record; when the record cannot be read it holds this instead, so a docs-only run never
+ * falls back to the worktree rule.
+ */
+export const WRITES_ENV = "NORN_WRITES";
+
+/**
  * The step a run was started at and what it lets the agent write, from the run's start receipt and
  * the workflow the unit pins; null when the record holds no start of that run. A run that is no
  * longer live is held to its own step's rule, not to the step the unit has moved on to.

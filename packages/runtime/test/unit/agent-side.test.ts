@@ -16,6 +16,7 @@ import {
   recordSentPrompt,
   reportRun,
   writeStoryDoc,
+  WRITES_ENV,
 } from "../../src/index.ts";
 import { has, harness, type Harnessed, record, type Report, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
 
@@ -231,6 +232,27 @@ describe("guard hook on a docs-only step", () => {
     const { h, runId } = await docsOnly();
     expect(reasonOf(await hook(h, runId, "PreToolUse", preWrite("/repo/src/x.ts")))?.permissionDecisionReason).toContain("outside this unit's worktree");
     expect(reasonOf(await hook(h, runId, "PreToolUse", preWrite("/machine/repo/store/units/lt-1/state.json")))?.permissionDecisionReason).toContain("run state");
+  });
+
+  test("with the record unreadable or corrupt, the guard holds the step's writes from the launch env: a write to code is still denied", async () => {
+    const { h, runId } = await docsOnly();
+    const unreadable = { ...h.env.journal, readUnit: async () => ({ ok: false, failure: { code: "unavailable", message: "store down", retryable: true } }) } as unknown as IngestDeps["journal"];
+    const corrupt = {
+      ...h.env.journal,
+      readUnit: async (u: string) => {
+        const r = await h.env.journal.readUnit(u);
+        return r.ok ? { ok: true, value: { ...r.value, corrupt: "state.json fails its schema" } } : r;
+      },
+    } as unknown as IngestDeps["journal"];
+    for (const journal of [unreadable, corrupt]) {
+      const r = await ingestHook(deps(h, { journal }), { harness: "claude", hook: "PreToolUse", payload: { hook_event_name: "PreToolUse", session_id: "s1", ...preWrite("src/x.ts") }, env: { ...env(runId), [WRITES_ENV]: "docs" } });
+      await r.delivered();
+      expect(reasonOf(r)?.permissionDecision).toBe("deny");
+      expect(reasonOf(r).permissionDecisionReason).toContain("writes: docs");
+      const doc = await ingestHook(deps(h, { journal }), { harness: "claude", hook: "PreToolUse", payload: { hook_event_name: "PreToolUse", session_id: "s1", ...preWrite(".agents/specs/lt-1/spec.md") }, env: { ...env(runId), [WRITES_ENV]: "docs" } });
+      await doc.delivered();
+      expect(reasonOf(doc)).toBeNull();
+    }
   });
 
   test("a shell call is not judged, as on every step", async () => {
