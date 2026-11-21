@@ -55,7 +55,7 @@ export { type GatherOptions, type GatheredFacts, gatherFacts } from "./facts.ts"
 export { acquireTickLock, DEFAULT_LOCK_STALE_MS, type TickLock, tickLockPath } from "./lock.ts";
 export { lastSeqIn, unitInFacts, writeAndCommit, type Written } from "./record.ts";
 export { NO_REPO_WORKFLOWS, overlayRepoWorkflows, readRepoWorkflows, REPO_WORKFLOWS_DIR, type RepoWorkflows, repoFileOf, workflowNameOf } from "./repo-workflows.ts";
-export { CONFIRMED_DIR, confirmedWorkflowPath, type HeldWorkflow, holdChanged, readConfirmedWorkflows } from "./confirm.ts";
+export { CONFIRMED_DIR, confirmedWorkflowPath, type HeldWorkflow, heldProblems, heldRunning, holdChanged, readConfirmedWorkflows } from "./confirm.ts";
 export { collectSignals, collectStepKinds, findProvided, loadPackWorkflows, type ProvidedSignal, type ProvidedStepKind, type ResolvedSlots, resolveSlots, signalDeclarations, type SlotName } from "./resolve.ts";
 export { clockSignalSource } from "./signal-clock.ts";
 export { VERIFY_BASE_KIND, vcsSignalSources } from "./signal-vcs.ts";

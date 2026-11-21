@@ -32,7 +32,9 @@ export const storyCreateCommand = defineCommand({
     const tracker = env.slots.tracker;
     if (!tracker.capabilities.create) throw refuse(`the ${tracker.name} tracker cannot create an item`, "create the item where the tracker keeps it, with the intake label", "unsupported");
     const workflow = opt.str(args, "workflow");
-    const refused = workflow === undefined ? null : workflowRefusal(env, workflow);
+    // an item naming no workflow takes the default at intake, so a held default is refused here too
+    const fallback = env.config.kernel.workflow;
+    const refused = workflow !== undefined ? workflowRefusal(env, workflow) : env.held[fallback] ? workflowRefusal(env, fallback) : null;
     if (refused) throw refused;
     const defined = [intakeLabel(env), ...(workflow ? [workflowLabel(env, workflow)] : [])];
     const labels = defined.map((l) => l.name);

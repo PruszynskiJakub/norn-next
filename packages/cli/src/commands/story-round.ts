@@ -105,8 +105,9 @@ export const storyRoundCommand = defineCommand({
     await syncStore(env, key, `norn story round ${key} --workflow ${name}`);
 
     const load = env.workflows[name];
-    // a workflow that is missing or does not load always has a refusal
-    if (!load?.ok) throw workflowRefusal(env, name) as CliFailure;
+    const refused = workflowRefusal(env, name);
+    // a workflow that is missing, does not load or is held always has a refusal
+    if (refused || !load?.ok) throw refused as CliFailure;
     const graph = load.workflow.graph;
     if (at !== undefined && !graph.steps[at]) {
       throw refuse(`workflow ${name} has no step ${at}`, `name one of ${Object.keys(graph.steps).join(", ")}`, "unknown_step");

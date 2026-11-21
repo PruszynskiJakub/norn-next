@@ -41,6 +41,22 @@ export interface HeldWorkflow {
   refused?: string;
 }
 
+/** What a held workflow's new rounds run instead of the repo's file, as a person reads it. */
+export function heldRunning(h: HeldWorkflow): string {
+  return h.running === null ? "none of it" : h.running.from === "pack" ? "the pack's revision, not the repo's file" : "the revision the person last confirmed, not the repo's file";
+}
+
+/**
+ * The line a tick reports for each held workflow, every tick until the person confirms it: a held
+ * file stops no tick, so a repo whose own files were held the first time this norn saw them would
+ * otherwise start rounds on the pack's file with nothing said.
+ */
+export function heldProblems(held: Readonly<Record<string, HeldWorkflow>>): string[] {
+  return Object.entries(held)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, h]) => `workflow ${name} is held for the person's confirmation (${h.changes.join("; ")}); new rounds run ${heldRunning(h)}: a person runs norn workflow confirm ${name}`);
+}
+
 /** What each load takes but its shared files, worked out from the document loaded: a policy grant names a step by the workflow's own `name:`. */
 export type ConfirmOptions = (doc: unknown, name: string) => Omit<LoadWorkflowOptions, "sharedFiles">;
 
