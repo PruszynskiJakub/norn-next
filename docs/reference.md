@@ -45,7 +45,7 @@ An agent step's `inputs:` lists what its brief gives it. norn writes each one un
 | `spec` | the story's spec, `.agents/specs/<story>/spec.md`: its tracker item, mirrored, and the sections later steps added |
 | `handoff` | this unit's handoff, `.agents/specs/<story>/handoffs/<unit>.md`, which the agent keeps current |
 | `last_check` | the last check's exit, outcome and the end of its output |
-| `last_findings` | the findings that sent the work back: a rejected gate's reason, or the report of the step that handed findings back |
+| `last_findings` | the open findings (below): a rejected gate's reason, or the report of a step whose outcome produced findings |
 | `signal` | the signal that moved the story from where it waited, with what its source reported; the agent step right after a signal gets it whether or not it lists it |
 | `diff` | the `git diff` command that shows the change so far |
 | `slice` | this slice's file, `slices/<nn>-<slug>.md` in the story's spec folder |
@@ -54,22 +54,62 @@ An agent step's `inputs:` lists what its brief gives it. norn writes each one un
 | `resolution` | the resolution to review: each merge's remerge-diff and the conflicts this round recorded |
 | `base_side` | the base side of a conflict: the base commit to merge and what it changed in each conflicting path |
 
+**The open findings.** `last_findings` names one report, never a history:
+
+1. the report that sent this visit back (a rejected gate, or an outcome that produced findings), when one did;
+2. otherwise the latest one this round that no clean outcome has settled since: a gate's `approve`, or the producing step reporting an outcome without findings (a review of the rework reads the findings that sent implement back);
+3. otherwise none, and the brief says so.
+
+A red check is passed over in the search, never a stop: it carries no findings, and the ones before it are still what the rework answers. Two producers sending findings into one step (QA's `fail` and a person's `reject` at `human-qa` both reach `implement`) need no naming: the one that sent this visit back is open.
+
 An entry may also be a file in the repo, `{file: <path>, label: <text>}`, which the brief names as it is, or a name an earlier step produces (below). A workflow file naming any other input is refused when it loads, at the step and the entry (`/steps/review/inputs/2`), with the names above. A unit's pinned workflow loads without this check, so a pinned workflow that names one keeps running, and its brief notes that norn provides no input of that name.
+
+## Outcomes
+
+A step's `outcomes:` routes each outcome it ends with. A route is a bare target (a step, `$done` or `$stuck`), or an object that says everything about the outcome in one place:
+
+```yaml
+qa:
+  agent: "Give each criterion a verdict with evidence."
+  inputs: [spec, slices, diff]
+  produces: [criteria]                   # what every outcome produces, unless it lists its own
+  outcomes:
+    pass:       { to: describe, verdict: pass, means: "every criterion observed with evidence" }
+    fail:       { to: implement, counter: qa_loop, verdict: fail, produces: [criteria, findings] }
+    unverified: { to: human-qa, verdict: unverified }
+```
+
+| Key | What it says |
+|---|---|
+| `to` | the next step, `$done` or `$stuck` |
+| `exit` | in a shared file, in place of `to`: the exit it leaves by, which the `use` step routes |
+| `max` | the bound of the counter derived for this edge ([Recipes › Bound a loop](recipes.md#bound-a-loop)) |
+| `counter` | a counter declared under `counters:`, shared with other edges, in place of `max` |
+| `means` | what the outcome means, shown to the agent in the brief (agent steps) |
+| `verdict` | the worst criteria verdict this outcome needs: `pass`, `fail`, `person` or `unverified` (agent steps) |
+| `produces` | what the report of this outcome comes with, replacing the step's list whole; `[]` is nothing (agent steps) |
+
+An entry of a `produces:` list is a report norn takes with the outcome, written bare, or a file:
+
+- `criteria`: a criteria report, `norn done <outcome> --criteria <file>`. An outcome with a `verdict` produces it, and one without a verdict produces it only when every outcome of the step does.
+- `findings` (or `evidence`): handed back with the outcome; an outcome hands back one of them. Findings become the next step's open findings ([Inputs](#inputs)). A person's `reject` at a gate produces findings from its reason without saying so.
+- `{ name: <name>, file: <path> }`: a file the agent writes in the spec folder (below), declared once in the step and named bare in any other list of it.
+
+`means`, `verdict` and `produces` belong to an agent step's outcomes; on a gate's or a step kind's they are refused, and so is one on a route the kernel takes (`stuck`, `timeout`, …). A step says each of them one way: an outcome object's `means` with a step's `means:` map, or an outcome's `produces` with `criteria:` or `hand_back:`, is refused with the spelling to use. Outcome objects are how a file is written; a unit pins its workflow with the older keys (`means:`, `verdict:`, `criteria: required`, `hand_back:`, `produces: {<name>: {file, on}}`), which a file may still use, so the two spellings of one workflow pin the same document and hash.
 
 ### Produced files
 
-An agent step declares the files it writes for later steps under `produces:`, each by a name of its own:
+An agent step declares the files it writes for later steps in a `produces:` list, each by a name of its own:
 
 ```yaml
 describe:
   agent: "Write the PR body to pr.md in the spec folder."
-  produces:
-    pr_body: { file: pr.md }            # on: [done] would name the outcomes it is due on
+  produces: [{ name: pr_body, file: pr.md }]
   outcomes: { done: ship }
 ```
 
 - `file` is relative to the story's spec folder, `.agents/specs/<story>/`; a path that may leave it (absolute, with `..`, a backslash or a drive letter) is refused, and so is a file norn writes there itself: `.gitignore`, `spec.md`, or one under `handoffs/` or `slices/`.
-- `on:` lists the outcomes whose report needs the file. Without it, every outcome the step reports needs it but one that hands findings back (`hand_back: findings`), which sends the work back rather than forward. An outcome the step does not report is refused.
+- The step's list is due on every outcome the step reports; an outcome that lists its own, such as `changes_requested: { to: implement, produces: [findings] }`, needs only what it lists. A name with no file in the step, or one name given two files, is refused. The older form, a map `pr_body: { file: pr.md, on: [done] }`, still loads: there `on:` names the outcomes, and without it every outcome but one that hands findings back.
 - A produced name may not be an input norn provides, and every step producing one name writes the same file.
 - `norn done <outcome>` is refused (`produced_missing`) while a file due on that outcome is missing or empty in the worktree; a file left by an earlier pass counts, as norn does not check that this run wrote it. The brief says which file each outcome needs.
 - A later step lists the name under `inputs:`, and its brief names the file. norn keeps the file with the story's documents, so a step in another worktree gets it too.
@@ -413,7 +453,7 @@ Report the step done with an outcome
 norn done <outcome> [--criteria <file>] [--findings <file>] [--note <text>] [--report-id <id>]
 ```
 
-- `--criteria <file>`: the criteria report: a JSON array with one verdict per acceptance criterion; a step with `criteria: required` needs it
+- `--criteria <file>`: the criteria report: a JSON array with one verdict per acceptance criterion; a step that produces criteria with every outcome, or an outcome gated by a verdict, needs it
 - `--findings <file>`: the findings to hand back: a JSON file, {"findings": [...]} or an array, each with a `title` and a `severity` (blocking, major, minor, nit); a step whose outcome hands back findings needs them or a note
 - `--note <text>`: what the next step should know
 - `--report-id <id>`: the report's id; a retry with the same id records it once

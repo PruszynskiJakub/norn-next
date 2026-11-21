@@ -22,6 +22,7 @@ import {
   validateRunState,
   validateSharedWorkflowDocument,
   validateWorkflowDocument,
+  validateWorkflowFile,
   validateWorkflowGraph,
 } from "../../src/index.ts";
 
@@ -178,8 +179,8 @@ describe("workflow documents", () => {
   const dirs = [join(ROOT, "packages", "pack-sdlc", "assets", "workflows"), join(ROOT, ".agents", "workflows")];
   const yamls = (dir: string) => readdirSync(dir).filter((n) => n.endsWith(".yaml")).map((n) => join(dir, n));
 
-  test.each(dirs.flatMap(yamls).map((f) => [f.slice(ROOT.length + 1), f]))("%s fits the workflow document schema", (_name, file) => {
-    expect(errorsOf(validateWorkflowDocument(parse(readFileSync(file, "utf8"))))).toEqual([]);
+  test.each(dirs.flatMap(yamls).map((f) => [f.slice(ROOT.length + 1), f]))("%s fits the workflow file schema", (_name, file) => {
+    expect(errorsOf(validateWorkflowFile(parse(readFileSync(file, "utf8"))))).toEqual([]);
   });
 
   test.each(dirs.flatMap((d) => yamls(join(d, "shared"))).map((f) => [f.slice(ROOT.length + 1), f]))("%s fits the shared document schema", (_name, file) => {
@@ -189,7 +190,14 @@ describe("workflow documents", () => {
   test("an exit route belongs to a shared file only", () => {
     const doc = { name: "w", start: "a", steps: { a: { agent: "x", outcomes: { done: { exit: "out" } } } } };
     expect(validateWorkflowDocument(doc).ok).toBe(false);
+    expect(validateWorkflowFile(doc).ok).toBe(false);
     expect(validateSharedWorkflowDocument({ start: "a", steps: doc.steps }).ok).toBe(true);
+  });
+
+  test("an outcome object belongs to a file; the document a unit pins keeps routes only under outcomes", () => {
+    const doc = { name: "w", start: "a", steps: { a: { agent: "x", outcomes: { done: { to: "$done", means: "finished" } } } } };
+    expect(validateWorkflowFile(doc).ok).toBe(true);
+    expect(validateWorkflowDocument(doc).ok).toBe(false);
   });
 });
 

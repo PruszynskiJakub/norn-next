@@ -14,6 +14,6 @@ steps:
     skills: [norn-merge]
     inputs: [spec, handoff, base_side]
     outcomes:
-      done: sync
-    means:
-      done: "base merged into the story branch, conflicts resolved and committed"
+      done:
+        to: sync
+        means: "base merged into the story branch, conflicts resolved and committed"

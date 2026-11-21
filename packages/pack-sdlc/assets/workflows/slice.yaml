@@ -10,9 +10,10 @@ steps:
     agent: "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps."
     skills: [norn-implement]
     inputs: [slice, spec, handoff, last_check, last_findings]
-    outcomes: { done: test }
-    means:
-      done: "every acceptance criterion (or rework point) has a passing test"
+    outcomes:
+      done:
+        to: test
+        means: "every acceptance criterion (or rework point) has a passing test"
   test:
     check: "{checks.test}"
     timeout: 10m
@@ -22,13 +23,14 @@ steps:
     skills: [norn-review]
     writes: docs
     inputs: [slice, spec, diff, last_findings]
-    hand_back: { changes_requested: findings }
     outcomes:
-      approve:           integrate
-      changes_requested: implement
-    means:
-      approve: "all criteria met, no blocking findings"
-      changes_requested: "blocking findings, handed back with --findings <file>"
+      approve:
+        to: integrate
+        means: "all criteria met, no blocking findings"
+      changes_requested:
+        to: implement
+        means: "blocking findings, handed back with --findings <file>"
+        produces: [findings]
   integrate:
     integrate:
     outcomes: { done: $done, conflict: merge }
@@ -36,6 +38,7 @@ steps:
     agent: "Slice mode: integrating this slice into the story branch conflicted; merge the story branch's commit the base_side input names into this slice in this worktree, resolve each conflict keeping the intent of both sides, prove it with the tests and commit the merge; never rebase."
     skills: [norn-merge]
     inputs: [slice, spec, base_side]
-    outcomes: { done: integrate }
-    means:
-      done: "conflicts resolved keeping the intent of both sides; tests pass"
+    outcomes:
+      done:
+        to: integrate
+        means: "conflicts resolved keeping the intent of both sides; tests pass"

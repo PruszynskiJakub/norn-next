@@ -193,7 +193,8 @@ describe("revisions pinned before produces and reads", () => {
     const inputs = ["spec", "handoff", "last_check", "last_findings", "signal", "diff", "slice", "slices", "record", "resolution", "base_side"];
     const strip = (doc: unknown) => {
       const d = structuredClone(doc) as { steps: Record<string, Record<string, unknown>> };
-      for (const s of Object.values(d.steps)) delete s.produces;
+      // the files only: the reports a list names (criteria, findings) were never produces declarations
+      for (const s of Object.values(d.steps)) if (Array.isArray(s.produces)) s.produces = s.produces.filter((p) => typeof p === "string");
       return d;
     };
     for (const file of ["quick.yaml", "story.yaml"]) {

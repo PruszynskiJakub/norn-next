@@ -206,7 +206,7 @@ describe("done at a step with criteria: required", () => {
     const r = await done(m, ["pass"]);
     expect(r.exit).toBe(ExitCode.refused);
     expect(r.out).toEqual({
-      error: "step qa requires a criteria report (criteria: required): one verdict per criterion",
+      error: "step qa produces criteria with every outcome: one verdict per criterion",
       do_instead: "write the report (a JSON array of {id, verdict, ...} covering AC1, 01.AC2) and run: norn done pass --criteria <file>",
       code: "criteria_required",
     });

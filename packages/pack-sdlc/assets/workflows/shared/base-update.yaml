@@ -26,9 +26,9 @@ steps:
     skills: [norn-merge]
     inputs: [spec, handoff, base_side]
     outcomes:
-      done: update
-    means:
-      done: "base merged into the story branch, conflicts resolved and committed"
+      done:
+        to: update
+        means: "base merged into the story branch, conflicts resolved and committed"
   test:
     check: "{checks.test}"
     timeout: 15m
@@ -49,12 +49,15 @@ steps:
     skills: [norn-review]
     writes: docs
     inputs: [spec, resolution]
-    hand_back: { changes_requested: findings }
     outcomes:
-      approve:           { exit: ship }
-      redescribe:        { exit: redescribe }
-      changes_requested: { to: resolve, max: 2 }
-    means:
-      approve: "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger"
-      redescribe: "the resolution is sound, but the merge danger pr.md describes changed"
-      changes_requested: "blocking findings on the resolution, handed back with --findings <file>"
+      approve:
+        exit: ship
+        means: "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger"
+      redescribe:
+        exit: redescribe
+        means: "the resolution is sound, but the merge danger pr.md describes changed"
+      changes_requested:
+        to: resolve
+        max: 2
+        means: "blocking findings on the resolution, handed back with --findings <file>"
+        produces: [findings]

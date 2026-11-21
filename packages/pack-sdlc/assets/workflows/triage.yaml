@@ -20,6 +20,6 @@ steps:
     skills: [norn-triage]
     inputs: [spec, handoff]
     outcomes:
-      done: $done
-    means:
-      done: "the ## Triage comment is posted, with one recommendation (refinement, quick, reproduce or close) and its reason, and the kind, risk and priority labels that could be set are on the issue"
+      done:
+        to: $done
+        means: "the ## Triage comment is posted, with one recommendation (refinement, quick, reproduce or close) and its reason, and the kind, risk and priority labels that could be set are on the issue"

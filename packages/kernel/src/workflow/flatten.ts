@@ -5,9 +5,10 @@
  * as it always has, so a workflow that ignores an exit stops visibly rather than guessing a step.
  */
 import { check, StepName } from "@norn/schema";
-import { type Route, SharedWorkflowDocument, type WorkflowDocument, type WorkflowStepDoc } from "./document.ts";
+import { type Route, SharedWorkflowDocument, type WorkflowDocument, type WorkflowFile, type WorkflowStepDoc } from "./document.ts";
 import type { ExitLeft } from "./counters.ts";
 import type { WorkflowError } from "./graph.ts";
+import { lowerOutcomes } from "./outcomes.ts";
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -35,7 +36,7 @@ interface Included {
 
 const fileOf = (name: string) => `shared/${name}.yaml`;
 
-export function flatten(doc: WorkflowDocument, sharedFiles: Readonly<Record<string, unknown>>): { ok: true; flat: Flat } | { ok: false; errors: WorkflowError[] } {
+export function flatten(doc: WorkflowFile, sharedFiles: Readonly<Record<string, unknown>>): { ok: true; flat: Flat } | { ok: false; errors: WorkflowError[] } {
   const written = doc.steps as Obj;
   const uses = Object.entries(written).filter((e): e is [string, Obj] => isObj(e[1]) && "use" in e[1]);
   const usedNames = [...new Set(uses.map(([, s]) => s.use).filter((u): u is string => typeof u === "string"))];
@@ -46,7 +47,7 @@ export function flatten(doc: WorkflowDocument, sharedFiles: Readonly<Record<stri
     const shared = sharedFiles[name];
     if (isObj(shared) && isObj(shared.steps)) for (const s of Object.keys(shared.steps)) elsewhere.set(s, fileOf(name));
   }
-  const own = resolveLikes(written, elsewhere);
+  const own = resolveLikes(written, elsewhere, false);
   if ("errors" in own) return { ok: false, errors: own.errors };
   if (!uses.length) return { ok: true, flat: { steps: own.steps as Record<string, WorkflowStepDoc>, start: doc.start, ...(doc.base && { base: doc.base }), exits: {}, included: {} } };
 
@@ -110,7 +111,7 @@ function readShared(name: string, by: string, routes: Obj, value: unknown, workf
   }
   const r = check(SharedWorkflowDocument, value);
   if (!r.ok) return { errors: r.errors.map((e) => inFile(e.path, e.message)) };
-  const own = resolveLikes(r.value.steps as Obj, workflowSteps);
+  const own = resolveLikes(r.value.steps as Obj, workflowSteps, true);
   if ("errors" in own) return { errors: own.errors.map((e) => inFile(e.path, e.message)) };
   const steps = own.steps;
   const errors: WorkflowError[] = [];
@@ -132,9 +133,10 @@ function readShared(name: string, by: string, routes: Obj, value: unknown, workf
 /**
  * Each `like` step of one file filled in from its target, shallowly: a key the copy writes replaces
  * the target's value whole. `elsewhere` names the file of a step that is not in this one, so a copy
- * across files is told why it cannot be.
+ * across files is told why it cannot be. Every step's outcome objects are lowered after the copy, so
+ * an `outcomes:` the copy writes replaces the target's means and products with it.
  */
-function resolveLikes(steps: Obj, elsewhere: Map<string, string>): { steps: Obj } | { errors: WorkflowError[] } {
+function resolveLikes(steps: Obj, elsewhere: Map<string, string>, shared: boolean): { steps: Obj } | { errors: WorkflowError[] } {
   const errors: WorkflowError[] = [];
   const out: Obj = {};
   for (const [name, step] of Object.entries(steps)) {
@@ -159,6 +161,12 @@ function resolveLikes(steps: Obj, elsewhere: Map<string, string>): { steps: Obj 
     } else if ("like" in of) refuse(`\`${target}\` is a like step: name the step it copies, \`${String(of.like)}\``);
     else if ("use" in of) refuse(`\`${target}\` is a use step: like copies a step written in its own file`);
     else out[name] = structuredClone({ ...of, ...rest });
+  }
+  for (const [name, step] of Object.entries(out)) {
+    if (!isObj(step)) continue;
+    const lowered = lowerOutcomes(name, step, shared);
+    if ("errors" in lowered) errors.push(...lowered.errors);
+    else out[name] = lowered.step;
   }
   return errors.length ? { errors } : { steps: out };
 }
@@ -185,7 +193,7 @@ function clashes(steps: Obj, uses: Array<[string, Obj]>, included: Included[]): 
 }
 
 /** `reset_on` and `base.verify` name one step, never a way in: a use step there is ambiguous. */
-function useStepNamedWhereAStepMustBe(doc: WorkflowDocument, byUse: Map<string, Included>): WorkflowError[] {
+function useStepNamedWhereAStepMustBe(doc: WorkflowFile, byUse: Map<string, Included>): WorkflowError[] {
   const out: WorkflowError[] = [];
   for (const [c, spec] of Object.entries(doc.counters ?? {})) {
     const edges = spec.reset_on === undefined ? [] : Array.isArray(spec.reset_on) ? spec.reset_on : [spec.reset_on];

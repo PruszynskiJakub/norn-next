@@ -24,8 +24,9 @@ steps:
     skills: [norn-diagnose]
     inputs: [spec, handoff]
     outcomes:
-      reproduced:       $done
-      cannot_reproduce: $done
-    means:
-      reproduced: "the bug was observed as a user and a loop goes red on it; loop, repro, cause and seam posted and in the handoff"
-      cannot_reproduce: "followed the report faithfully and the bug did not occur, nor in any loop tried; what was tried posted and in the handoff"
+      reproduced:
+        to: $done
+        means: "the bug was observed as a user and a loop goes red on it; loop, repro, cause and seam posted and in the handoff"
+      cannot_reproduce:
+        to: $done
+        means: "followed the report faithfully and the bug did not occur, nor in any loop tried; what was tried posted and in the handoff"

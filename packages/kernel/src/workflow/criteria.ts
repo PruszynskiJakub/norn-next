@@ -77,7 +77,7 @@ export function checkCriteriaReport(input: CriteriaCheckInput): CriteriaCheck {
       return no(
         "criteria_required",
         spec.criteria
-          ? `step ${input.step} requires a criteria report (criteria: required): one verdict per criterion`
+          ? `step ${input.step} produces criteria with every outcome: one verdict per criterion`
           : `outcome '${outcome}' is gated by verdict '${gated}': it needs a criteria report to check against`,
         `write the report (a JSON array of {id, verdict, ...}${expected ? ` covering ${expected.join(", ")}` : ""}) and run: ${withReport(outcome)}`,
       );

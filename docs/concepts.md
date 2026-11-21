@@ -52,11 +52,11 @@ A **step** is one node of a workflow. Its head key says what happens there:
 | `update-branch:`, `integrate:`, `push:`, `verify-base:` | git work by the vcs plugin: merge the base into the story (never a rebase), integrate a slice into the story branch, push, check the merged tree after the base moved |
 | `open-pr:`, `await-merge:` | forge work: open the change (or rewrite its body), then wait for a person to merge it; the merge ends the story |
 
-A step written `use:` brings in a shared file's steps, and `like:` copies another step. An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). A step's `outcomes:` maps each outcome to the next step, `$done` or `$stuck`. Every route back (a failed test sends the story back to `implement`) carries a **counter** with a max, derived from the kind of edge and named `<step>.<outcome>`: a check's `fail` 5, a gate's `reject` 2, a `conflict` 2, `stale` 10, an agent sending work back 3. `max:` on an edge changes its bound, and the `kernel.counters` config keys change the defaults.
+A step written `use:` brings in a shared file's steps, and `like:` copies another step. An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). A step's `outcomes:` maps each outcome to the next step, `$done` or `$stuck`, and on an agent step everything else about the outcome sits on it too: what it means, the verdict it needs and what its report comes with (`fail: { to: implement, verdict: fail, means: "…", produces: [criteria, findings] }`, [Reference › Outcomes](reference.md#outcomes)). Every route back (a failed test sends the story back to `implement`) carries a **counter** with a max, derived from the kind of edge and named `<step>.<outcome>`: a check's `fail` 5, a gate's `reject` 2, a `conflict` 2, `stale` 10, an agent sending work back 3. `max:` on an edge changes its bound, and the `kernel.counters` config keys change the defaults.
 
 ### What steps hand each other
 
-A step hands a file to the steps after it by declaring it. An agent step's `produces:` names each file it writes in the story's spec folder (`describe` produces `pr_body`, written to `pr.md`); a later agent step lists the name under `inputs:`, and a step kind declares what it reads (`open-pr` reads `pr_body`). Two rules hold:
+A step hands a file to the steps after it by declaring it. An agent step's `produces:` lists what each of its outcomes produces unless the outcome lists its own: a file it writes in the story's spec folder (`describe` produces `{ name: pr_body, file: pr.md }`), or a report norn takes with the outcome (`criteria`, `findings`). A later agent step lists a file's name under `inputs:`, and a step kind declares what it reads (`open-pr` reads `pr_body`). Two rules hold:
 
 - **Inputs.** A step reads only what the host provides or what an earlier step on every path to it produces. A file breaking it is refused when it loads, with the step and one path that lacks a producer. A route back is fine: what counts is that a producer comes first on every path.
 - **Outputs.** A report is accepted only with everything its outcome produces. `norn done` is refused while a declared file is missing or empty in the worktree, and says which file to write. It checks only that the file is there and not empty, not that this run wrote it: a file an earlier pass left passes the check, so a step that must rewrite it says so in its text.
@@ -72,8 +72,9 @@ review:
   agent: "Review this slice's diff against its acceptance criteria and the spec."
   skills: [norn-review]
   writes: docs
-  hand_back: { changes_requested: findings }
-  outcomes: { approve: integrate, changes_requested: implement }
+  outcomes:
+    approve: integrate
+    changes_requested: { to: implement, produces: [findings] }
 ```
 
 The worktree hooks hold it (below), so a `writes: docs` step runs only on an executor whose harness can refuse a tool call: on any other, the unit parks `stuck` (`agent.unguarded`) before an agent starts, naming the step and the executor. `by:` on the step, or another default executor, lets it run. `writes: worktree` is the default and can be left out.

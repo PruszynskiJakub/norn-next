@@ -152,7 +152,7 @@ When the merge conflicts, norn aborts it and refuses with the conflicting paths 
 ## Write your own workflow
 
 1. Put a YAML file in `.agents/workflows/`. A file with the name of one of the pack's (`quick.yaml`) replaces it; a new name (`docs.yaml`) adds a workflow. Start from the pack's file of the same name.
-2. Edit the steps. Each opens with one head key that says what happens (`agent:`, `check:`, `gate:`, `slices:`, or a step kind with no value such as `open-pr:`), then says where each outcome goes in `outcomes:`. An agent step's head is its orientation, what the step is for; `skills:` (optional) lists the skills it uses, `by:` picks an executor, `inputs:` what its brief gives it (the names are in [Reference › Inputs](reference.md#inputs)), `means:` says what each routed outcome means, and `writes: docs` keeps it to the story's documents ([Concepts](concepts.md#what-an-agent-step-may-write)):
+2. Edit the steps. Each opens with one head key that says what happens (`agent:`, `check:`, `gate:`, `slices:`, or a step kind with no value such as `open-pr:`), then says where each outcome goes in `outcomes:`. An agent step's head is its orientation, what the step is for; `skills:` (optional) lists the skills it uses, `by:` picks an executor, `inputs:` what its brief gives it (the names are in [Reference › Inputs](reference.md#inputs)), each outcome's `means:` says what it means, and `writes: docs` keeps it to the story's documents ([Concepts](concepts.md#what-an-agent-step-may-write)). An outcome is a bare target, or an object with its target and what it means, its bound and what it produces ([Reference › Outcomes](reference.md#outcomes)):
 
 ```yaml
   implement:
@@ -160,9 +160,7 @@ When the merge conflicts, norn aborts it and refuses with the conflicting paths 
     skills: [norn-implement]
     inputs: [spec, handoff, last_check]
     outcomes:
-      done: test
-    means:
-      done: "every criterion has a passing test"
+      done: { to: test, means: "every criterion has a passing test" }
   test:
     check: "{checks.test}"
     timeout: 15m

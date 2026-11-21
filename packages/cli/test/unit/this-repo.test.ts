@@ -194,7 +194,7 @@ describe("this repo's workflows, as norn loads them", () => {
       );
     const shape = (w: Written) => ({
       start: w.start,
-      steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { kind: Object.keys(step).filter((k) => !NOT_KIND.has(k)), skills: step.skills, outcomes: bounded(w, { ...step.outcomes, ...step.on }) }])),
+      steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { kind: Object.keys(step).filter((k) => !NOT_KIND.has(k)).sort(), skills: step.skills, outcomes: bounded(w, { ...step.outcomes, ...step.on }) }])),
     });
     for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(repo[wf] as Written) }).toEqual({ wf, ...shape(pack[wf] as Written) });
   });

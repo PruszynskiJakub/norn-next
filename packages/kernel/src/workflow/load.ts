@@ -7,7 +7,7 @@ import { BUILTIN_SIGNALS, type SignalDeclaration, type StepKindDefinition } from
 import { check, parseDuration } from "@norn/schema";
 import type { KernelConfig } from "../model/config.ts";
 import { type CountedStep, deriveCounters } from "./counters.ts";
-import { type CounterDoc, type OnRoute, type Route, WorkflowDocument, type WorkflowStepDoc } from "./document.ts";
+import { type CounterDoc, type OnRoute, type Route, type WorkflowDocument, WorkflowFile, type WorkflowStepDoc } from "./document.ts";
 import { type Flat, flatten } from "./flatten.ts";
 import type { AgentStepSpec, CompiledCounter, CompiledRoute, CompiledStep, PinnedWorkflow, WorkflowError, WorkflowGraph, WorkflowLoad } from "./graph.ts";
 import { flowErrors, producesOn, readersOf } from "./produces.ts";
@@ -58,7 +58,7 @@ const fail = (errors: WorkflowError[]): Fail => ({ ok: false, errors });
  * its hash covers them, and loading a pinned document again gives the same hash.
  */
 export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowLoad {
-  const schema = check(WorkflowDocument, doc);
+  const schema = check(WorkflowFile, doc);
   if (!schema.ok) return fail(schema.errors.map((e) => ({ path: e.path, message: e.message })));
   const written = schema.value;
   const signals: Record<string, SignalDeclaration> = { ...opts.signals, ...BUILTIN_SIGNALS };
@@ -163,7 +163,7 @@ function targetErrors(flat: Flat, read: Readonly<Record<string, ReadStep>>, decl
 
 /** The flat document a unit records: shared steps brought in, copies filled, every bounded route naming its counter. */
 function pin(
-  written: WorkflowDocument,
+  written: WorkflowFile,
   flat: Flat,
   read: Readonly<Record<string, ReadStep>>,
   routes: Record<string, Record<string, CompiledRoute>>,

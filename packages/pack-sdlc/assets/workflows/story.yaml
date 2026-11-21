@@ -6,7 +6,7 @@
 # then wait at merge until a person merges the PR.
 # Rework found by the story-level test, QA, CI or a person is done in the story worktree and reviewed
 # before it is checked again.
-# QA reports a verdict per acceptance criterion (criteria: required) and may only report the outcome
+# QA reports a verdict per acceptance criterion (produces: [criteria]) and may only report the outcome
 # matching its worst verdict; `unverified` (could not check here) goes to a person at human-qa.
 # A story waiting at human-qa, ready or merge goes back through update when the base moved
 # under it in a way that conflicts (base.stale; `behind` re-updates on any base commit).
@@ -31,11 +31,12 @@ steps:
     skills: [norn-slice]
     inputs: [spec, slices]
     outcomes:
-      done:   approve-slices
-      replan: $stuck
-    means:
-      done: "slice files written against the current base; every user story is covered by some slice's acceptance"
-      replan: "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans it in a refinement round from its plan step (norn story round <story> --workflow refinement --at plan)"
+      done:
+        to: approve-slices
+        means: "slice files written against the current base; every user story is covered by some slice's acceptance"
+      replan:
+        to: $stuck
+        means: "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans it in a refinement round from its plan step (norn story round <story> --workflow refinement --at plan)"
   approve-slices:
     gate: "Review the slice files in the spec folder (edit them if needed). Approve to start the slices, or reject with what to change."
     outcomes: { approve: slices, reject: { to: slice, max: 3 } }
@@ -54,23 +55,27 @@ steps:
     agent: "The criteria are spec.md's frontmatter `criteria`; an id `<nn>.<id>` is criterion `<id>` of slice file `<nn>-*.md`, which says what it means."
     skills: [norn-qa]
     inputs: [spec, slices, diff]
-    criteria: required
-    hand_back: { fail: findings }
+    # a criteria report with every outcome, and only the outcome matching its worst verdict
+    produces: [criteria]
     outcomes:
-      pass:       describe
-      fail:       { to: implement, counter: qa_loop }
-      partial:    human-qa
-      unverified: human-qa
-    means:
-      pass: "every acceptance criterion of the story and its slices observed with evidence"
-      fail: "a criterion fails; its repro in the criteria report, and the findings handed back with --findings <file>"
-      partial: "criteria only a person can judge, evidence prepared"
-      unverified: "criteria this session could not check; how to check each one is in the report"
-    verdict:
-      pass: pass
-      fail: fail
-      partial: person
-      unverified: unverified
+      pass:
+        to: describe
+        verdict: pass
+        means: "every acceptance criterion of the story and its slices observed with evidence"
+      fail:
+        to: implement
+        counter: qa_loop
+        verdict: fail
+        means: "a criterion fails; its repro in the criteria report, and the findings handed back with --findings <file>"
+        produces: [criteria, findings]
+      partial:
+        to: human-qa
+        verdict: person
+        means: "criteria only a person can judge, evidence prepared"
+      unverified:
+        to: human-qa
+        verdict: unverified
+        means: "criteria this session could not check; how to check each one is in the report"
   human-qa:
     gate: "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed."
     outcomes:
@@ -83,9 +88,9 @@ steps:
     skills: [norn-implement]
     inputs: [spec, handoff, last_check, last_findings]
     outcomes:
-      done: review
-    means:
-      done: "every rework point has a passing test"
+      done:
+        to: review
+        means: "every rework point has a passing test"
   # only rework reaches implement, and slices are reviewed before they integrate: this reviews the
   # story-level rework, so a round without rework never runs it
   review:
@@ -93,24 +98,24 @@ steps:
     skills: [norn-review]
     writes: docs
     inputs: [spec, diff, last_findings]
-    hand_back: { changes_requested: findings }
     outcomes:
-      approve:           test
-      changes_requested: implement
-    means:
-      approve: "the rework does what the findings and the story ask and nothing else, no blocking findings"
-      changes_requested: "blocking findings, handed back with --findings <file>"
+      approve:
+        to: test
+        means: "the rework does what the findings and the story ask and nothing else, no blocking findings"
+      changes_requested:
+        to: implement
+        means: "blocking findings, handed back with --findings <file>"
+        produces: [findings]
   describe:
     agent: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
     skills: [norn-pr]
     inputs: [spec, diff, record]
     # open-pr reads it; norn done refuses the report while pr.md is missing or empty
-    produces:
-      pr_body: { file: pr.md }
+    produces: [{ name: pr_body, file: pr.md }]
     outcomes:
-      done: ship
-    means:
-      done: "pr.md describes the branch as it is now: summary, evidence, merge danger"
+      done:
+        to: ship
+        means: "pr.md describes the branch as it is now: summary, evidence, merge danger"
   # open-pr, ci, ready and merge (shared/ship.yaml)
   ship:
     use: ship

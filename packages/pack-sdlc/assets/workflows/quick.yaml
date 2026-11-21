@@ -27,9 +27,9 @@ steps:
     skills: [norn-implement]
     inputs: [spec, handoff, last_check, last_findings]
     outcomes:
-      done: update
-    means:
-      done: "the change is made; each behaviour change and rework point has a passing test"
+      done:
+        to: update
+        means: "the change is made; each behaviour change and rework point has a passing test"
   # update, resolve, test and the light path's steps (shared/base-update.yaml)
   base-update:
     use: base-update
@@ -43,24 +43,24 @@ steps:
     skills: [norn-review]
     writes: docs
     inputs: [spec, diff, last_findings]
-    hand_back: { changes_requested: findings }
     outcomes:
-      approve:           describe
-      changes_requested: implement
-    means:
-      approve: "the change does what the story asks and nothing else, no blocking findings"
-      changes_requested: "blocking findings, handed back with --findings <file>"
+      approve:
+        to: describe
+        means: "the change does what the story asks and nothing else, no blocking findings"
+      changes_requested:
+        to: implement
+        means: "blocking findings, handed back with --findings <file>"
+        produces: [findings]
   describe:
     agent: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
     skills: [norn-pr]
     inputs: [spec, diff, handoff]
     # open-pr reads it; norn done refuses the report while pr.md is missing or empty
-    produces:
-      pr_body: { file: pr.md }
+    produces: [{ name: pr_body, file: pr.md }]
     outcomes:
-      done: ship
-    means:
-      done: "pr.md describes the branch as it is now: summary, evidence, merge danger"
+      done:
+        to: ship
+        means: "pr.md describes the branch as it is now: summary, evidence, merge danger"
   # open-pr, ci, ready and merge (shared/ship.yaml)
   ship:
     use: ship

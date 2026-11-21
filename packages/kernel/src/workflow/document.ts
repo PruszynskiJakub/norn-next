@@ -1,6 +1,6 @@
 /**
- * A workflow as its file is written, in the wording the shipped workflows use, so they carry over
- * with at most mechanical edits. A step holds exactly one head key: a kernel built-in (`agent`,
+ * A workflow as its file is written (`WorkflowFile`) and as a unit pins it (`WorkflowDocument`, the
+ * flat form every outcome object is lowered to, so a pin's hash never depends on the spelling). A step holds exactly one head key: a kernel built-in (`agent`,
  * `check`, `gate`, `slices`), `use` (a shared file's steps) or `like` (a copy of a sibling), or a step
  * kind a plugin provides (`open-pr:`, `await-merge:`), whose extra keys its `configSchema` checks.
  * The schema checks the keys it knows and lets the rest through; `loadWorkflow` decides which key is
@@ -75,10 +75,50 @@ export const ProducesDoc = Type.Object(
 );
 export type ProducesDoc = Static<typeof ProducesDoc>;
 
+/**
+ * What an agent's report of an outcome comes with: a report norn takes with it (`findings`,
+ * `evidence`, `criteria`), bare, or a file in the spec folder, given once in the step as
+ * `{name, file}` and named bare elsewhere in it.
+ */
+export const ProducesEntry = Type.Union([
+  Type.String({ pattern: OUTCOME_NAME_PATTERN }),
+  Type.Object({ name: Type.String({ pattern: OUTCOME_NAME_PATTERN }), file: ProducesDoc.properties.file }, closed),
+]);
+export type ProducesEntry = Static<typeof ProducesEntry>;
+export const ProducesList = Type.Array(ProducesEntry, { uniqueItems: true });
+export type ProducesList = Static<typeof ProducesList>;
+
+/** What an outcome object says of the outcome beside its route; lowered into the step's maps. */
+const OUTCOME_FIELDS = {
+  means: Type.Optional(Type.String({ minLength: 1 })),
+  verdict: Type.Optional(Verdict),
+  produces: Type.Optional(ProducesList),
+};
+
+/**
+ * An outcome as a file writes it: a bare target, or everything about the outcome in one place. `to`
+ * is optional to the schema only so that the loader can say which outcome lacks it.
+ */
+export const OutcomeDoc = Type.Union([
+  Target,
+  Type.Object({ to: Type.Optional(Target), counter: Type.Optional(DocCounterName), max: Type.Optional(PosInt), ...OUTCOME_FIELDS }, closed),
+]);
+export type OutcomeDoc = Static<typeof OutcomeDoc>;
+/** An outcome in a shared file may leave it through an exit instead of going `to` a step. */
+export const SharedOutcomeDoc = Type.Union([
+  Target,
+  Type.Object({ to: Type.Optional(Target), exit: Type.Optional(OutcomeName), counter: Type.Optional(DocCounterName), max: Type.Optional(PosInt), ...OUTCOME_FIELDS }, closed),
+]);
+export type SharedOutcomeDoc = Static<typeof SharedOutcomeDoc>;
+
+const ProducesMap = Type.Record(Type.String({ pattern: OUTCOME_NAME_PATTERN }), ProducesDoc, { ...closed, minProperties: 1 });
+/** A file's step-level `produces:`: the older map of files, or the list every outcome produces unless it lists its own. */
+const FileProduces = Type.Union([ProducesMap, ProducesList]);
+
 const EXIT_CODE_PATTERN = "^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
 const SharedName = Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "A shared file's name, without `.yaml`" });
 
-function stepDoc<R extends TSchema, O extends TSchema>(route: R, onRoute: O) {
+function stepDoc<R extends TSchema, O extends TSchema, P extends TSchema>(route: R, onRoute: O, produces: P) {
   return Type.Object(
     {
       // the built-in head keys; exactly one head per step is the loader's check, not the schema's
@@ -97,7 +137,7 @@ function stepDoc<R extends TSchema, O extends TSchema>(route: R, onRoute: O) {
       skills: Type.Optional(Type.Array(NonEmpty, { uniqueItems: true })),
       inputs: Type.Optional(Type.Array(StepInputDoc, { uniqueItems: true })),
       /** what an agent step writes for later steps, by the name their `inputs:` (or a step kind's `reads`) use */
-      produces: Type.Optional(Type.Record(Type.String({ pattern: OUTCOME_NAME_PATTERN }), ProducesDoc, { ...closed, minProperties: 1 })),
+      produces: Type.Optional(produces),
       attended: Type.Optional(Type.Boolean({ description: "Worked with a person; always started by a person" })),
       by: Type.Optional(Type.String({ minLength: 1, description: "The executor that runs the agent; default the config's" })),
       model: Type.Optional(NonEmpty),
@@ -115,9 +155,11 @@ function stepDoc<R extends TSchema, O extends TSchema>(route: R, onRoute: O) {
   );
 }
 
-export const WorkflowStepDoc = stepDoc(Route, OnRoute);
+export const WorkflowStepDoc = stepDoc(Route, OnRoute, ProducesMap);
 export type WorkflowStepDoc = Static<typeof WorkflowStepDoc>;
-export const SharedStepDoc = stepDoc(SharedRoute, SharedOnRoute);
+export const WorkflowFileStepDoc = stepDoc(OutcomeDoc, OnRoute, FileProduces);
+export type WorkflowFileStepDoc = Static<typeof WorkflowFileStepDoc>;
+export const SharedStepDoc = stepDoc(SharedOutcomeDoc, SharedOnRoute, FileProduces);
 export type SharedStepDoc = Static<typeof SharedStepDoc>;
 
 const ResetEdge = Type.String({ pattern: "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$", description: "<step>.<outcome> whose edge resets the counter" });
@@ -142,21 +184,29 @@ export const BaseDoc = Type.Object(
 );
 export type BaseDoc = Static<typeof BaseDoc>;
 
-export const WorkflowDocument = Type.Object(
-  {
-    $schema: Type.Optional(Type.String()),
-    name: Type.String({ pattern: "^[a-z][a-z0-9_-]*$" }),
-    description: Type.Optional(Type.String()),
-    mode: Type.Optional(Mode),
-    defaults: Type.Optional(StepDefaultsDoc),
-    start: StepName,
-    steps: Type.Record(StepName, WorkflowStepDoc, { ...closed, minProperties: 1 }),
-    counters: Type.Optional(Type.Record(DocCounterName, CounterDoc, closed)),
-    base: Type.Optional(BaseDoc),
-  },
-  { ...closed, title: "WorkflowDocument" },
-);
+function workflowDoc<S extends TSchema>(step: S, title: string) {
+  return Type.Object(
+    {
+      $schema: Type.Optional(Type.String()),
+      name: Type.String({ pattern: "^[a-z][a-z0-9_-]*$" }),
+      description: Type.Optional(Type.String()),
+      mode: Type.Optional(Mode),
+      defaults: Type.Optional(StepDefaultsDoc),
+      start: StepName,
+      steps: Type.Record(StepName, step, { ...closed, minProperties: 1 }),
+      counters: Type.Optional(Type.Record(DocCounterName, CounterDoc, closed)),
+      base: Type.Optional(BaseDoc),
+    },
+    { ...closed, title },
+  );
+}
+
+/** The flat document a unit pins: routes only under `outcomes:`, what each outcome means and needs in the step's maps. */
+export const WorkflowDocument = workflowDoc(WorkflowStepDoc, "WorkflowDocument");
 export type WorkflowDocument = Static<typeof WorkflowDocument>;
+/** A workflow file: a pinned document's form, or outcomes written as objects. */
+export const WorkflowFile = workflowDoc(WorkflowFileStepDoc, "WorkflowFile");
+export type WorkflowFile = Static<typeof WorkflowFile>;
 
 /** A file of shared steps a workflow brings in with `use:`, entered at `start` and left through its exits. */
 export const SharedWorkflowDocument = Type.Object(
