@@ -49,8 +49,16 @@ export interface ApplyResult {
 export function applyReceipts(state: RunState, receipts: readonly KernelReceipt[], graph: WorkflowGraph): ApplyResult {
   const out: ApplyResult = { state, applied: [], rejected: [], routes: [] };
   const ordered = [...receipts].sort((a, b) => a.seq - b.seq);
+  const vetoed = vetoedReports(ordered);
   for (const r of ordered) {
     if (r.seq <= out.state.applied_through) continue;
+    const veto = vetoed.get(r.seq);
+    if (veto !== undefined) {
+      out.applied.push(r.seq);
+      out.rejected.push({ seq: r.seq, reason: veto });
+      out.state = { ...out.state, applied_through: r.seq };
+      continue;
+    }
     const needs = r.data.kind === "round.started" ? r.data.workflow.hash : out.state.workflow.hash;
     if (needs !== graph.hash) {
       out.blocked = { seq: r.seq, hash: needs };
@@ -70,6 +78,22 @@ export function applyReceipts(state: RunState, receipts: readonly KernelReceipt[
       if (out.state.ended === undefined && out.state.step === to && graph.steps[to]?.agent && sendsBack(graph, from, outcome, r)) out.state.rework_from = r.seq;
       out.routes.push({ seq: r.seq, from, outcome, to, ...(counter ? { counter } : {}), ...(exhausted ? { exhausted } : {}), reset });
     }
+  }
+  return out;
+}
+
+/**
+ * The reports a later check refused or could not do, by seq, each with why: such a report never
+ * routes, whichever tick applies it, and the check's own receipt parks the unit.
+ */
+function vetoedReports(ordered: readonly KernelReceipt[]): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const c of ordered) {
+    if (c.data.kind !== "run.checked" || c.data.verdict === "clean" || c.data.verdict === "reset") continue;
+    const { run_id, verdict } = c.data;
+    for (const r of ordered)
+      if (r.seq < c.seq && r.data.kind === "run.reported" && r.data.run_id === run_id)
+        out.set(r.seq, `the check after run ${run_id} reported ${verdict === "refused" ? "refused it" : "could not be done"}`);
   }
   return out;
 }

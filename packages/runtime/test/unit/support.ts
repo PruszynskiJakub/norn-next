@@ -302,6 +302,7 @@ export const WORKFLOWS: Record<string, string> = {
     "",
   ].join("\n"),
   "granted.yaml": ["name: granted", "start: review", "steps:", "  review:", "    by: reviewer", "    do: Review the thing.", "    outcomes: { approve: $done }", ""].join("\n"),
+  "scratched.yaml": ["name: scratched", "start: try", "steps:", "  try:", "    by: qa", "    do: Try the thing.", "    outcomes: { done: $done }", ""].join("\n"),
   "widened.yaml": ["name: widened", "start: review", "steps:", "  review:", "    by: reviewer", "    do: Review the thing.", "    allow: [code:write]", "    outcomes: { approve: $done }", ""].join("\n"),
   "reviewed.yaml": [
     "name: reviewed",

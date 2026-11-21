@@ -171,6 +171,7 @@ back as the unit's `corrupt_marked` fact.
 | (none) | | `agent.no_executor` | `park` (inbox `stuck`: the step's executor is not configured) |
 | (none) | | `agent.unguarded` | `park` (inbox `stuck`: the step is `writes: docs` and its executor's harness cannot deny a tool) |
 | (none) | | `agent.no_presence` | `park` (inbox `stuck`: the step is `attended: person` and no executor its binding names runs in a runner with presence) |
+| (none) | | `agent.check` | `check_run` (a `done` from a run that may not keep code: its processes killed, what changed since the visit's snapshot judged by its code level, reset or refused, before the report applies) |
 | (none) | | `source.unbound` | `park` (inbox `stuck`: the step reads a workflow source that neither the workflow's `path:` nor the config binds) |
 | (attended) | `noop` | `agent.ready.attended` | `park` (inbox `attended`) |
 | `agent.queued` | `noop` | dropped: every due agent starts; no cap bounds the runs at once | |
@@ -286,4 +287,4 @@ New rule ids: `agent.died.route`, `agent.died.manual`, `agent.died.retry`, `agen
 | `set_aside_record` | dropped: the store's compare-and-swap settles a lost race |
 | `restore_markers` | dropped: worktree markers belong to the host |
 | `reclaim_leases` | dropped: machine slot leases belong to the host |
-| (none) | `stop_run`, `run_step`, `renew_claim`, `release_claim`, `finish_story`, `flush` are new |
+| (none) | `stop_run`, `run_step`, `renew_claim`, `release_claim`, `finish_story`, `flush`, `check_run` are new |

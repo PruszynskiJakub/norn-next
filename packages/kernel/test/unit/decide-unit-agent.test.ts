@@ -635,3 +635,50 @@ describe("the code level a run starts under", () => {
     expect(d.intent.data).toMatchObject({ kind: "run.started", code: "read", retry_of: "run-1" });
   });
 });
+
+describe("the check of a run that may not keep code, once it reports", () => {
+  const done = (seq: number, over: Record<string, unknown> = {}) => receipt(seq, { kind: "run.reported", run_id: "run-1", verb: "done", outcome: "done", step: "build", attempt: 1, ...over } as never);
+  const checking = (seq: number) => receipt(seq, { kind: "run.checking", run_id: "run-1", step: "build", attempt: 1 });
+  const checked = (seq: number, verdict: "clean" | "reset" | "refused" | "failed", detail?: string) =>
+    receipt(seq, { kind: "run.checked", run_id: "run-1", verdict, step: "build", attempt: 1, ...(detail && { detail }) });
+  const guarded = (over = {}) => stateAt("build", { run: run({ code: "read", session: "s-1", ...over }) });
+
+  test("a done is checked before it is applied: the host kills the run's processes, compares and resets under a receipt", () => {
+    const d = kindOf(decideCase({ state: guarded(), receipts: [done(1)] }), "check_run");
+    expect(d).toMatchObject({ rule: "agent.check", run_id: "run-1", code: "read", passes: false });
+    expect(d.intent.data).toEqual({ kind: "run.checking", run_id: "run-1", step: "build", attempt: 1 });
+  });
+
+  test("an outcome whose verdict is pass is checked as passing the step", () => {
+    const wf = loaded(graph({ build: { agent: agentSpec({ verdict: { done: "pass" } }) } }));
+    const d = kindOf(decideCase({ state: stateAt("build", { run: run({ code: "scratch" }) }, wf), workflows: [wf], receipts: [done(1)] }), "check_run");
+    expect(d).toMatchObject({ code: "scratch", passes: true });
+  });
+
+  test("a check cut short runs again under the intent already written", () => {
+    const d = kindOf(decideCase({ state: guarded(), receipts: [done(1), checking(2)] }), "check_run");
+    expect(d.intent.id).toBe("r-2");
+  });
+
+  test("a clean or reset check lets the report route", () => {
+    for (const verdict of ["clean", "reset"] as const) {
+      const d = kindOf(decideCase({ state: guarded(), receipts: [done(1), checking(2), checked(3, verdict)] }), "apply_receipts");
+      expect(d.state).toMatchObject({ step: "test", run: null });
+      expect(d.rejected).toEqual([]);
+    }
+  });
+
+  test("a refused or failed check refuses the report and parks the unit stuck with what it found", () => {
+    const d = kindOf(decideCase({ state: guarded(), receipts: [done(1), checking(2), checked(3, "refused", "tracked files changed since the run started: src/a.ts")] }), "apply_receipts");
+    expect(d.state.step).toBe("build");
+    expect(d.state.parked).toMatchObject({ reason: "run.check.refused", text: "the check after run run-1 reported refused it: tracked files changed since the run started: src/a.ts" });
+    expect(d.rejected).toEqual([{ seq: 1, reason: "the check after run run-1 reported refused it" }]);
+    const failed = kindOf(decideCase({ state: guarded(), receipts: [done(1), checking(2), checked(3, "failed", "git diff: fatal")] }), "apply_receipts");
+    expect(failed.state.parked?.reason).toBe("run.check.failed");
+  });
+
+  test("a run that keeps its code, an ask or a stuck is applied as it comes", () => {
+    expect(decideCase({ state: stateAt("build", { run: run() }), receipts: [done(1)] })?.kind).toBe("apply_receipts");
+    expect(decideCase({ state: guarded(), receipts: [done(1, { verb: "ask", outcome: undefined, text: "Which?" })] })?.kind).toBe("apply_receipts");
+  });
+});

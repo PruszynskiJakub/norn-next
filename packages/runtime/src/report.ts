@@ -9,20 +9,32 @@
  * records once. It is refused, never guessed at, when the run is not the unit's live one or `done`
  * names an outcome the step does not route.
  */
-import { type BriefInputs, checkCriteriaReport, grantOf, HANDOFF_MAX_BYTES, producedOn, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
+import {
+  type BriefInputs,
+  checkCriteriaReport,
+  type GuardedCode,
+  grantOf,
+  HANDOFF_MAX_BYTES,
+  judgeChanges,
+  producedOn,
+  renderBrief,
+  type UnitJournal,
+  verdictCounts,
+  worstVerdict,
+} from "@norn/kernel";
 import type { Capability, HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
 import { parseUnitId, STORE_ID_PATTERN } from "@norn/plugin-api";
-import { type CriterionVerdict, type Finding, type Note, REPORT_TYPES, reportPath, type Verdict } from "@norn/schema";
+import { type CriterionVerdict, type Finding, type Note, OUT_ENV, REPORT_TYPES, reportPath, type Verdict } from "@norn/schema";
+import { changesSince, ownedBy, snapshotOf } from "./detect.ts";
 import { branchOf, baseRefOf, cutFrom } from "./branches.ts";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
 import { baseConflictOf } from "./input-history.ts";
-import { producedOf, readBackDocs, RUN_DIR, specFolder, worktreeOf } from "./inputs.ts";
+import { producedOf, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
 import { collectReports } from "./reports.ts";
 import { handoffArtifact } from "./story-docs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
-import { skillLinks } from "./skills.ts";
 import { type LiveStep, liveStepOf, reportOnRecord } from "./live-run.ts";
 
 export type ReportRequest =
@@ -165,7 +177,9 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     if (long) return long;
     const stopped = await unfinishedRefusal(env, unit);
     if (stopped) return stopped;
-    const dirty = await uncommittedRefusal(env, unit, live.run.executor);
+    const detected = await detectedRefusal(env, record, live, req.outcome);
+    if (detected) return detected;
+    const dirty = await uncommittedRefusal(env, unit, live.run.executor, live.run.code);
     if (dirty) return dirty;
     const unmerged = await baseUnmergedRefusal(env, record, live);
     if (unmerged) return unmerged;
@@ -411,22 +425,51 @@ const DIRTY_SHOWN = 10;
  * can leave showing and which committing would carry norn's hooks into the branch. An ask or stuck
  * is never held back: the work is not handed on.
  */
-async function uncommittedRefusal(env: RuntimeEnv, unit: string, executor: string): Promise<Refusable<never> | null> {
+async function uncommittedRefusal(env: RuntimeEnv, unit: string, executor: string, code: GuardedCode | undefined): Promise<Refusable<never> | null> {
   const vcs = env.slots.vcs;
-  if (!vcs.uncommitted) return null;
+  // a run that may not keep code answers for its tracked changes to the check; only what it left untracked is held here
+  const list = code === undefined ? vcs.uncommitted?.bind(vcs) : vcs.untracked?.bind(vcs);
+  if (!list) return null;
   const worktree = worktreeOf(env, unit);
-  const r = await vcs.uncommitted(worktree);
+  const r = await list(worktree);
   if (!r.ok) return refuse(`cannot tell whether ${worktree} holds uncommitted work: ${r.failure.message}`, "report again with the same command", r.failure.code);
-  const owned = [`${RUN_DIR}/`, `${specFolder(unit)}/`];
-  const harness = env.slots.executors[executor];
-  const installed = new Set([...(harness?.localFiles ?? []), ...skillLinks(harness?.skillsDir, env.slots.pack.skills)]);
-  const left = r.value.filter((p) => !installed.has(p) && !owned.some((o) => p.startsWith(o)));
+  const owned = ownedBy(env, unit, executor);
+  const left = r.value.filter((p) => !owned(p));
   if (left.length === 0) return null;
   const named = left.slice(0, DIRTY_SHOWN).join(", ") + (left.length > DIRTY_SHOWN ? ` and ${left.length - DIRTY_SHOWN} more` : "");
+  if (code !== undefined)
+    return refuse(`${worktree} holds files this run made: ${named}`, `delete them (this step keeps no code: code:${code}), or move a report into $${OUT_ENV}, then report again`, "dirty_worktree");
   return refuse(
     `${worktree} holds uncommitted work: ${named}`,
     "run `git status` in the worktree, commit the work this step made, then report again; ask a person about a change you cannot tell whether to commit",
     "dirty_worktree",
+  );
+}
+
+/**
+ * Why the done of a run that may not keep code cannot be recorded as it is, or null when it can: what
+ * changed since the visit's snapshot, judged as the check after the report judges it, so the agent puts
+ * it right now rather than the unit parking later. Its processes still run here, so the tick's check
+ * after killing them is the one that counts.
+ */
+async function detectedRefusal(env: RuntimeEnv, record: UnitJournal, live: LiveStep, outcome: string): Promise<Refusable<never> | null> {
+  const code = live.run.code;
+  if (code === undefined) return null;
+  const snap = snapshotOf(record.receipts, live.run.id);
+  if (snap === null) return refuse(`no snapshot of run ${live.run.id} is on the record, so what it changed cannot be checked`, "report stuck: a person has to look at the unit", "detect_failed");
+  const seen = await changesSince(env, record.unit, worktreeOf(env, record.unit), snap, live.run.executor);
+  if (!seen.ok) return refuse(`cannot check what run ${live.run.id} changed: ${seen.failure.message}`, "report again with the same command; if it keeps failing, report stuck", seen.failure.code);
+  const judged = judgeChanges({ code, passes: live.verdict[outcome] === "pass", ...seen.value });
+  if (judged.verdict !== "refused") return null;
+  const fix =
+    code === "read"
+      ? `put the code back as the run found it (\`git restore <file>\`, \`git reset --keep ${snap.head ?? "<the run's first commit>"}\` for a commit), then report again; a change the code needs is a finding for the step that keeps code`
+      : "report an outcome that does not pass the step (norn then resets what you changed), or put the code back as the run found it and report again";
+  const repo = seen.value.remoteMoved || seen.value.configChanged || seen.value.hooksChanged;
+  return refuse(
+    `the run may not keep code (code:${code}), and ${judged.reasons.join("; ")}`,
+    repo ? `put back what changed in the repo's git config, hooks or remote branch, or report stuck saying what changed; ${fix}` : fix,
+    "code_changed",
   );
 }
 

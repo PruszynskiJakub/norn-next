@@ -7,6 +7,7 @@ import type { Decision } from "@norn/kernel";
 import type { PluginResult } from "@norn/plugin-api";
 import { nudge, retryRun, startRun, stopRun } from "./act-runs.ts";
 import { runCheck, runStep } from "./act-steps.ts";
+import { checkRun } from "./detect.ts";
 import { claim, finishStory, flush, importMailbox, intakeStory, releaseClaim, renewClaim } from "./act-story.ts";
 import { applyReceipts, markCorrupt, markDone, park, startSlices } from "./act-unit.ts";
 import type { TickContext } from "./env.ts";
@@ -30,6 +31,8 @@ function carryOut(t: TickContext, d: Decision, index: number): Promise<PluginRes
       return retryRun(t, d);
     case "nudge":
       return nudge(t, d);
+    case "check_run":
+      return checkRun(t, d);
     case "stop_run":
       return stopRun(t, d);
     case "run_check":

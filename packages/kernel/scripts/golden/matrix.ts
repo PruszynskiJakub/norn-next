@@ -255,9 +255,20 @@ export const MATRIX: Scenario[] = [
     ["agent.no_executor"],
   ),
   scenario(
+    "agent-check",
+    "A review, which may not keep code, reports done: before the report routes, the host kills its processes and checks what changed since the visit's snapshot, then the report applies.",
+    { files: shippedFiles("quick") },
+    (w) => {
+      const u = seed(w, "gh-150", { workflow: "quick", step: "review", run: { code: "read", session: "s-150" } });
+      w.unit("gh-150").session = session("turn_ended");
+      w.append("gh-150", { kind: "run.reported", run_id: u.state?.run?.id as string, verb: "done", outcome: "approve", step: "review", attempt: 1 });
+    },
+    ["agent.check"],
+  ),
+  scenario(
     "agent-unguarded",
     "A ready docs-only step (a review) whose executor's harness cannot deny a tool: the story waits for a person rather than run the agent with its writes unguarded.",
-    { files: shippedFiles("slice"), capabilities: capabilities({ executors: { claude: executor({ denyTool: false }) } }) },
+    { files: shippedFiles("slice"), config: config({ roles: { reviewer: ["code:read", "docs:write", "exec:checks", "out:findings"] } }), capabilities: capabilities({ executors: { claude: executor({ denyTool: false }) } }) },
     (w) => seed(w, "gh-116", { workflow: "slice", step: "review" }),
     ["agent.unguarded"],
   ),

@@ -19,6 +19,8 @@ export function applyOne(state: RunState, r: KernelReceipt, graph: WorkflowGraph
   const d = r.data;
   // records of who holds the story and of a person's update of its branch, applied wherever the unit stands, ended or corrupt
   if (d.kind === "receipt.rejected" || d.kind === "claim.taken" || d.kind === "branch.update" || d.kind === "branch.updated") return { state };
+  // a check that let its report stand records what it did; the report it follows has moved the unit on
+  if (d.kind === "run.checking" || (d.kind === "run.checked" && (d.verdict === "clean" || d.verdict === "reset"))) return { state };
   if (d.kind === "round.started") return roundStarted(state, d, graph);
   if (state.ended === "corrupt") return { reject: "the unit is corrupt" };
   if (d.kind === "step.moved") return stepMoved(state, d, graph);
@@ -66,6 +68,8 @@ export function applyOne(state: RunState, r: KernelReceipt, graph: WorkflowGraph
       return runBound(state, d.run_id) ?? onRun(state, (run) => ({ ...run, stopped_at: r.at }));
     case "run.snapshot":
       return runBound(state, d.run_id) ?? snapshotted(state, d, r.at);
+    case "run.checked":
+      return runBound(state, d.run_id) ?? checkedRun(state, d, r.at);
     case "run.limited":
       return runBound(state, d.run_id) ?? onRun(state, (run) => ({ ...run, limited_until: d.resets_at }));
     case "run.requested":
@@ -136,6 +140,13 @@ export const SNAPSHOT_FAILED_PARK = "run.snapshot.failed";
 function snapshotted(state: RunState, d: ReceiptDataOf<"run.snapshot">, at: string): OneApplied {
   if (d.failed === undefined) return d.snapshot === undefined ? { reject: "a snapshot names what it noted, or why it failed" } : { state };
   return { state: { ...state, parked: { reason: SNAPSHOT_FAILED_PARK, since: at, text: `the snapshot run ${d.run_id} is checked against could not be taken: ${d.failed}` } } };
+}
+
+/** A check that refused a run's report, or could not be done, parks the unit; its report is refused before it (`vetoedReports`). */
+function checkedRun(state: RunState, d: ReceiptDataOf<"run.checked">, at: string): OneApplied {
+  if (d.verdict === "clean" || d.verdict === "reset") return { state };
+  const text = `the check after run ${d.run_id} reported ${d.verdict === "refused" ? "refused it" : "could not be done"}${d.detail ? `: ${d.detail}` : ""}`;
+  return { state: { ...state, parked: { reason: `run.check.${d.verdict}`, since: at, text } } };
 }
 
 function onRun(state: RunState, change: (run: NonNullable<RunState["run"]>) => NonNullable<RunState["run"]>): OneApplied {

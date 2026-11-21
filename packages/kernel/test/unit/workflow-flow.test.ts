@@ -209,7 +209,9 @@ describe("revisions pinned before produces and reads", () => {
     for (const f of readdirSync(GOLDEN_DIR).filter((n) => n.endsWith(".json"))) {
       const c = JSON.parse(readFileSync(join(GOLDEN_DIR, f), "utf8")) as GoldenCase;
       const kinds = Object.fromEntries(Object.entries(c.step_kinds).map(([name, k]) => [name, { name, ...k } as StepKindInfo]));
-      for (const p of pinnedIn(c.facts)) pinned.set(p.hash, { doc: p.doc, kinds });
+      // a case added since pins a revision that may produce; only the older pins are this test's
+      const older = (doc: unknown) => !Object.values((doc as { steps?: Record<string, object> }).steps ?? {}).some((s) => "produces" in s);
+      for (const p of pinnedIn(c.facts)) if (older(p.doc)) pinned.set(p.hash, { doc: p.doc, kinds });
     }
     expect(pinned.size).toBeGreaterThan(5);
     for (const [hash, { doc, kinds }] of pinned) {

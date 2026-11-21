@@ -329,6 +329,15 @@ export class World {
         if (d.kind === "nudge") u.session = session("working");
         return;
       }
+      case "check_run": {
+        // the model host's checkout never changes, so every check finds it as its snapshot did
+        const u = this.unitOf(d);
+        this.record(u, d.intent);
+        const header = d.intent.data.kind === "run.checking" ? { step: d.intent.data.step, attempt: d.intent.data.attempt } : {};
+        this.record(u, { id: deriveUlid(d.intent.id, 1), data: { kind: "run.checked", run_id: d.run_id, verdict: "clean", ...header } });
+        u.session = session("ended");
+        return;
+      }
       case "run_step": {
         const u = this.unitOf(d);
         if (d.intent) this.record(u, d.intent);

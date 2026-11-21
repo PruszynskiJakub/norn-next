@@ -79,6 +79,21 @@ const KINDS = [
    * taken, which parks the unit stuck and never lets the run start
    */
   kind("run.snapshot", { run_id: Id, snapshot: Type.Optional(RunSnapshot), failed: Type.Optional(NonEmpty) }),
+  /** the host is about to check a reported run that may not keep code: kill its processes, compare, reset; written before any of it */
+  kind("run.checking", { run_id: Id }),
+  /**
+   * how the check went: `clean`, `reset` (the paths put back as the snapshot held them, and HEAD with
+   * `head`), `refused` (the report may not stand) or `failed` (it could not be told); the last two park
+   * the unit stuck and refuse the report they follow
+   */
+  kind("run.checked", {
+    run_id: Id,
+    verdict: Type.Union([Type.Literal("clean"), Type.Literal("reset"), Type.Literal("refused"), Type.Literal("failed")]),
+    reset: Type.Optional(Type.Array(NonEmpty)),
+    head: Type.Optional(Type.Boolean()),
+    /** what the check found, for a person: why it refused or failed, and anything it only notes */
+    detail: Type.Optional(NonEmpty),
+  }),
   kind("run.reported", {
     run_id: Id,
     verb: ReportVerb,
