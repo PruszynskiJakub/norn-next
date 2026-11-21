@@ -49,8 +49,17 @@ export interface Command {
    * a story's work. Refused before its arguments are read when the process runs in an agent's
    * session (`person-only.ts`), so the rule holds for every harness and runner and no flag lifts it.
    */
-  personOnly?: boolean;
+  personOnly?: boolean | PersonOnlyWhen;
   run(ctx: CliContext, args: ParsedArgs): Promise<unknown>;
+}
+
+/**
+ * A command person-only for some calls: `when` reads its arguments as given and answers what the
+ * refusal names, or null for a call anyone may make; `help` says which calls, for the reference.
+ */
+export interface PersonOnlyWhen {
+  when(args: readonly string[]): string | null;
+  help: string;
 }
 
 export function defineCommand(c: Command): Command {

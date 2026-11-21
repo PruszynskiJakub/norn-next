@@ -321,6 +321,39 @@ describe("the runtime config derived from the person's", () => {
   });
 });
 
+describe("policy: granted in the user's file only; a repo file may narrow it, never widen it", () => {
+  const USER_POLICY = "policy: { stand_in: { gates: [story.ready, story.human-qa], attended: [refinement.refine] } }\n";
+
+  test("a list the user's file grants is cut to what a repo file also names, and a list no repo file names stays the user's", async () => {
+    const c = await loaded({ user: USER_POLICY, local: LOCAL_CONFIG, repo: "policy: { stand_in: { gates: [story.ready, quick.ready] } }\n" });
+    expect(c.config.policy).toEqual({ stand_in: { gates: ["story.ready"], attended: ["refinement.refine"] } });
+  });
+
+  test("a grant only a repo file makes is no grant: the committed file and the repo-local one each narrow", async () => {
+    expect((await loaded({ local: `${LOCAL_CONFIG}policy: { stand_in: { gates: [story.ready] } }\n` })).config.policy).toEqual({ stand_in: { gates: [] } });
+    const both = await loaded({ user: USER_POLICY, local: `${LOCAL_CONFIG}policy: { stand_in: { attended: [] } }\n`, repo: "policy: { stand_in: { gates: [story.human-qa] } }\n" });
+    expect(both.config.policy).toEqual({ stand_in: { gates: ["story.human-qa"], attended: [] } });
+  });
+
+  test("a set in a repo file that names more than the user's grants still loads, and the merged policy keeps only the user's", async () => {
+    const c = await loaded({ user: USER_POLICY, local: LOCAL_CONFIG });
+    const r = planSet(c, null, "repo", "policy.stand_in.gates", ["story.ready", "story.merge"]);
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    expect(getKey(r.next.config, "policy.stand_in.gates")).toEqual(["story.ready"]);
+  });
+
+  test("a grant names a workflow's step as <workflow>.<step>, once; anything else is refused", async () => {
+    expect(await problems({ user: "policy: { stand_in: { gates: [ready] } }\n", local: LOCAL_CONFIG })).toMatchObject([{ layer: "user", path: "/policy/stand_in/gates/0" }]);
+    expect((await problems({ user: "policy: { stand_in: { gates: [story.ready, story.ready] } }\n", local: LOCAL_CONFIG }))[0]).toMatchObject({ layer: "user", path: "/policy/stand_in/gates" });
+    expect((await problems({ user: "policy: { stand_out: {} }\n", local: LOCAL_CONFIG }))[0]).toMatchObject({ layer: "user", path: "/policy" });
+  });
+
+  test("the policy reaches the runtime as the stand-in grants, empty lists when no file grants any", async () => {
+    expect(runtimeConfigOf(await loaded({ user: USER_POLICY, local: LOCAL_CONFIG }), "me@box").standIn).toEqual({ gates: ["story.ready", "story.human-qa"], attended: ["refinement.refine"] });
+    expect(runtimeConfigOf(await loaded({ local: LOCAL_CONFIG }), "me@box").standIn).toEqual({ gates: [], attended: [] });
+  });
+});
+
 describe("a key this norn no longer reads", () => {
   test("kernel.max_agents loads, is left out of the config, and is named with the command that deletes it", async () => {
     const c = await loaded({ user: "kernel: { mode: auto, max_agents: 4 }\n", local: LOCAL_CONFIG });

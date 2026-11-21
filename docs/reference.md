@@ -20,9 +20,21 @@ A command marked *a person's command* below is refused with `person_only` (exit 
 | `.agents/norn.local.yaml` | you, in this repository: kept out of git, the file `norn init` writes |
 | `.agents/norn.yaml` | the team: committed, written by `norn init --commit` |
 
-The nearer file wins: the committed file over the local file over the user file over the built-in defaults. Maps merge key by key; lists and scalars replace. A key norn does not know is refused with the file it is in, never ignored; a slot (`tracker`, `forge`, `store`, `vcs`, an executor's `runner`, a `runners:` entry) also takes the keys of the plugin it names, and that plugin checks them. `norn config show` prints the merged config and the file each key came from; `norn config set <key> <value>` changes one key in the local file, or in the committed file with `--commit` or the user file with `--user`.
+The nearer file wins: the committed file over the local file over the user file over the built-in defaults, for every key but the policy ([Policy](#policy)). Maps merge key by key; lists and scalars replace. A key norn does not know is refused with the file it is in, never ignored; a slot (`tracker`, `forge`, `store`, `vcs`, an executor's `runner`, a `runners:` entry) also takes the keys of the plugin it names, and that plugin checks them. `norn config show` prints the merged config and the file each key came from; `norn config set <key> <value>` changes one key in the local file, or in the committed file with `--commit` or the user file with `--user`.
 
 A slot names a plugin with `use`: the bundled ones are listed by `norn plugin list`, and `norn plugin add <spec>` installs another and pins it in the plugin lock.
+
+### Policy
+
+`policy:` is what the person lets stand in for them, each step named `<workflow>.<step>`: `stand_in.gates`, the gates a supervisor may decide, and `stand_in.attended`, the `attended: person` steps whose presence a supervisor may take. It is the one key whose order is reversed: only `<norn home>/config.yaml` grants it, and a repo file, which an agent inside its step can change, may only narrow it. Each repo file that sets a list keeps only what it names of the user file's list, so a grant only a repo file makes is no grant. `norn config set policy.…` is a person's command, and it says so when a repo file narrows what it wrote.
+
+```yaml
+policy:
+  stand_in:
+    gates: [story.human-qa]          # only the user file grants this
+```
+
+No stand-in acts on a grant yet: until a runner gives the agent an OS sandbox, every gate waits for the person and every attended step for its person ([Limitations](limitations.md)).
 
 ### Executors and runners
 
@@ -279,6 +291,8 @@ norn config get <key>
 ##### `norn config set`
 
 Set one config key in the repo-local file (the committed one with --commit)
+
+A person's command when it sets a `policy` key: refused then in an agent's session (`person_only`).
 
 ```sh
 norn config set <key> [<value>] [--commit] [--user] [--unset]
@@ -611,7 +625,7 @@ norn tidy [--dry-run]
 
 ### Config keys
 
-Every file takes every key: the user file, the repo-local file and the committed file, the nearer winning.
+Every file takes every key: the user file, the repo-local file and the committed file, the nearer winning, except `policy`: only the user file grants it, and each repo file that sets a list keeps only what it names of the user file's.
 
 | Key | Type | Default |
 |---|---|---|
@@ -659,6 +673,8 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `trace.retain` | duration or `"keep"` | `"7d"` |
 | `checks.<name>` | string | derived: `checks.test` is "bun test", which the shipped workflows' test steps run; init detects the repo's own |
 | `sources.<name>` | string | none |
+| `policy.stand_in.attended` | list of strings | derived: none: no step's presence is taken by a stand-in |
+| `policy.stand_in.gates` | list of strings | derived: none: every gate is the person's |
 
 Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner`, `runners.person`, `runners.agent`, `runners.none` take the keys of the plugin they name; that plugin checks them.
 

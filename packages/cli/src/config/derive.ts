@@ -124,5 +124,6 @@ export function runtimeConfigOf(loaded: LoadedConfig, holder: string, formerHold
     ...(lockStale ? { lockStaleMs: durationMs(lockStale) } : {}),
     ...(retain ? { traceRetainMs: retain === "keep" ? null : durationMs(retain) } : {}),
     ...(config.checks ? { checks: { ...config.checks } } : {}),
+    standIn: { gates: [...(config.policy?.stand_in?.gates ?? [])], attended: [...(config.policy?.stand_in?.attended ?? [])] },
   };
 }

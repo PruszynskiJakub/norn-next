@@ -20,6 +20,8 @@ const PERSON_ONLY: Record<string, string[]> = {
   "run stop": ["run", "stop", UNIT],
   "run rerun": ["run", "rerun", UNIT],
   tidy: ["tidy", "--dry-run"],
+  // only for the policy: what the person lets stand in for them is theirs to grant
+  "config set": ["config", "set", "policy.stand_in.gates", "[story.ready]", "--user"],
 };
 
 type Ancestor = { pid: number; env: Record<string, string> | null };
@@ -67,6 +69,14 @@ describe("person-only commands", () => {
     expect(r.exit).toBe(ExitCode.refused);
     expect(r.stdout).toContain("norn ask");
     expect(r.stdout).not.toStartWith("{");
+  });
+
+  test("config set is a person's command only for a policy key: any other key an agent may set", async () => {
+    const m = configured();
+    const policy = await runCli(["config", "set", "policy", "{stand_in: {gates: []}}", "--json"], withEnv(m, runEnv()).io);
+    expect(json(policy.stdout)).toMatchObject({ code: "person_only" });
+    expect(json(policy.stdout).error).toContain("norn config set policy");
+    expect((await runCli(["config", "set", "base", "dev", "--json"], withEnv(m, runEnv()).io)).exit).toBe(ExitCode.ok);
   });
 
   test("the refusal comes before argument checks, so no flag gets an agent past it", async () => {

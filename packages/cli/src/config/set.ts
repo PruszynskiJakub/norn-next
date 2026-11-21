@@ -6,9 +6,10 @@
  */
 import type { HostFiles } from "@norn/plugin-api";
 import { type ConfigProblem, configError, loadConfig } from "./load.ts";
-import { getKey } from "./merge.ts";
+import { getKey, keyPath } from "./merge.ts";
 import { leafKeys } from "./origins.ts";
 import { type ConfigPaths, LAYERS, type Layer } from "./paths.ts";
+import { POLICY_KEY } from "./schema.ts";
 import { planSet, setKeyInText, writeLayer } from "./write.ts";
 
 export interface SetOutcome {
@@ -18,6 +19,8 @@ export interface SetOutcome {
   problems: ConfigProblem[];
   /** a higher file sets the key too, so the merged config keeps its value rather than the one just written */
   overridden?: Override;
+  /** a policy key the merged config holds less of than was written: only the user's file grants, and a repo file narrows */
+  narrowed?: { value: unknown };
 }
 
 export interface Override {
@@ -56,7 +59,11 @@ export async function setConfigKey(files: HostFiles, paths: ConfigPaths, layer: 
   // the layer set to `{}` keeps the refusal from reading as "nothing configured": something is, just not right
   if (!plan.ok && (before.ok || own.length > 0)) throw configError(plan.problems, { ...layers, [layer]: {} }, paths);
   await writeLayer(files, paths[layer], plan.ok ? plan.text : setKeyInText(current, key, value));
+  // a policy key merges the other way round: no file above overrides it, a repo file narrows it
+  const policy = keyPath(key)[0] === POLICY_KEY;
+  const effective = plan.ok ? getKey(plan.next.config, key) : undefined;
+  const narrowed = policy && plan.ok && value !== undefined && !Bun.deepEquals(effective, value) ? { value: effective } : undefined;
   // removing a key leaves whatever a higher file sets, which is no surprise
-  const overridden = value === undefined ? undefined : overrideOf(layers, paths, layer, key, value);
-  return { file: paths[layer], valid: plan.ok, problems: plan.ok ? [] : plan.problems, ...(overridden && { overridden }) };
+  const overridden = value === undefined || policy ? undefined : overrideOf(layers, paths, layer, key, value);
+  return { file: paths[layer], valid: plan.ok, problems: plan.ok ? [] : plan.problems, ...(overridden && { overridden }), ...(narrowed && { narrowed }) };
 }

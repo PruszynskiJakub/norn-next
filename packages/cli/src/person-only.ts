@@ -35,19 +35,21 @@ export interface PersonOnlyProbe {
 
 const ASK = 'ask the person: norn ask "<what you need them to run, and why>"';
 
-const refusal = (c: Command, where: string): CliFailure =>
+const refusal = (what: string, where: string): CliFailure =>
   refuse(
-    `norn ${c.name} is a person's command, and this process runs in an agent's session (${where})`,
-    `${ASK}. A person runs norn ${c.name} from their own shell, not from the agent's pane`,
+    `norn ${what} is a person's command, and this process runs in an agent's session (${where})`,
+    `${ASK}. A person runs norn ${what} from their own shell, not from the agent's pane`,
     "person_only",
   );
 
 const named = (s: { unit?: string; run?: string }): string => [s.unit && `unit ${s.unit}`, s.run && `run ${s.run}`].filter(Boolean).join(", ");
 
-export async function personOnlyRefusal(c: Command, probe: PersonOnlyProbe): Promise<CliFailure | null> {
-  if (!c.personOnly) return null;
+/** `args`: the command's arguments as given, which a command person-only for some calls reads. */
+export async function personOnlyRefusal(c: Command, probe: PersonOnlyProbe, args: readonly string[] = []): Promise<CliFailure | null> {
+  const what = typeof c.personOnly === "object" ? c.personOnly.when(args) : c.personOnly ? c.name : null;
+  if (what === null) return null;
   const own = agentSessionOf(probe.env);
-  if (own) return refusal(c, named(own));
+  if (own) return refusal(what, named(own));
   if (!probe.ancestry) return null;
   let ancestors: AncestorProcess[];
   try {
@@ -55,14 +57,14 @@ export async function personOnlyRefusal(c: Command, probe: PersonOnlyProbe): Pro
   } catch (e) {
     // an ancestry that cannot be read could hide the agent's process, so it is never taken for a person's shell
     return refuse(
-      `norn ${c.name} is a person's command, and whether this process runs in an agent's session could not be read: ${e instanceof Error ? e.message : String(e)}`,
-      `a person runs norn ${c.name} from their own shell once the process list can be read (ps, or /proc on Linux); an agent must ${ASK}`,
+      `norn ${what} is a person's command, and whether this process runs in an agent's session could not be read: ${e instanceof Error ? e.message : String(e)}`,
+      `a person runs norn ${what} from their own shell once the process list can be read (ps, or /proc on Linux); an agent must ${ASK}`,
       "person_only",
     );
   }
   for (const a of ancestors) {
     const session = a.env ? agentSessionOf(a.env) : null;
-    if (session) return refusal(c, `${named(session)}, through ancestor process ${a.pid}`);
+    if (session) return refusal(what, `${named(session)}, through ancestor process ${a.pid}`);
   }
   return null;
 }

@@ -46,7 +46,7 @@ function renderCommand(c: Command): string[] {
       .filter((k) => !named.has(k))
       .map((k) => `- \`--${k}\``),
   ];
-  const personOnly = c.personOnly ? ["A person's command: refused in an agent's session (`person_only`).", ""] : [];
+  const personOnly = typeof c.personOnly === "object" ? [c.personOnly.help, ""] : c.personOnly ? ["A person's command: refused in an agent's session (`person_only`).", ""] : [];
   return [`##### \`norn ${c.name}\``, "", c.summary, "", ...personOnly, "```sh", c.usage, "```", "", ...(options.length ? [...options, ""] : [])];
 }
 
@@ -145,6 +145,8 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   "kernel.claim_renew_before": durationText(d.claimRenewBeforeMs),
   "kernel.lock_stale": durationText(DEFAULT_LOCK_STALE_MS),
   "trace.retain": durationText(DEFAULT_TRACE_RETAIN_MS),
+  "policy.stand_in.attended": { derived: "none: no step's presence is taken by a stand-in" },
+  "policy.stand_in.gates": { derived: "none: every gate is the person's" },
   "checks.<name>": { derived: `\`checks.test\` is ${JSON.stringify(DEFAULT_CHECKS.test)}, which the shipped workflows' test steps run; init detects the repo's own` },
   "kernel.counters.check_fail": d.counterDefaults.checkFail,
   "kernel.counters.gate_reject": d.counterDefaults.gateReject,
@@ -170,7 +172,7 @@ export function configKeys(): { rows: ConfigRow[]; open: string[] } {
 function renderConfig(): string[] {
   const { rows, open } = configKeys();
   return [
-    "Every file takes every key: the user file, the repo-local file and the committed file, the nearer winning.",
+    "Every file takes every key: the user file, the repo-local file and the committed file, the nearer winning, except `policy`: only the user file grants it, and each repo file that sets a list keeps only what it names of the user file's.",
     "",
     "| Key | Type | Default |",
     "|---|---|---|",

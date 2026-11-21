@@ -72,7 +72,7 @@ async function dispatch(command: Command, rest: readonly string[], json: boolean
   const ctx = new CliContext(io, { acts: command.acts === true });
   const withStderr = (r: CliResult): CliResult => (ctx.stderr.length > 0 ? { ...r, stderr: ctx.stderr.map((l) => `${l}\n`).join("") } : r);
   try {
-    const refused = await personOnlyRefusal(command, { env: io.env, ...(io.hosts.ancestry && { ancestry: io.hosts.ancestry }) });
+    const refused = await personOnlyRefusal(command, { env: io.env, ...(io.hosts.ancestry && { ancestry: io.hosts.ancestry }) }, rest);
     if (refused) throw refused;
     const args = parseCommandArgs(command, own, json);
     const result = await command.run(ctx, args);

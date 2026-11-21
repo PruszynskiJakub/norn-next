@@ -94,6 +94,20 @@ export const Checks = Type.Record(Name, NonEmpty, closed);
  */
 export const Sources = Type.Record(Type.String({ pattern: OUTCOME_NAME_PATTERN }), NonEmpty, closed);
 
+/** A workflow's step, as `<workflow>.<step>`: the workflow's name and the step's. */
+const StepRef = Type.String({ pattern: "^[a-z0-9][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$" });
+const StepRefs = Type.Array(StepRef, { uniqueItems: true });
+
+/**
+ * What the person lets stand in for them: the attended steps whose presence a supervisor may take
+ * (`attended`) and the gates a supervisor may decide (`gates`). Granted in the user's own file only: a
+ * repo file, which an agent in its step can change, may narrow a list and never widen it.
+ */
+export const Policy = Type.Object({ stand_in: Type.Optional(Type.Object({ attended: Type.Optional(StepRefs), gates: Type.Optional(StepRefs) }, closed)) }, closed);
+export type Policy = Static<typeof Policy>;
+/** The keys a repo file can only narrow, and the user's file alone grants. */
+export const POLICY_KEY = "policy";
+
 export const CONFIG_FORMAT = 1;
 
 /** The merged config every command runs on. */
@@ -126,6 +140,8 @@ export const NornConfig = Type.Object(
     checks: Type.Optional(Checks),
     /** where this machine keeps the sources a workflow names, which win over a workflow's own `path:` */
     sources: Type.Optional(Sources),
+    /** what the person lets stand in for them; the user's file grants it, a repo file only narrows it */
+    policy: Type.Optional(Policy),
   },
   { ...closed, title: "NornConfig" },
 );
@@ -168,6 +184,7 @@ export const ConfigLayer = Type.Object(
     trace: Type.Optional(TraceKnobs),
     checks: Type.Optional(Checks),
     sources: Type.Optional(Sources),
+    policy: Type.Optional(Policy),
   },
   { ...closed, title: "NornConfigLayer" },
 );

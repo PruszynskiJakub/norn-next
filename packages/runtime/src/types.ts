@@ -57,6 +57,17 @@ export interface RuntimeConfig {
   traceRetainMs?: number | null;
   /** the commands a check step names as `{checks.<name>}`, over DEFAULT_CHECKS */
   checks?: Record<string, string>;
+  /**
+   * What the person's policy lets stand in for them, each a step as `<workflow>.<step>`: the gates a
+   * supervisor may decide and the attended steps whose presence it may take. A granted gate is no
+   * person's step to the floor a workflow is checked against. Absent: nothing is granted.
+   */
+  standIn?: StandIn;
+}
+
+export interface StandIn {
+  gates: readonly string[];
+  attended: readonly string[];
 }
 
 /** What the launcher needs to start one agent run; the brief is the kernel's inputs, rendered by the launcher. */
