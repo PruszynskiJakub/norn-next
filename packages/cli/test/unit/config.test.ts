@@ -361,6 +361,14 @@ describe("policy: granted in the user's file only; a repo file may narrow it, ne
     expect(runtimeConfigOf(await loaded({ user: USER_POLICY, local: LOCAL_CONFIG }), "me@box").standIn).toEqual({ gates: ["story.ready", "story.human-qa"], attended: ["refinement.refine"] });
     expect(runtimeConfigOf(await loaded({ local: LOCAL_CONFIG }), "me@box").standIn).toEqual({ gates: [], attended: [] });
   });
+
+  test("the kernel decides on the user's stand-in grants as a repo file narrows them, and on none when no file grants any", async () => {
+    const user = "policy: { stand_in: { attended: [supervised.build, story.build], gates: [supervised.ready] } }\n";
+    expect(runtimeConfigOf(await loaded({ user, local: LOCAL_CONFIG }), "me@box").kernel.standIn).toEqual({ attended: ["supervised.build", "story.build"], gates: ["supervised.ready"] });
+    const narrowed = await loaded({ user, local: LOCAL_CONFIG, repo: "policy: { stand_in: { attended: [supervised.build, quick.build] } }\n" });
+    expect(runtimeConfigOf(narrowed, "me@box").kernel.standIn).toEqual({ attended: ["supervised.build"], gates: ["supervised.ready"] });
+    expect(runtimeConfigOf(await loaded({ local: `${LOCAL_CONFIG}policy: { stand_in: { attended: [supervised.build] } }\n` }), "me@box").kernel.standIn?.attended ?? []).toEqual([]);
+  });
 });
 
 describe("a key this norn no longer reads", () => {
