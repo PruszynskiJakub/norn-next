@@ -5,17 +5,20 @@ description: Wait for a person at ready, then for the PR's merge.
 start: ready
 steps:
   ready:
-    gate: "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change."
+    by: person
+    do: "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change."
     outcomes:
       approve: merge
       reject:  { exit: rejected }
-      stale:   { exit: stale }
-      unpushed: { exit: unpushed }
+    on:
+      vcs.stale:    { exit: stale }
+      vcs.unpushed: { exit: unpushed }
   # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
-  # move it counts as stale (base.stale) leaves through `stale` by itself
+  # move it counts as stale (the workflow's vcs.stale settings) leaves through `stale` by itself
   merge:
-    await-merge:
+    by: forge.await-merge
     outcomes:
       merged: $done
-      stale: { exit: stale }
-      unpushed: { exit: unpushed }
+    on:
+      vcs.stale:    { exit: stale }
+      vcs.unpushed: { exit: unpushed }

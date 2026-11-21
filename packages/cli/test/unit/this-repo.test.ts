@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Pack } from "@norn/plugin-api";
+import { type Pack, STEP_KEYS } from "@norn/plugin-api";
 import { collectStepKinds, findProvided, loadPackWorkflows, overlayRepoWorkflows } from "@norn/runtime";
 import { parse } from "yaml";
 import { BUNDLED_PLUGINS, configPaths, ExitCode, REPO_COMMITTED_FILE, runCli } from "../../src/index.ts";
@@ -56,6 +56,26 @@ describe("this repo on the norn it builds", () => {
     expect(own).toContain("release");
     expect(byName.workflows?.detail).toContain(`(${own.join(", ")} from .agents/workflows/)`);
     expect(r.exit).toBe(ExitCode.ok);
+  });
+});
+
+describe("this repo's workflow files, as written", () => {
+  const files = [...yamlIn(WORKFLOWS).map((f) => join(WORKFLOWS, f)), ...yamlIn(join(WORKFLOWS, "shared")).map((f) => join(WORKFLOWS, "shared", f))];
+  const written = files.map((file) => ({ file, doc: parse(readFileSync(join(REPO, file), "utf8")) as { steps: Record<string, Record<string, unknown>>; base?: unknown } }));
+
+  test("every step is written in the step form: by:, do: and with:, no older head key or sibling map", () => {
+    const keys: readonly string[] = STEP_KEYS;
+    const older = written.flatMap(({ file, doc }) =>
+      Object.entries(doc.steps).flatMap(([step, body]) => Object.keys(body).filter((k) => !keys.includes(k)).map((k) => `${file}: ${step}.${k}`)),
+    );
+    expect(older).toEqual([]);
+    // a step that brings in a shared file or copies another names no actor of its own
+    const actorless = written.flatMap(({ file, doc }) => Object.entries(doc.steps).filter(([, b]) => !("by" in b) && !("use" in b) && !("like" in b)).map(([step]) => `${file}: ${step}`));
+    expect(actorless).toEqual([]);
+  });
+
+  test("a workflow sets its stale signal under signals: and its entries under entries:, never base:", () => {
+    expect(written.filter(({ doc }) => "base" in doc).map(({ file }) => file)).toEqual([]);
   });
 });
 
@@ -148,11 +168,12 @@ describe("this repo's workflows, as norn loads them", () => {
     expect(w.steps.prepare?.outcomes).toEqual({ done: "open-pr" });
     expect(w.steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
     expect(w.steps.ci?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: { to: "update", counter: "stale_loop" } });
-    // a signal may be routed under `on:` or, in the form the released norn reads, under `outcomes:`
-    const routes = (s: string) => ({ ...w.steps[s]?.outcomes, ...w.steps[s]?.on });
-    expect(routes("ready")).toEqual({ approve: "merge", reject: { to: "prepare", counter: "ready.reject" }, stale: { to: "update", counter: "stale_loop" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
+    // a signal is routed under `on:`, never among the outcomes a person or a step kind reports
+    expect(w.steps.ready?.outcomes).toEqual({ approve: "merge", reject: { to: "prepare", counter: "ready.reject" } });
+    expect(w.steps.ready?.on).toEqual({ stale: { to: "update", counter: "stale_loop" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
     expect(w.counters?.["ready.reject"]).toEqual({ max: 2 });
-    expect(routes("merge")).toEqual({ merged: "$done", stale: { to: "update", counter: "stale_loop" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
+    expect(w.steps.merge?.outcomes).toEqual({ merged: "$done" });
+    expect(w.steps.merge?.on).toEqual({ stale: { to: "update", counter: "stale_loop" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
     expect(w.base).toEqual({ stale: "behind" });
   });
 
@@ -178,14 +199,8 @@ describe("this repo's workflows, as norn loads them", () => {
   });
 
   test("the repo's copies of the pack's workflows have the same steps, kinds and edges", () => {
-    // what a step does is the one key beside these; its text (agent, check, gate) is the repo's own
-    // `on:` is compared with the outcomes: the released norn reads only the form that routes signals under
-    // `outcomes:`, so the repo's copies keep it until a release reads `on:`, and both forms load to one graph
-    // `produces:` and `writes:` likewise: the released norn refuses the keys, so the copies leave them out until a release reads them
-    // outcome objects likewise: the released norn refuses `means`, `verdict` or `produces` on an outcome, so the copies keep the
-    // step's sibling maps; both spellings pin one step, but the lowering appends those keys, so the kind keys compare as a set
-    // `role` likewise: the pack's steps name an agent role with by:, which the released norn refuses
-    const NOT_KIND = new Set(["outcomes", "on", "skills", "inputs", "produces", "means", "hand_back", "writes", "timeout", "exits", "role"]);
+    // what a step does is the one key beside these; its text (agent, check, gate), its means and its timeout are the repo's own
+    const NOT_KIND = new Set(["outcomes", "on", "skills", "inputs", "means", "timeout", "exits"]);
     // a counter's name follows the exit its edge leaves by, and the copies name their exits apart: compare its bound
     const bounded = (w: Written, outcomes: Record<string, unknown>) =>
       Object.fromEntries(
@@ -197,7 +212,9 @@ describe("this repo's workflows, as norn loads them", () => {
       );
     const shape = (w: Written) => ({
       start: w.start,
-      steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { kind: Object.keys(step).filter((k) => !NOT_KIND.has(k)).sort(), skills: step.skills, outcomes: bounded(w, { ...step.outcomes, ...step.on }) }])),
+      steps: Object.fromEntries(
+        Object.entries(w.steps).map(([s, step]) => [s, { kind: Object.keys(step).filter((k) => !NOT_KIND.has(k)), role: step.role, skills: step.skills, outcomes: bounded(w, step.outcomes), on: step.on && bounded(w, step.on) }]),
+      ),
     });
     for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(repo[wf] as Written) }).toEqual({ wf, ...shape(pack[wf] as Written) });
   });
