@@ -140,6 +140,20 @@ describe("the workflow's signals: and entries:", () => {
     );
   });
 
+  test("a verify or an entry that names the wrong step is refused where the file wrote it", () => {
+    const steps = {
+      update: { by: "vcs.update-branch", outcomes: { done: "ready", conflict: "$stuck", clean: "ready", resolved: "ready" } },
+      ready: { by: "person", do: "Approve?", outcomes: { approve: "$done", reject: "$stuck" } },
+    };
+    expect(refusals(wf(steps, { signals: { "vcs.stale": { verify: "ready" } }, entries: { "update-branch": "nowhere" } }))).toEqual([
+      { path: "/entries/update-branch", message: "entries.update-branch 'nowhere' does not exist" },
+      { path: "/signals/vcs.stale/verify", message: "vcs.stale's verify 'ready' must name a shell step" },
+    ]);
+    expect(refusals(wf(steps, { signals: { "vcs.stale": { when: "behind", verify: "update" } } }))).toEqual([
+      { path: "/signals/vcs.stale/verify", message: "vcs.stale's verify cannot be set with when: behind (any base move already updates the story, so nothing would be verified)" },
+    ]);
+  });
+
   test("base: beside them, another signal's settings, and an entry norn never re-enters are refused", () => {
     const steps = { ready: { by: "person", do: "Approve?", outcomes: { approve: "$done", reject: "$stuck" } } };
     expect(refusals(wf(steps, { base: { stale: "behind" }, signals: { "vcs.stale": { when: "conflict" } } }))).toEqual([

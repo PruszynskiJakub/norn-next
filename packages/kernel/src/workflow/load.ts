@@ -6,7 +6,7 @@
 import { BUILTIN_SIGNALS, type SignalDeclaration, type StepKindDefinition } from "@norn/plugin-api";
 import { check, parseDuration } from "@norn/schema";
 import type { KernelConfig } from "../model/config.ts";
-import { lowerWorkflowKeys } from "./actors.ts";
+import { inWorkflowKeys, lowerWorkflowKeys } from "./actors.ts";
 import { type CountedStep, deriveCounters } from "./counters.ts";
 import { type CounterDoc, type OnRoute, type Route, type WorkflowDocument, WorkflowFile, type WorkflowStepDoc } from "./document.ts";
 import { type Flat, flatten } from "./flatten.ts";
@@ -71,8 +71,9 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
   if ("errors" in lifted) return fail(lifted.errors);
   const written: WorkflowFile = lifted.doc;
   const signals: Record<string, SignalDeclaration> = { ...opts.signals, ...BUILTIN_SIGNALS };
+  const byKeys = schema.value.signals !== undefined || schema.value.entries !== undefined;
   const flat = flatten(written, opts.sharedFiles, { stepKinds: opts.stepKinds, signals });
-  if (!flat.ok) return flat;
+  if (!flat.ok) return byKeys ? fail(flat.errors.map(inWorkflowKeys)) : flat;
   const { steps: flatSteps, included } = flat.flat;
   const inShared = (e: WorkflowError): WorkflowError => {
     const from = e.path.startsWith("/steps/") ? included[e.path.split("/")[2] ?? ""] : undefined;
@@ -98,7 +99,7 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
   if (errors.length) return fail(errors);
 
   const declared = written.counters ?? {};
-  errors.push(...targetErrors(flat.flat, read, declared).map(inShared));
+  errors.push(...targetErrors(flat.flat, read, declared).map((e) => inShared(byKeys ? inWorkflowKeys(e) : e)));
   if (errors.length) return fail(errors);
 
   const order = Object.keys(read);

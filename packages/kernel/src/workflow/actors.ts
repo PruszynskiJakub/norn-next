@@ -6,14 +6,13 @@
  * `reset_on` keep one dot, and a pin's hash never depends on which form a file used.
  */
 import { BUILTIN_STEP_KINDS, type SignalDeclaration, STEP_KEYS, STEP_KEYWORDS } from "@norn/plugin-api";
+import { AGENT_ROLES } from "@norn/schema";
 import type { WorkflowError } from "./graph.ts";
 import type { StepKindInfo } from "./load.ts";
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** The agent roles a step may name; a repo's own roles come with the executor binding. */
-export const AGENT_ROLES = ["builder", "reviewer", "qa", "investigator", "writer"] as const;
 const ROLES: readonly string[] = AGENT_ROLES;
 
 /** The capabilities `allow:` may ask for while the pinned document holds only `writes:`. */
@@ -238,6 +237,17 @@ function pick(step: Obj, keys: readonly string[]): Obj {
 
 function refused(path: string, message: string): { errors: WorkflowError[] } {
   return { errors: [{ path, message }] };
+}
+
+/**
+ * A refusal of the pinned `base:` said where a file that wrote `signals:` and `entries:` gave it, in its
+ * words, so the author is pointed at a key the file has.
+ */
+export function inWorkflowKeys(e: WorkflowError): WorkflowError {
+  if (e.path === "/base/step") return { ...e, path: "/entries/update-branch", message: e.message.replace("base.step", "entries.update-branch") };
+  if (e.path === "/base/verify")
+    return { ...e, path: "/signals/vcs.stale/verify", message: e.message.replace("base.verify", "vcs.stale's verify").replace("base.stale: behind", "when: behind").replace("a check step", "a shell step") };
+  return e;
 }
 
 /** The settings a workflow file gives under `signals:` and `entries:`, as the pinned document's `base:`. */

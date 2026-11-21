@@ -221,13 +221,15 @@ describe("workflow-source and workflow-shared schemas", () => {
   const source = (step: unknown) => ({ name: "x", start: "a", steps: { a: step } });
   const shared = (step: unknown) => ({ start: "a", steps: { a: step } });
 
-  test("each schema has one step shape per head key, besides `use` and `like`", () => {
+  test("each schema has one step shape per actor written with by:, one per head key of the older form, besides `use` and `like`", () => {
     const shapes = (name: "workflow-source" | "workflow-shared") => {
       const steps = (toJsonSchema(name) as any).properties.steps.patternProperties;
       const union = (Object.values(steps)[0] as { anyOf: Array<{ properties: Record<string, unknown>; required?: string[] }> }).anyOf;
-      return union.map((v) => (v.required ?? []).filter((k) => k in ONE_OF_EACH || k === "use" || k === "like"));
+      return union.map((v) => (v.required ?? []).filter((k) => k in ONE_OF_EACH || k === "use" || k === "like" || k === "by"));
     };
-    const expected = [...Object.keys(ONE_OF_EACH).map((k) => [k]), ["like"]];
+    // an agent role, person, shell, a step kind, norn.each
+    const actors = [["by"], ["by"], ["by"], ["by"], ["by"]];
+    const expected = [...actors, ...Object.keys(ONE_OF_EACH).map((k) => [k]), ["like"]];
     expect(shapes("workflow-source")).toEqual([...expected.slice(0, -1), ["use"], ["like"]]);
     expect(shapes("workflow-shared")).toEqual(expected);
     for (const [head, step] of Object.entries(ONE_OF_EACH)) {
@@ -292,6 +294,60 @@ describe("the shipped workflows against the schemas a person writes against", ()
   });
   test.each(yamls(join(dir, "shared")))("shared/%s validates against workflow-shared", (file) => {
     expect(sharedErrorsOf(parse(readFileSync(join(dir, "shared", file), "utf8")))).toEqual([]);
+  });
+});
+
+describe("a step written with by: in the workflow-source and workflow-shared schemas", () => {
+  const source = (steps: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ name: "x", start: Object.keys(steps)[0], steps, ...extra });
+  const shared = (steps: Record<string, unknown>) => ({ start: Object.keys(steps)[0], steps });
+  /** One step per actor, as a file writes it. */
+  const ACTORS: Record<string, Record<string, unknown>> = {
+    agent: {
+      by: "reviewer",
+      do: "Review it.",
+      with: { skills: ["norn-review"] },
+      reads: ["spec", "diff"],
+      produces: ["criteria"],
+      allow: ["docs:write"],
+      attended: "person",
+      limits: { deadline: "2h", nudges: 1, retries: 0 },
+      outcomes: { approve: { to: "$done", verdict: "pass", means: "fine" }, changes_requested: { to: "$stuck", produces: ["criteria", "findings"] } },
+    },
+    person: { by: "person", do: "Approve?", outcomes: { approve: "$done", reject: { to: "$stuck", max: 2 } }, on: { "vcs.stale": "$stuck", "norn.timeout": { to: "$stuck", after: "48h" } } },
+    shell: { by: "shell", do: "bun test", with: { exits: { 3: "stale" } }, limits: { timeout: "5m" }, outcomes: { pass: "$done", fail: "$stuck", stale: "$stuck" } },
+    kind: { by: "forge.await-merge", with: { note: "x" }, outcomes: { merged: "$done" }, on: { "vcs.stale": "$stuck", "vcs.unpushed": "$stuck" } },
+    each: { by: "norn.each", reads: ["slices"], outcomes: { done: "$done", stuck: "$stuck" } },
+  };
+
+  test("an agent role, a person, shell, a step kind and norn.each each validate as a file writes them", () => {
+    for (const [actor, step] of Object.entries(ACTORS)) expect({ actor, source: errorsOf(source({ a: step })), shared: sharedErrorsOf(shared({ a: step })) }).toEqual({ actor, source: [], shared: [] });
+    expect(validate("workflow", source({ a: ACTORS.person })).ok).toBe(false);
+  });
+
+  test("a step written with by: takes none of the older form's keys, and each actor only its own", () => {
+    for (const [actor, extra] of [
+      ["agent", { skills: ["x"] }],
+      ["agent", { inputs: ["spec"] }],
+      ["agent", { writes: "docs" }],
+      ["agent", { attended: true }],
+      ["agent", { limits: { timeout: "5m" } }],
+      ["shell", { timeout: "5m" }],
+      ["shell", { exits: { 3: "stale" } }],
+      ["person", { reads: ["spec"] }],
+      ["person", { on: { stale: "$stuck" } }],
+      ["kind", { do: "Wait." }],
+    ] as const) {
+      const step = { ...ACTORS[actor], ...extra };
+      expect({ actor, extra, ok: validate("workflow-source", source({ a: step })).ok }).toEqual({ actor, extra, ok: false });
+    }
+  });
+
+  test("a workflow file holds signals: and entries:, which neither a shared file nor the pinned workflow holds", () => {
+    const wf = source({ a: ACTORS.shell }, { signals: { "vcs.stale": { when: "conflict", verify: "a" } }, entries: { "update-branch": "a" } });
+    expect(errorsOf(wf)).toEqual([]);
+    expect(validate("workflow", wf).ok).toBe(false);
+    expect(validate("workflow-shared", { ...shared({ a: ACTORS.shell }), signals: {} }).ok).toBe(false);
+    expect(validate("workflow-source", source({ a: ACTORS.shell }, { signals: { "vcs.stale": { when: "sometimes" } } })).ok).toBe(false);
   });
 });
 

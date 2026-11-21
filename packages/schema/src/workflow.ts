@@ -25,6 +25,13 @@ export type HandBack = Static<typeof HandBack>;
 export const StepWrites = Type.Union([Type.Literal("worktree"), Type.Literal("docs")]);
 export type StepWrites = Static<typeof StepWrites>;
 
+/** A signal as a step written with `by:` names it under `on:`: `<namespace>.<signal>`. */
+const SignalSurfaceName = Type.String({ pattern: "^[^.\\s]+\\.[a-z][a-z0-9_-]*$" });
+
+/** The agent roles a step written with `by:` may name; a repo's own roles come with the executor binding. */
+export const AGENT_ROLES = ["builder", "reviewer", "qa", "investigator", "writer"] as const;
+export type AgentRole = (typeof AGENT_ROLES)[number];
+
 /** Full outcome edge: `{ to, counter?, means? }`. */
 export const OutcomeEdge = Type.Object(
   {
@@ -260,7 +267,68 @@ function fileStepTypes<R extends TSchema>(route: R, agentRoute: TSchema, onRoute
       } & typeof common & { outcomes: TSchema },
       { additionalProperties: false },
     );
+  // a step written with by: names a signal by its namespace (`vcs.stale`) and a step kind by value
+  const onNamed = Type.Optional(
+    Type.Record(SignalSurfaceName, onRoute, { minProperties: 1, additionalProperties: false, description: "Signal → route: vcs.stale, vcs.unpushed, norn.timeout, or one a plugin declares as <namespace>.<signal>" }),
+  );
+  const instruction = (description: string) => Type.String({ minLength: 1, pattern: "\\S", description });
+  const AgentActorStep = Type.Object(
+    {
+      by: Type.Union(AGENT_ROLES.map((r) => Type.Literal(r)), { description: "The agent role that does the step" }),
+      do: instruction("The agent's instruction: what the step is for"),
+      ...common,
+      with: Type.Optional(Type.Object({ skills: agentKeys.skills }, { additionalProperties: false, description: "How the agent works: the skills it uses" })),
+      reads: agentKeys.inputs,
+      produces: Type.Optional(ProducesList),
+      allow: Type.Optional(
+        Type.Array(Type.Union([Type.Literal("code:write"), Type.Literal("docs:write")]), { minItems: 1, uniqueItems: true, description: "What the step may write; docs:write alone keeps it to the story's documents" }),
+      ),
+      attended: Type.Optional(Type.Literal("person", { description: "A person stays alongside the agent and starts the step" })),
+      limits: Type.Optional(Type.Object({ deadline: agentKeys.deadline, nudges: agentKeys.nudges, retries: agentKeys.retries }, { additionalProperties: false })),
+      outcomes: openOutcomes(agentRoute),
+    },
+    { additionalProperties: false },
+  );
+  const PersonStep = Type.Object(
+    { by: Type.Literal("person"), do: instruction("What the person decides; shown in inbox"), ...common, outcomes: fixedOutcomes(["approve", "reject"] as const, route), on: onNamed },
+    { additionalProperties: false },
+  );
+  const ShellStep = Type.Object(
+    {
+      by: Type.Literal("shell"),
+      do: NonEmpty,
+      ...common,
+      with: Type.Optional(Type.Object({ exits: model.CheckStep.properties.exits }, { additionalProperties: false })),
+      limits: Type.Object({ timeout: Duration }, { additionalProperties: false }),
+      outcomes: routes,
+    },
+    { additionalProperties: false },
+  );
+  const KindStep = Type.Object(
+    {
+      by: Type.String({ pattern: "^(?!norn\\.)[^.\\s]+\\.[a-z][a-z0-9-]*$", description: "A step kind as <slot>.<kind> (forge.open-pr) or <plugin>.<kind>" }),
+      ...common,
+      with: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: "The step kind's settings" })),
+      outcomes: routes,
+      on: onNamed,
+    },
+    { additionalProperties: false },
+  );
+  const EachStep = Type.Object(
+    {
+      by: Type.Literal("norn.each", { description: "Runs each slice of the story through the config's slice_workflow" }),
+      ...common,
+      reads: Type.Optional(Type.Tuple([Type.Literal("slices")])),
+      outcomes: fixedOutcomes(["done", "stuck"] as const, route),
+    },
+    { additionalProperties: false },
+  );
   return {
+    AgentActorStep,
+    PersonStep,
+    ShellStep,
+    KindStep,
+    EachStep,
     AgentStep,
     CheckStep,
     GateStep,
@@ -470,6 +538,22 @@ export const WorkflowSource = Type.Object(
     steps: Type.Record(StepName, Type.Union([...FileSteps, UseStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
     // a dotted name is derived from its edge, so a declared one never clashes with it
     counters: Type.Optional(Type.Record(CounterName, CounterSpec, { additionalProperties: false })),
+    signals: Type.Optional(
+      Type.Object(
+        {
+          "vcs.stale": Type.Optional(
+            Type.Object(
+              { when: BaseSync.properties.stale, verify: BaseSync.properties.verify },
+              { additionalProperties: false, description: "when: conflict (default) or behind; verify: the check step run on a base move without a conflict" },
+            ),
+          ),
+        },
+        { additionalProperties: false, description: "A signal's settings for the whole workflow, written once" },
+      ),
+    ),
+    entries: Type.Optional(
+      Type.Object({ "update-branch": Type.Optional(StepName) }, { additionalProperties: false, description: "A way back in → the step it enters: update-branch is what norn story update-branch re-enters" }),
+    ),
   },
   {
     $id: "https://norn.dev/schema/workflow-source.json",

@@ -71,6 +71,729 @@
               "additionalProperties": false,
               "type": "object",
               "required": [
+                "by",
+                "do",
+                "outcomes"
+              ],
+              "properties": {
+                "by": {
+                  "description": "The agent role that does the step",
+                  "anyOf": [
+                    {
+                      "const": "builder",
+                      "type": "string"
+                    },
+                    {
+                      "const": "reviewer",
+                      "type": "string"
+                    },
+                    {
+                      "const": "qa",
+                      "type": "string"
+                    },
+                    {
+                      "const": "investigator",
+                      "type": "string"
+                    },
+                    {
+                      "const": "writer",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "do": {
+                  "minLength": 1,
+                  "pattern": "\\S",
+                  "description": "The agent's instruction: what the step is for",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "with": {
+                  "additionalProperties": false,
+                  "description": "How the agent works: the skills it uses",
+                  "type": "object",
+                  "properties": {
+                    "skills": {
+                      "uniqueItems": true,
+                      "description": "Skills the agent uses, in the order the brief names them",
+                      "type": "array",
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "reads": {
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "const": "spec",
+                            "type": "string"
+                          },
+                          {
+                            "const": "slice",
+                            "type": "string"
+                          },
+                          {
+                            "const": "slices",
+                            "type": "string"
+                          },
+                          {
+                            "const": "diff",
+                            "type": "string"
+                          },
+                          {
+                            "const": "handoff",
+                            "type": "string"
+                          },
+                          {
+                            "const": "last_check",
+                            "type": "string"
+                          },
+                          {
+                            "const": "last_findings",
+                            "type": "string"
+                          },
+                          {
+                            "const": "record",
+                            "type": "string"
+                          },
+                          {
+                            "const": "resolution",
+                            "type": "string"
+                          },
+                          {
+                            "const": "base_side",
+                            "type": "string"
+                          },
+                          {
+                            "const": "signal",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "file"
+                        ],
+                        "properties": {
+                          "file": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "label": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "produces": {
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "pattern": "^[a-z][a-z0-9_-]*$",
+                        "type": "string"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "name",
+                          "file"
+                        ],
+                        "properties": {
+                          "name": {
+                            "pattern": "^[a-z][a-z0-9_-]*$",
+                            "type": "string"
+                          },
+                          "file": {
+                            "minLength": 1,
+                            "pattern": "\\S",
+                            "description": "The file, relative to the story's spec folder (`pr.md`)",
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "allow": {
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "What the step may write; docs:write alone keeps it to the story's documents",
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "const": "code:write",
+                        "type": "string"
+                      },
+                      {
+                        "const": "docs:write",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                },
+                "attended": {
+                  "description": "A person stays alongside the agent and starts the step",
+                  "const": "person",
+                  "type": "string"
+                },
+                "limits": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "deadline": {
+                      "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+                      "description": "Duration like 30s, 10m, 1h30m",
+                      "type": "string"
+                    },
+                    "nudges": {
+                      "minimum": 0,
+                      "description": "Max nudges in the same session",
+                      "type": "integer"
+                    },
+                    "retries": {
+                      "minimum": 0,
+                      "description": "Max fresh-session retries after died",
+                      "type": "integer"
+                    }
+                  }
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_-]*$": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "produces": {
+                              "uniqueItems": true,
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "pattern": "^[a-z][a-z0-9_-]*$",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "type": "object",
+                                    "required": [
+                                      "name",
+                                      "file"
+                                    ],
+                                    "properties": {
+                                      "name": {
+                                        "pattern": "^[a-z][a-z0-9_-]*$",
+                                        "type": "string"
+                                      },
+                                      "file": {
+                                        "minLength": 1,
+                                        "pattern": "\\S",
+                                        "description": "The file, relative to the story's spec folder (`pr.md`)",
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "by",
+                "do",
+                "outcomes"
+              ],
+              "properties": {
+                "by": {
+                  "const": "person",
+                  "type": "string"
+                },
+                "do": {
+                  "minLength": 1,
+                  "pattern": "\\S",
+                  "description": "What the person decides; shown in inbox",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "approve": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "reject": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "on": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "description": "Signal → route: vcs.stale, vcs.unpushed, norn.timeout, or one a plugin declares as <namespace>.<signal>",
+                  "type": "object",
+                  "patternProperties": {
+                    "^[^.\\s]+\\.[a-z][a-z0-9_-]*$": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": true,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "after": {
+                              "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+                              "description": "Duration like 30s, 10m, 1h30m",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "by",
+                "do",
+                "limits",
+                "outcomes"
+              ],
+              "properties": {
+                "by": {
+                  "const": "shell",
+                  "type": "string"
+                },
+                "do": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "with": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "exits": {
+                      "minProperties": 1,
+                      "additionalProperties": false,
+                      "description": "Exit code → outcome; exit 0 is pass, an undeclared one fail",
+                      "type": "object",
+                      "patternProperties": {
+                        "^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$": {
+                          "pattern": "^[a-z][a-z0-9_-]*$",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "limits": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "timeout"
+                  ],
+                  "properties": {
+                    "timeout": {
+                      "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+                      "description": "Duration like 30s, 10m, 1h30m",
+                      "type": "string"
+                    }
+                  }
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_-]*$": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "by",
+                "outcomes"
+              ],
+              "properties": {
+                "by": {
+                  "pattern": "^(?!norn\\.)[^.\\s]+\\.[a-z][a-z0-9-]*$",
+                  "description": "A step kind as <slot>.<kind> (forge.open-pr) or <plugin>.<kind>",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "with": {
+                  "description": "The step kind's settings",
+                  "type": "object",
+                  "patternProperties": {
+                    "^(.*)$": {}
+                  }
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_-]*$": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "on": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "description": "Signal → route: vcs.stale, vcs.unpushed, norn.timeout, or one a plugin declares as <namespace>.<signal>",
+                  "type": "object",
+                  "patternProperties": {
+                    "^[^.\\s]+\\.[a-z][a-z0-9_-]*$": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": true,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "after": {
+                              "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+                              "description": "Duration like 30s, 10m, 1h30m",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "by",
+                "outcomes"
+              ],
+              "properties": {
+                "by": {
+                  "description": "Runs each slice of the story through the config's slice_workflow",
+                  "const": "norn.each",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "reads": {
+                  "type": "array",
+                  "items": [
+                    {
+                      "const": "slices",
+                      "type": "string"
+                    }
+                  ],
+                  "additionalItems": false,
+                  "minItems": 1,
+                  "maxItems": 1
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "done": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "stuck": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
                 "agent",
                 "outcomes"
               ],
@@ -1341,28 +2064,33 @@
                   "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
                   "type": "string"
                 },
-                "agent": {},
+                "by": {},
+                "do": {},
                 "description": {},
+                "with": {},
+                "reads": {},
+                "produces": {},
+                "allow": {},
+                "attended": {},
+                "limits": {},
+                "outcomes": {},
+                "on": {},
+                "agent": {},
                 "skills": {},
                 "inputs": {},
                 "model": {},
-                "attended": {},
                 "deadline": {},
                 "nudges": {},
                 "retries": {},
                 "criteria": {},
                 "hand_back": {},
-                "produces": {},
                 "writes": {},
-                "by": {},
-                "outcomes": {},
                 "means": {},
                 "verdict": {},
                 "check": {},
                 "timeout": {},
                 "exits": {},
                 "gate": {},
-                "on": {},
                 "update-branch": {},
                 "open-pr": {},
                 "integrate": {},
@@ -1433,6 +2161,47 @@
           "type": "string"
         },
         "verify": {
+          "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+          "type": "string"
+        }
+      }
+    },
+    "signals": {
+      "additionalProperties": false,
+      "description": "A signal's settings for the whole workflow, written once",
+      "type": "object",
+      "properties": {
+        "vcs.stale": {
+          "additionalProperties": false,
+          "description": "when: conflict (default) or behind; verify: the check step run on a base move without a conflict",
+          "type": "object",
+          "properties": {
+            "when": {
+              "anyOf": [
+                {
+                  "const": "conflict",
+                  "type": "string"
+                },
+                {
+                  "const": "behind",
+                  "type": "string"
+                }
+              ]
+            },
+            "verify": {
+              "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "entries": {
+      "additionalProperties": false,
+      "description": "A way back in → the step it enters: update-branch is what norn story update-branch re-enters",
+      "type": "object",
+      "properties": {
+        "update-branch": {
           "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
           "type": "string"
         }
