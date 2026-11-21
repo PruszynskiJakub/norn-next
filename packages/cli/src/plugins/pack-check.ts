@@ -18,6 +18,8 @@ export interface PackSource {
   installedAs: Readonly<Record<string, string>>;
   /** the repo's own files laid over the pack; a failure in one of them is the repo's to fix, never the plugin's */
   repo?: RepoWorkflows;
+  /** the workflows held for the person's confirmation: waiting for the person, not broken, so they stop no tick */
+  held?: readonly string[];
 }
 
 function fileOf(plugin: NornPlugin | undefined, pack: string, workflow: string): string {
@@ -41,7 +43,7 @@ const errorText = (errors: readonly WorkflowError[]): string[] => errors.map((e)
 export function packFailure(byName: Readonly<Record<string, WorkflowLoad>>, src: PackSource): CliFailure | null {
   const missing = missingStepKinds(byName);
   if (missing) return missing;
-  const broken = Object.entries(byName).flatMap(([name, load]) => (load.ok ? [] : [{ name, errors: load.errors }]));
+  const broken = Object.entries(byName).flatMap(([name, load]) => (load.ok || src.held?.includes(name) ? [] : [{ name, errors: load.errors }]));
   if (broken.length === 0) return null;
   const repo = src.repo ?? NO_REPO_WORKFLOWS;
   const inRepo = broken.flatMap((b) => {

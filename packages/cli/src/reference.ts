@@ -23,7 +23,7 @@ export const REFERENCE_END = "<!-- norn:reference:end -->";
  */
 export const REFERENCE_GROUPS: ReadonlyArray<{ title: string; commands: readonly string[] }> = [
   { title: "Setup", commands: ["init", "doctor", "config", "plugin"] },
-  { title: "A person's commands", commands: ["status", "story", "run"] },
+  { title: "A person's commands", commands: ["status", "story", "run", "workflow"] },
   { title: "Background: run by a person, cron or a terminal multiplexer", commands: ["watch", "tick"] },
   { title: "Agent protocol: the only commands an agent runs", commands: ["brief", "done", "ask", "stuck"] },
   { title: "Called by the harness's hooks, not by hand", commands: ["hook"] },

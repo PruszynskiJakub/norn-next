@@ -10,7 +10,8 @@ import { type CliFailure, corruptError, failure, refuse } from "../output.ts";
 
 /**
  * Why a person may not name this workflow, or null when it loads. One no file holds is named with
- * the ones that load and the repo file that would add it; one whose file fails to load, with why.
+ * the ones that load and the repo file that would add it; one whose file fails to load, with why; one
+ * held for the person's confirmation with nothing confirmed to run instead, with the confirmation.
  */
 export function workflowRefusal(env: RuntimeEnv, name: string): CliFailure | null {
   const load = env.workflows[name];
@@ -19,6 +20,7 @@ export function workflowRefusal(env: RuntimeEnv, name: string): CliFailure | nul
     const loading = Object.entries(env.workflows).flatMap(([n, w]) => (w.ok ? [n] : [])).sort();
     return refuse(`no workflow ${name}`, `name one of ${loading.join(", ")}, or write ${REPO_WORKFLOWS_DIR}/${name}.yaml`, "unknown_workflow");
   }
+  if (env.held[name]) return refuse(loadProblem(name, load) ?? `workflow ${name} is held for the person's confirmation`, `norn workflow confirm ${name}`, "workflow_held");
   const file = repoFileOf(env.repoWorkflows, name, "workflow");
   return refuse(loadProblem(name, load) ?? `workflow ${name} is invalid`, `fix ${file ?? `the workflow ${name}`}, then norn doctor`, "invalid_workflow");
 }

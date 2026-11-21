@@ -202,6 +202,9 @@ export async function setUp(w: World, opts: SetUpOptions = {}): Promise<{ added:
     const set = await norn(w, ["config", "set", key, value, "--json"]);
     if (set.code !== 0) throw new Error(`config set ${key}: ${set.stdout}${set.stderr}`);
   }
+  // the person confirms the repo's own workflows, as a person setting a repo up would; one that does
+  // not load yet has nothing to confirm, and the test that wrote it reads that refusal itself
+  for (const name of Object.keys(opts.workflows ?? {})) await norn(w, ["workflow", "confirm", name, "--json"]);
   return { added, init };
 }
 

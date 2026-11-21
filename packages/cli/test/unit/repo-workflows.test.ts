@@ -80,6 +80,8 @@ describe("the repo's own workflows in .agents/workflows", () => {
     const legacy = [...TIDY.trimEnd().replace("{ done: $done }", "{ done: ready }").split("\n"), ...gate("      stale: work\n      unpushed: work"), ""].join("\n");
     const sharedLegacy = ["start: ready", "steps:", ...gate("      stale: $stuck"), ""].join("\n");
     const m = repoWith({ "tidy.yaml": legacy, "shared/hold.yaml": sharedLegacy });
+    // the workflow brings a person's step, which the person confirms before new rounds run it
+    await runCli(["workflow", "confirm", "tidy"], m.io);
     expect((await runCli(["tick", "--json"], m.io)).exit).toBe(ExitCode.ok);
     const doctor = await runCli(["doctor", "--json"], m.io);
     const check = (json(doctor.stdout).checks as Array<{ name: string; ok: boolean; warning?: string; do_instead?: string }>).find((c) => c.name === "workflows");
@@ -92,6 +94,7 @@ describe("the repo's own workflows in .agents/workflows", () => {
     const moved = legacy.replace("      reject: work\n      stale: work", "      reject: work\n    on:\n      stale: work");
     await m.files.write(`${DIR}/tidy.yaml`, moved);
     await m.files.write(`${DIR}/shared/hold.yaml`, sharedLegacy.replace("      reject: work\n", "      reject: work\n    on:\n"));
+    await runCli(["workflow", "confirm", "tidy"], m.io);
     const again = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; warning?: string; do_instead?: string }>).find((c) => c.name === "workflows");
     expect(again).not.toHaveProperty("warning");
     expect(again).not.toHaveProperty("do_instead");

@@ -287,6 +287,8 @@ describe("norn watch's cadence", () => {
       1: async () => {
         // the repo's own file of the shipped workflow's name replaces it: its first step waits for a person
         await m.files.write(`${ROOT}/.agents/workflows/story.yaml`, TIDY_YAML.replace("name: tidy", "name: story"));
+        // it drops the pack's person steps, so it runs once the person confirms it
+        await runCli(["workflow", "confirm", "story"], m.io);
         await addItem(m, "First");
       },
     });

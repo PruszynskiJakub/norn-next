@@ -138,6 +138,18 @@ function parseYaml(text: string): { ok: true; value: unknown } | { ok: false; me
   }
 }
 
+const NO_STAND_IN: StandIn = { gates: [], attended: [] };
+
+/**
+ * The gates of one workflow a policy grant lets a stand-in decide: a grant names a step as
+ * `<workflow>.<step>` by the workflow's name, the one `bind:` names it by, else by its file's.
+ */
+export function delegatedGates(standIn: StandIn, doc: unknown, file: string): string[] {
+  const named = (doc as { name?: unknown } | null)?.name;
+  const prefix = `${typeof named === "string" ? named : file}.`;
+  return standIn.gates.filter((ref) => ref.startsWith(prefix)).map((ref) => ref.slice(prefix.length));
+}
+
 /**
  * Load every workflow of a pack by its file name without the extension. A workflow that fails to load
  * is kept as its failure, not dropped, and so is one whose file does not parse: decide parks a story
@@ -145,18 +157,6 @@ function parseYaml(text: string): { ok: true; value: unknown } | { ok: false; me
  * command over one file. A shared file that does not parse is named in the failure of every workflow
  * that does not load without it.
  */
-const NO_STAND_IN: StandIn = { gates: [], attended: [] };
-
-/**
- * The gates of one workflow a policy grant lets a stand-in decide: a grant names a step as
- * `<workflow>.<step>` by the workflow's name, the one `bind:` names it by, else by its file's.
- */
-function delegatedGates(standIn: StandIn, doc: unknown, file: string): string[] {
-  const named = (doc as { name?: unknown } | null)?.name;
-  const prefix = `${typeof named === "string" ? named : file}.`;
-  return standIn.gates.filter((ref) => ref.startsWith(prefix)).map((ref) => ref.slice(prefix.length));
-}
-
 export function loadPackWorkflows(
   pack: Pack,
   stepKinds: Readonly<Record<string, ProvidedStepKind>>,

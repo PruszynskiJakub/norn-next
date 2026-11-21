@@ -87,6 +87,20 @@ function unboundSourceWarning(env: RuntimeEnv): { warning: string; do_instead: s
   };
 }
 
+/**
+ * The repo's workflows held for the person's confirmation: what changed, and what new rounds run
+ * meanwhile. A tick goes on, so doctor is where the person learns a file is waiting for them.
+ */
+function heldWarning(env: RuntimeEnv): { warning: string; do_instead: string } | null {
+  const held = Object.entries(env.held).sort(([a], [b]) => a.localeCompare(b));
+  if (held.length === 0) return null;
+  const running = (r: (typeof held)[number][1]["running"]): string => (r === null ? "none of it" : r.from === "pack" ? "the pack's revision" : "the revision you last confirmed");
+  return {
+    warning: held.map(([name, h]) => `workflow ${name} is held for your confirmation (${h.changes.join("; ")}); new rounds run ${running(h.running)}`).join("; "),
+    do_instead: held.map(([name]) => `norn workflow confirm ${name}`).join(", "),
+  };
+}
+
 /** Which workflows load, and which of them are the repo's own files rather than the pack's. */
 function workflowsDetail(env: RuntimeEnv): string {
   const names = Object.keys(env.workflows).sort();
@@ -288,8 +302,9 @@ export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Prom
         else {
           const legacy = legacySignalWarning(env.value);
           const unbound = unboundSourceWarning(env.value);
-          const warning = [await unseenSkillWarning(env.value), legacy?.warning, unbound?.warning].filter((w) => w).join("; ");
-          const doInstead = [legacy?.do_instead, unbound?.do_instead].filter((w) => w).join("; ");
+          const held = heldWarning(env.value);
+          const warning = [await unseenSkillWarning(env.value), legacy?.warning, unbound?.warning, held?.warning].filter((w) => w).join("; ");
+          const doInstead = [legacy?.do_instead, unbound?.do_instead, held?.do_instead].filter((w) => w).join("; ");
           checks.push({ ...passed("workflows", workflowsDetail(env.value)), ...(warning ? { warning } : {}), ...(doInstead ? { do_instead: doInstead } : {}) });
         }
         if (!opts.repoOnly) {

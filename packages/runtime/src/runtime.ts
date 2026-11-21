@@ -9,7 +9,8 @@ import { briefRenderInput } from "./brief-context.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { createHarnessLauncher, DEFAULT_HOOK_COMMAND } from "./executors.ts";
 import { NO_REPO_WORKFLOWS, overlayRepoWorkflows } from "./repo-workflows.ts";
-import { loadPackWorkflows, type ResolvedSlots, resolveSlots, signalDeclarations } from "./resolve.ts";
+import { delegatedGates, loadPackWorkflows, type ResolvedSlots, resolveSlots, signalDeclarations } from "./resolve.ts";
+import { holdChanged } from "./confirm.ts";
 import { newTickId, tick } from "./tick.ts";
 import type { AgentLauncher, AgentRunRequest, Runtime, RuntimeDeps } from "./types.ts";
 import { newWakeWriter, stampingReceipts } from "./wake.ts";
@@ -48,8 +49,18 @@ export function createRuntimeEnv(deps: Omit<RuntimeDeps, "tickId">): PluginResul
   const slots = resolveSlots(deps.ctx, deps.plugins, deps.config);
   if (!slots.ok) return slots;
   const repoWorkflows = deps.repoWorkflows ?? NO_REPO_WORKFLOWS;
-  const workflows = loadPackWorkflows(overlayRepoWorkflows(slots.value.pack, repoWorkflows), slots.value.stepKinds, deps.config.kernel, signalDeclarations(slots.value.signals), deps.config.standIn);
-  if (!workflows.ok) return workflows;
+  const signals = signalDeclarations(slots.value.signals);
+  const overlaid = loadPackWorkflows(overlayRepoWorkflows(slots.value.pack, repoWorkflows), slots.value.stepKinds, deps.config.kernel, signals, deps.config.standIn);
+  if (!overlaid.ok) return overlaid;
+  const packOnly = loadPackWorkflows(slots.value.pack, slots.value.stepKinds, deps.config.kernel, signals, deps.config.standIn);
+  if (!packOnly.ok) return packOnly;
+  const standIn = deps.config.standIn ?? { gates: [], attended: [] };
+  const workflows = holdChanged(overlaid.value, packOnly.value, deps.confirmedWorkflows ?? {}, (name) => ({
+    stepKinds: slots.value.stepKinds,
+    config: deps.config.kernel,
+    signals,
+    floor: { delegated: delegatedGates(standIn, { name }, name) },
+  }));
   let env: RuntimeEnv | undefined;
   const launcher = launcherOf(deps, slots.value, () => env);
   if (!launcher.ok) return launcher;
@@ -63,8 +74,9 @@ export function createRuntimeEnv(deps: Omit<RuntimeDeps, "tickId">): PluginResul
     wakeBy,
     launcher: launcher.value,
     sessions,
-    workflows: workflows.value,
+    workflows: workflows.byName,
     repoWorkflows,
+    held: workflows.held,
   };
   return ok(env);
 }

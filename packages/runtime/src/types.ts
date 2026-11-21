@@ -181,6 +181,8 @@ export interface RuntimeDeps {
   tickId?: () => string;
   /** the repo's own workflow files, laid over the pack's (repo-workflows.ts); absent: the pack's alone */
   repoWorkflows?: RepoWorkflows;
+  /** the revisions the person confirmed, each one's text by workflow name (confirm.ts); absent: none */
+  confirmedWorkflows?: Readonly<Record<string, string>>;
 }
 
 /** How carrying out one decision went. A failure is recorded and the tick goes on with the next unit. */

@@ -6,7 +6,7 @@
 import { userInfo } from "node:os";
 import type { HostContext, NornPlugin } from "@norn/plugin-api";
 import { PLUGIN_API_VERSION } from "@norn/plugin-api";
-import { createRuntimeEnv, EventLogSessionSource, newTickId, readRepoWorkflows, type RepoWorkflows, type Runtime, type RuntimeConfig, type RuntimeEnv, tick } from "@norn/runtime";
+import { createRuntimeEnv, EventLogSessionSource, newTickId, readConfirmedWorkflows, readRepoWorkflows, type RepoWorkflows, type Runtime, type RuntimeConfig, type RuntimeEnv, tick } from "@norn/runtime";
 import { runtimeConfigOf } from "./config/derive.ts";
 import { configError, type LoadedConfig, loadConfig, problemText } from "./config/load.ts";
 import { oldConfigRefusal } from "./config/migrate.ts";
@@ -97,9 +97,14 @@ export function wireRepoWorkflows(w: WiredRepo): Promise<RepoWorkflows> {
   return readRepoWorkflows(w.ctx.files, w.repo.root);
 }
 
+/** The workflow revisions the person confirmed, kept in the machine dir where no worktree reaches. */
+export function wireConfirmedWorkflows(w: WiredRepo): Promise<Record<string, string>> {
+  return readConfirmedWorkflows(w.ctx.files, w.machine);
+}
+
 /**
  * The text of every file a runtime is built from: the config layers, the plugin lock in either place
- * it can be, and the repo's workflow files. Two equal answers mean a rebuild would build the same
+ * it can be, the repo's workflow files and the revisions the person confirmed. Two equal answers mean a rebuild would build the same
  * runtime, so a long-running command rebuilds only when this changes. An installed plugin's code
  * changes only with its lock entry, so the lock stands for it; a rebuild imports a new plugin, but one
  * already imported keeps its loaded module (the import cache is per process), so an upgrade takes a restart.
@@ -107,8 +112,8 @@ export function wireRepoWorkflows(w: WiredRepo): Promise<RepoWorkflows> {
 export async function wiringSources(w: WiredRepo): Promise<string> {
   const paths = configPaths(w.home, w.repo.root);
   const files = [paths.user, paths.local, paths.repo, lockPath(w.repo.root, w.machine, true), lockPath(w.repo.root, w.machine, false)];
-  const [texts, workflows] = await Promise.all([Promise.all(files.map((f) => w.ctx.files.read(f))), wireRepoWorkflows(w)]);
-  return JSON.stringify({ texts, workflows });
+  const [texts, workflows, confirmed] = await Promise.all([Promise.all(files.map((f) => w.ctx.files.read(f))), wireRepoWorkflows(w), wireConfirmedWorkflows(w)]);
+  return JSON.stringify({ texts, workflows, confirmed });
 }
 
 /** Who claims from this machine when the config names nobody. */
@@ -139,6 +144,8 @@ export interface RuntimeParts {
   home?: string;
   /** the repo's own workflow files, laid over the pack's */
   repoWorkflows?: RepoWorkflows;
+  /** the workflow revisions the person confirmed, by name */
+  confirmedWorkflows?: Record<string, string>;
 }
 
 function runtimeDeps(p: RuntimeParts): Parameters<typeof createRuntimeEnv>[0] {
@@ -151,6 +158,7 @@ function runtimeDeps(p: RuntimeParts): Parameters<typeof createRuntimeEnv>[0] {
     ...(p.path !== undefined ? { hostPath: p.path } : {}),
     ...(p.home !== undefined ? { agentEnv: { NORN_HOME_DIR: p.home } } : {}),
     ...(p.repoWorkflows !== undefined ? { repoWorkflows: p.repoWorkflows } : {}),
+    ...(p.confirmedWorkflows !== undefined ? { confirmedWorkflows: p.confirmedWorkflows } : {}),
     sessions: (launcher) =>
       new EventLogSessionSource({
         ctx: p.w.ctx,

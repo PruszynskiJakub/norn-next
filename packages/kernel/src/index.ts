@@ -28,6 +28,7 @@ export * from "./workflow/document.ts";
 export * from "./workflow/graph.ts";
 export { type LoadWorkflowOptions, loadWorkflow, type StepKindInfo } from "./workflow/load.ts";
 export { type Produced, producedFiles, producedOn, producesOn } from "./workflow/produces.ts";
+export { guardChanges } from "./workflow/guard.ts";
 export { type CountedStep, type DerivedCounters, deriveCounters, type ExitLeft } from "./workflow/counters.ts";
 export { type ApplyResult, applyReceipts, type NewRunStateInput, newRunState, type RouteTaken } from "./journal/apply.ts";
 export { type ActOutcome, type ActPlan, Journal, outcomeReceiptId, type UnitJournal } from "./journal/journal.ts";

@@ -13,7 +13,7 @@ import { machineHolder } from "./holder.ts";
 import { packFailure } from "./plugins/pack-check.ts";
 import type { PluginImporter } from "./plugins/installed.ts";
 import { floorRefusal } from "./version-guard.ts";
-import { type HostFactory, type WiredPlugins, type WiredRepo, wireConfig, wirePlugins, wireRepo, wireRepoWorkflows, wireRuntime, wireRuntimeEnv } from "./wiring.ts";
+import { type HostFactory, type WiredPlugins, type WiredRepo, wireConfig, wirePlugins, wireConfirmedWorkflows, wireRepo, wireRepoWorkflows, wireRuntime, wireRuntimeEnv } from "./wiring.ts";
 
 /** A terminal a person types into: what `status --watch` reads keys from and draws its frames for. */
 export interface Terminal {
@@ -130,7 +130,7 @@ export class CliContext {
   /** the runtime env, refused when the workflows (the pack's and the repo's) cannot run: what a tick needs */
   async workflowEnv(): Promise<RuntimeEnv> {
     const [env, p] = await Promise.all([this.runtimeEnv(), this.plugins()]);
-    const failure = packFailure(env.workflows, { pack: env.config.pack, plugins: p.plugins, installedAs: p.installedAs, repo: env.repoWorkflows });
+    const failure = packFailure(env.workflows, { pack: env.config.pack, plugins: p.plugins, installedAs: p.installedAs, repo: env.repoWorkflows, held: Object.keys(env.held) });
     if (failure) throw failure;
     return env;
   }
@@ -141,7 +141,7 @@ export class CliContext {
 
   private async parts() {
     const [w, loaded, p] = await Promise.all([this.repo(), this.config(), this.plugins()]);
-    const [repoWorkflows, machine] = await Promise.all([wireRepoWorkflows(w), machineHolder(w.ctx, w.home, this.io.env, this.io.hostname ?? hostname())]);
-    return { w, loaded, plugins: p.plugins, repoWorkflows, holder: machine.holder, formerHolders: machine.former, self: this.io.self, ...(this.io.env.PATH !== undefined ? { path: this.io.env.PATH } : {}), ...(this.io.env.NORN_HOME_DIR ? { home: this.io.env.NORN_HOME_DIR } : {}) };
+    const [repoWorkflows, confirmedWorkflows, machine] = await Promise.all([wireRepoWorkflows(w), wireConfirmedWorkflows(w), machineHolder(w.ctx, w.home, this.io.env, this.io.hostname ?? hostname())]);
+    return { w, loaded, plugins: p.plugins, repoWorkflows, confirmedWorkflows, holder: machine.holder, formerHolders: machine.former, self: this.io.self, ...(this.io.env.PATH !== undefined ? { path: this.io.env.PATH } : {}), ...(this.io.env.NORN_HOME_DIR ? { home: this.io.env.NORN_HOME_DIR } : {}) };
   }
 }

@@ -20,6 +20,7 @@ const PERSON_ONLY: Record<string, string[]> = {
   "run stop": ["run", "stop", UNIT],
   "run rerun": ["run", "rerun", UNIT],
   tidy: ["tidy", "--dry-run"],
+  "workflow confirm": ["workflow", "confirm", "story"],
   // only for the policy: what the person lets stand in for them is theirs to grant
   "config set": ["config", "set", "policy.stand_in.gates", "[story.ready]", "--user"],
 };

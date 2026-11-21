@@ -37,6 +37,7 @@ import { stuckCommand } from "./stuck.ts";
 import { tickCommand } from "./tick.ts";
 import { tidyCommand } from "./tidy.ts";
 import { watchCommand } from "./watch.ts";
+import { workflowConfirmCommand } from "./workflow-confirm.ts";
 
 export const COMMANDS: readonly Command[] = [
   helpCommand,
@@ -56,6 +57,7 @@ export const COMMANDS: readonly Command[] = [
 export const NOUNS: readonly Noun[] = [
   defineNoun({ name: "story", summary: "Stories: list, view, create, the person's decisions, the next round, taking one to this machine, and updating a finished one's branch", verbs: [storyListCommand, storyViewCommand, storyCreateCommand, storyApproveCommand, storyRejectCommand, storyAnswerCommand, storyRoundCommand, storyTakeCommand, storyUpdateBranchCommand, storyCloseCommand] }),
   defineNoun({ name: "run", summary: "Runs: start one manual mode holds, stop a live one, run a step again, bring one's pane in front", verbs: [runStartCommand, runStopCommand, runRerunCommand, runAttachCommand] }),
+  defineNoun({ name: "workflow", summary: "Workflows: confirm a repo workflow held for the person", verbs: [workflowConfirmCommand] }),
   defineNoun({ name: "config", summary: "Read and change the config", verbs: [configGetCommand, configSetCommand, configShowCommand] }),
   defineNoun({ name: "plugin", summary: "Install, list, update and remove plugins", verbs: [pluginAddCommand, pluginListCommand, pluginRemoveCommand, pluginUpdateCommand] }),
 ];

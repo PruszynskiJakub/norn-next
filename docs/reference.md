@@ -107,6 +107,12 @@ step merge (forge.await-merge) writes to the forge, and start reaches it through
 
 Opening the draft pull request (`forge.open-pr`) pushes only the story's branch and asks no one to merge, so the shipped workflows open it before the person's `ready` gate. A round already under way keeps the revision it pinned, whatever the policy grants since; a person who starts a round at a step (`norn story round --at`) stands there themselves.
 
+**Confirmation.** A repo's own workflow file can be changed by an agent inside its step, so a change to what the person stands on is held until the person confirms it: a `by: person` step added, removed or changed (its decision or its routes), or an agent step's `attended:` or `allow:`. Until then new rounds run the revision the person last confirmed, else the pack's file of that name; a workflow only the repo has is weighed against no steps, and one with any of these waits with nothing to run. Any other change (an instruction, a route, a new step that sets neither key) runs as it is, and so does a change back to the pack's own guarded parts. `norn doctor` names each held workflow, what changed and what new rounds run meanwhile; ticks go on, and a story asking for a workflow with nothing to run parks saying so. `norn workflow confirm <name>`, a person's command, keeps the revision the file loads to now in the machine dir (`<norn home>/repos/<repo>/workflows/<name>.json`), and the next tick runs it:
+
+```text
+workflow story is held for your confirmation (person step ready removed); new rounds run the pack's revision — do instead: norn workflow confirm story
+```
+
 **The older form.** One head key per step, `agent: <instruction>`, `check: <command>`, `gate: <decision>`, `slices:`, or a step kind's bare name with no value (`open-pr:`), with `skills:`, `inputs:`, `writes:`, `attended: true`, `timeout:`, `exits:` and the step kind's settings beside it, and `base: { stale, step, verify }` for the workflow. It still loads, and pins the same document: a unit pins every workflow in that form, so a pin's hash never depends on which form its file used.
 
 ## Signals
@@ -536,6 +542,20 @@ norn run attach <unit> | norn run attach --next
 ```
 
 - `--next`: the agent that has waited on you longest, without naming it
+
+##### `norn workflow` (noun)
+
+Workflows: confirm a repo workflow held for the person
+
+##### `norn workflow confirm`
+
+Confirm a repo workflow held because it changes a person's step, attended: or allow:
+
+A person's command: refused in an agent's session (`person_only`).
+
+```sh
+norn workflow confirm <name>
+```
 
 #### Background: run by a person, cron or a terminal multiplexer
 
