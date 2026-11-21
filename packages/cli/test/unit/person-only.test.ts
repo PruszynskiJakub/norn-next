@@ -76,16 +76,20 @@ describe("person-only commands", () => {
   });
 
   test.each([
-    ["brief", ["brief"]],
-    ["done", ["done", "done"]],
-    ["ask", ["ask", "which way?"]],
-    ["stuck", ["stuck", "blocked"]],
-    ["status", ["status"]],
-    ["story view", ["story", "view", UNIT]],
-  ])("%s is not refused as person-only in an agent's session", async (_name, argv) => {
+    ["brief", ["brief"], null],
+    ["done", ["done", "done"], "done"],
+    ["ask", ["ask", "which way?"], "ask"],
+    ["stuck", ["stuck", "blocked"], "stuck"],
+    ["status", ["status"], null],
+    ["story view", ["story", "view", UNIT], null],
+  ] as const)("%s works in an agent's session as it does anywhere", async (_name, argv, verb) => {
     const m = configured();
     await seedUnit(m, { step: AGENT_STEP, run: RUN });
     const r = await runCli([...argv, "--json"], withEnv(m, runEnv()).io);
-    expect(r.stdout === "" ? undefined : json(r.stdout).code).not.toBe("person_only");
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(json(r.stdout).error).toBeUndefined();
+    // a report reaches the record, as the agent's own commands are what the session is for
+    const reported = (await receiptsOf(m)).flatMap((x) => (x.data.kind === "run.reported" ? [x.data.verb] : []));
+    expect(reported).toEqual(verb === null ? [] : [verb]);
   });
 });
