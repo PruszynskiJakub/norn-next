@@ -191,6 +191,8 @@ describe:
 - A later step lists the name under `reads:`, and its brief names the file. norn keeps the file with the story's documents, so a step in another worktree gets it too.
 - A step that lists a produced name, or a step kind that reads one, must have a producer before it on every path from `start`, the producer reporting an outcome the file is due on. A file where some path lacks one is refused when it loads, naming the step and that path (`plan.skip → review`). A route back is fine.
 
+A step kind may produce files too, under the same rule: its plugin declares each name and file, the file is due on every outcome the kind answers, and a later step lists the name under `reads:` as it would an agent step's. A name produced by a step kind and an agent step names one file.
+
 The bundled `describe` steps produce `pr_body`, which `open-pr` reads. `open-pr` reads it with a fallback: a base update's light path reaches `open-pr` again without `describe`, and then it reads the `pr.md` an earlier pass left, else opens the change with norn's footer alone. A unit that pinned its workflow before `produces:` existed loads it to the same graph and hash.
 
 ## What an agent step writes

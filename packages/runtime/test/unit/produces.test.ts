@@ -23,6 +23,22 @@ async function brief(h: Harnessed): Promise<string> {
   return r.value.markdown;
 }
 
+describe("a step kind's produced files", () => {
+  test("the kind is handed where to write each one, the file is read back into the story's documents when it answers, and the next step reads it", async () => {
+    const h = harness({ workflow: "previewed" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    expect((h.stepCalls[0]?.input as { produces?: Record<string, string> }).produces).toEqual({ preview_url: ".agents/specs/lt-1/preview.md" });
+    const kept = await readStoryDoc(h.env, UNIT, "preview.md");
+    expect(kept.ok && kept.value).toBe("preview_url from preview\n");
+    // the next step may run in another checkout: only the story's documents carry the file there
+    await h.files.remove(`${WORKTREE}/.agents/specs/lt-1/preview.md`);
+    expect(await brief(h)).toContain("- `preview_url` — produced by step deploy: `.agents/specs/lt-1/preview.md`");
+    expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/preview.md`)).toBe("preview_url from preview\n");
+  });
+});
+
 describe("a step's produced files", () => {
   test("the brief says which file each outcome needs, and norn done is refused while it is missing or empty, naming the file", async () => {
     const { h, runId } = await at("write");

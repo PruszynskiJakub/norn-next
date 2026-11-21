@@ -20,7 +20,13 @@ import { type ReadStep, readStep } from "./steps.ts";
  * its name in a workflow file (`forge` in `forge.open-pr`), which the host knows from the plugin;
  * without it the kind's `slot` does, and a kind with neither is named only in the older form.
  */
-export type StepKindInfo = Pick<StepKindDefinition, "name" | "configSchema" | "outcomes" | "mode" | "reads" | "slot"> & { namespace?: string };
+export type StepKindInfo = Pick<StepKindDefinition, "name" | "configSchema" | "outcomes" | "mode" | "reads" | "produces" | "slot"> & { namespace?: string };
+
+/** The step kind a flat step runs, when it is one that declares products. */
+function productsOf(step: WorkflowStepDoc, stepKinds: Readonly<Record<string, StepKindInfo>>): { kind: StepKindInfo; head: string } | null {
+  const head = Object.keys(step).find((k) => Object.hasOwn(stepKinds, k) && stepKinds[k]?.produces !== undefined);
+  return head === undefined ? null : { kind: stepKinds[head] as StepKindInfo, head };
+}
 
 export interface LoadWorkflowOptions {
   /** every step kind the configured plugins provide, by head key */
@@ -82,7 +88,7 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
 
   const read: Record<string, ReadStep> = {};
   const errors: WorkflowError[] = [];
-  const produced = [...new Set(Object.values(flatSteps).flatMap((s) => Object.keys(s.produces ?? {})))];
+  const produced = [...new Set(Object.values(flatSteps).flatMap((s) => [...Object.keys(s.produces ?? {}), ...(productsOf(s, opts.stepKinds)?.kind.produces ?? []).map((p) => p.name)]))];
   const sources = Object.keys(written.sources ?? {});
   for (const step of Object.values(flatSteps)) if (step.inputs) step.inputs = lowerReads(step.inputs, [...produced, ...sources]);
   errors.push(...sourceErrors(written.sources ?? {}, opts.inputs, produced));
@@ -92,11 +98,15 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
     if (r.ok) read[name] = r.step;
     else errors.push(...r.errors.map(inShared));
     // the host hands a reader the file by its name, so every producer of a name writes the same file
-    for (const [p, { file }] of Object.entries(step.produces ?? {})) {
+    const kind = productsOf(step, opts.stepKinds);
+    const products: [string, string, string][] = [
+      ...Object.entries(step.produces ?? {}).map(([p, { file }]): [string, string, string] => [p, file, `/steps/${name}/produces/${p}/file`]),
+      ...(kind?.kind.produces ?? []).map((p): [string, string, string] => [p.name, p.file, `/steps/${name}/${kind?.head}`]),
+    ];
+    for (const [p, file, path] of products) {
       const first = fileOf.get(p);
       if (!first) fileOf.set(p, { step: name, file });
-      else if (first.file !== file)
-        errors.push(inShared({ path: `/steps/${name}/produces/${p}/file`, message: `\`${p}\` is produced as ${first.file} by step ${first.step} and as ${file} here: a produced name names one file` }));
+      else if (first.file !== file) errors.push(inShared({ path, message: `\`${p}\` is produced as ${first.file} by step ${first.step} and as ${file} here: a produced name names one file` }));
     }
   }
   if (errors.length) return fail(errors);
@@ -133,7 +143,13 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
     const host = opts.inputs;
     const names = new Set(produced);
     const readers = order.flatMap((name) => readersOf(name, flatSteps[name] as WorkflowStepDoc, read[name]?.kind as string, opts.stepKinds[read[name]?.kind ?? ""]?.reads, names, host));
-    const flow = flowErrors(flat.flat.start, routes, flatSteps, readers);
+    const kindOn = Object.fromEntries(
+      order.flatMap((name) => {
+        const kind = productsOf(flatSteps[name] as WorkflowStepDoc, opts.stepKinds);
+        return kind ? [[name, Object.fromEntries((kind.kind.produces ?? []).map((p) => [p.name, [...kind.kind.outcomes]]))]] : [];
+      }),
+    );
+    const flow = flowErrors(flat.flat.start, routes, flatSteps, readers, kindOn);
     if (flow.length) return fail(flow.map(inShared));
   }
 

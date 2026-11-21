@@ -110,6 +110,12 @@ export interface StepKindInput<C = Record<string, unknown>> {
    */
   reads?: Record<string, string>;
   /**
+   * Each name the kind `produces` → its file, relative to the worktree (plugin API 1.22). The kind
+   * writes it there; the host reads it back into the story's documents once the kind answers, so a
+   * later step, in this worktree or another, reads it.
+   */
+  produces?: Record<string, string>;
+  /**
    * The receipt the host wrote before running the kind (the run's intent); the idempotence key of
    * every effect the kind asks a provider for, so a run the host repeats after a crash replays it.
    */
@@ -139,6 +145,16 @@ export type StepKindRead = string | { name: string; fallback: string };
 /** The name a read declares, bare or optional. */
 export const readName = (read: StepKindRead): string => (typeof read === "string" ? read : read.name);
 
+/**
+ * A file a step kind writes for the steps after it (plugin API 1.22), under the rule an agent step's
+ * produced file follows: `name` is what a later step reads it by, and `file` is relative to the
+ * story's spec folder. It is due on every outcome the kind answers.
+ */
+export interface StepKindProduct {
+  name: string;
+  file: string;
+}
+
 export interface StepKindDefinition<S extends TSchema = TSchema> {
   /** the head key, the same as the key the plugin provides it under */
   name: string;
@@ -149,6 +165,8 @@ export interface StepKindDefinition<S extends TSchema = TSchema> {
   mode: StepKindMode;
   /** what the kind reads that an earlier step produces; absent: nothing */
   reads?: StepKindRead[];
+  /** the files the kind writes for later steps; absent: none */
+  produces?: StepKindProduct[];
   /**
    * The slot the kind works over (plugin API 1.21): a workflow names it `<slot>.<name>`
    * (`vcs.update-branch`). Absent, it is named after the plugin that provides it (`vercel.preview`).
@@ -188,6 +206,7 @@ export function stepKindProblems(key: string, value: unknown): string[] {
     if (outcomes.includes(WAITING_OUTCOME)) out.push(`outcome ${WAITING_OUTCOME} is implied for a wait kind and never declared`);
   }
   if (v.reads !== undefined) out.push(...readsProblems(v.reads));
+  if (v.produces !== undefined) out.push(...producesProblems(v.produces));
   const slot = slotProblem(v.slot);
   if (slot) out.push(slot);
   return out;
@@ -202,6 +221,18 @@ function readsProblems(reads: unknown): string[] {
   const bad = names.filter((n) => !OUTCOME_RE.test(n));
   if (bad.length > 0) out.push(`reads ${bad.map((n) => JSON.stringify(n)).join(", ")} are not input names`);
   if (new Set(names).size !== names.length) out.push("reads repeat");
+  return out;
+}
+
+function producesProblems(produces: unknown): string[] {
+  if (!Array.isArray(produces)) return ["produces must be a list"];
+  const shaped = produces.every((p) => p !== null && typeof p === "object" && typeof p.name === "string" && typeof p.file === "string" && p.file.trim() !== "");
+  if (!shaped) return ["a product is {name, file}: the name later steps read it by and its file in the story's spec folder"];
+  const names = (produces as StepKindProduct[]).map((p) => p.name);
+  const out: string[] = [];
+  const bad = names.filter((n) => !OUTCOME_RE.test(n));
+  if (bad.length > 0) out.push(`produces ${bad.map((n) => JSON.stringify(n)).join(", ")} ${bad.length === 1 ? "is not an input name" : "are not input names"}`);
+  if (new Set(names).size !== names.length) out.push("produces repeat");
   return out;
 }
 

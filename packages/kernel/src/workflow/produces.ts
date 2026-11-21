@@ -108,8 +108,14 @@ type Routes = Readonly<Record<string, Readonly<Record<string, CompiledRoute>>>>;
  * the name and is not followed. A route back is fine when a producer comes before on every path.
  * Breadth first, so the path a refusal names is a shortest one.
  */
-export function flowErrors(start: string, routes: Routes, steps: Readonly<Record<string, WorkflowStepDoc>>, readers: readonly Reader[]): WorkflowError[] {
-  const on = Object.fromEntries(Object.entries(steps).map(([s, doc]) => [s, producesOn(doc)]));
+export function flowErrors(
+  start: string,
+  routes: Routes,
+  steps: Readonly<Record<string, WorkflowStepDoc>>,
+  readers: readonly Reader[],
+  kindOn: Readonly<Record<string, Record<string, string[]>>> = {},
+): WorkflowError[] {
+  const on = Object.fromEntries(Object.entries(steps).map(([s, doc]) => [s, { ...producesOn(doc), ...kindOn[s] }]));
   const searched = new Map<string, Map<string, { from: string; outcome: string } | null>>();
   const reached = (name: string) => {
     const known = searched.get(name);

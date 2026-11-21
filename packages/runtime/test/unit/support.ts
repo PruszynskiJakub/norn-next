@@ -220,14 +220,17 @@ export type StepAnswer = string | StepKindOutcome;
 
 /** Step kinds that answer from a queue per kind (the last answer repeats), recording each input. */
 export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: StepCall[]): Record<string, StepKindDefinition> {
-  const kind = (name: string, mode: "effect" | "wait", outcomes: string[], reads?: StepKindDefinition["reads"]): StepKindDefinition => ({
+  const kind = (name: string, mode: "effect" | "wait", outcomes: string[], reads?: StepKindDefinition["reads"], produces?: StepKindDefinition["produces"]): StepKindDefinition => ({
     name,
     ...(reads && { reads }),
+    ...(produces && { produces }),
     configSchema: Type.Object({ note: Type.Optional(Type.String()) }, { additionalProperties: false }),
     outcomes,
     mode,
-    run: async (input) => {
+    run: async (input, ctx) => {
       calls.push({ kind: name, input });
+      // a kind that produces a file writes it where the host says, as a real one would
+      for (const [product, path] of Object.entries(input.produces ?? {})) await ctx.files.write(`${input.worktree}/${path}`, `${product} from ${name}\n`);
       const queue = answers[name] ?? [];
       const answer = queue.length > 1 ? (queue.shift() as StepAnswer) : (queue[0] ?? (outcomes[0] as string));
       if (answer === "!fail") return fail("unavailable", `${name} failed`);
@@ -240,6 +243,7 @@ export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: Step
     // named as the vcs plugin's kind, so the inputs that read the base update's receipts find it
     "update-branch": kind("update-branch", "effect", ["done", "conflict", "resolved"]),
     integrate: kind("integrate", "effect", ["done", "conflict"]),
+    preview: kind("preview", "effect", ["done", "failed"], undefined, [{ name: "preview_url", file: "preview.md" }]),
   };
 }
 
@@ -298,6 +302,19 @@ export const WORKFLOWS: Record<string, string> = {
     "  poke:",
     "    probe: null",
     "    outcomes: { done: $done, conflict: $stuck }",
+    "",
+  ].join("\n"),
+  "previewed.yaml": [
+    "name: previewed",
+    "start: deploy",
+    "steps:",
+    "  deploy:",
+    "    preview: null",
+    "    outcomes: { done: check, failed: check }",
+    "  check:",
+    "    agent: Check the preview.",
+    "    inputs: [spec, preview_url]",
+    "    outcomes: { done: $done }",
     "",
   ].join("\n"),
   "sourced.yaml": [

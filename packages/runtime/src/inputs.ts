@@ -164,8 +164,28 @@ export async function mirrorSpec(env: RuntimeEnv, unit: string, item: TrackerIte
   return ok(next);
 }
 
-/** Every file the steps of a unit's pinned workflow produce, relative to the story's spec folder. */
-export const producedOf = (record: UnitJournal): string[] => producedFiles(record.state?.workflow.doc.steps ?? {});
+/**
+ * The step of a unit's pinned workflow that produces `name` and its file, relative to the story's
+ * spec folder: an agent step's `produces:`, or the products the step kind it runs declares, which
+ * follow the same path rule. Null when no step produces it.
+ */
+export function producerOf(env: RuntimeEnv, steps: Readonly<Record<string, WorkflowStepDoc>>, name: string): { step: string; file: string } | null {
+  for (const [step, s] of Object.entries(steps)) {
+    const own = s.produces?.[name]?.file;
+    if (own !== undefined) return { step, file: own };
+    const product = kindProducts(env, s).find((p) => p.name === name);
+    if (product) return { step, file: product.file };
+  }
+  return null;
+}
+
+const kindProducts = (env: RuntimeEnv, step: WorkflowStepDoc) => Object.keys(step).flatMap((k) => (Object.hasOwn(env.slots.stepKinds, k) ? (env.slots.stepKinds[k]?.produces ?? []) : []));
+
+/** Every file the steps of a unit's pinned workflow produce, step kinds' included, relative to the story's spec folder. */
+export function producedOf(env: RuntimeEnv, record: UnitJournal): string[] {
+  const steps = record.state?.workflow.doc.steps ?? {};
+  return [...new Set([...producedFiles(steps), ...Object.values(steps).flatMap((s) => kindProducts(env, s).map((p) => p.file))])];
+}
 
 /**
  * Read the unit's edited documents in its worktree back into the story's documents: each one that
@@ -340,7 +360,7 @@ export async function materializeInputs(env: RuntimeEnv, record: UnitJournal, br
   try {
     await env.ctx.files.write(`${worktree}/${RUN_DIR}/${IGNORE_FILE}`, IGNORE_ALL);
     await env.ctx.files.write(`${worktree}/${specFolder(unit)}/${IGNORE_FILE}`, IGNORE_ALL);
-    await readBackDocs(env, unit, worktree, producedOf(record));
+    await readBackDocs(env, unit, worktree, producedOf(env, record));
     const item = await storyItem(env, unit);
     const out: MaterializedInputs = { inputs: [] };
     if (item) out.story = { key: item.key, title: item.title, ...(item.url !== undefined && { url: item.url }) };
@@ -390,8 +410,8 @@ async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: Brief
     const doc = record.state?.workflow.doc;
     const source = doc?.sources?.[name];
     if (source) return sourceView(env, name, source);
-    const producer = Object.entries(doc?.steps ?? {}).find(([, s]) => s.produces?.[name] !== undefined);
-    if (producer) return materializeProduced(env, worktree, unit, name, producer[0], producer[1]);
+    const producer = producerOf(env, doc?.steps ?? {}, name);
+    if (producer) return materializeProduced(env, worktree, unit, name, producer.step, producer.file);
     // a pinned revision is loaded without the input check, so it may still name one: noted, never failed
     return { name, note: "norn provides no input of this name" };
   }
@@ -459,9 +479,9 @@ function sourceView(env: RuntimeEnv, name: string, source: SourceDoc): BriefInpu
 }
 
 /** A file an earlier step produced, from the story's documents, so a step in another worktree reads it too. */
-async function materializeProduced(env: RuntimeEnv, worktree: string, unit: string, name: string, step: string, producer: WorkflowStepDoc): Promise<BriefInputView> {
+async function materializeProduced(env: RuntimeEnv, worktree: string, unit: string, name: string, step: string, file: string): Promise<BriefInputView> {
   const label = `produced by step ${step}`;
-  const d = doc(name, unit, producer.produces?.[name]?.file as string);
+  const d = doc(name, unit, file);
   const kept = await readStoryDoc(env, unit, d.artifact);
   if (!kept.ok || kept.value === null) return { name, label, note: `norn holds no \`${d.artifact}\` for this story yet: step ${step} has not produced it` };
   await materializeDoc(env, worktree, d, kept.value);

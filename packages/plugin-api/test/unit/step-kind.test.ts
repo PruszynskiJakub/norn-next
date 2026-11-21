@@ -74,6 +74,21 @@ describe("step kind reads (plugin API 1.20)", () => {
   });
 });
 
+describe("step kind produces (plugin API 1.22)", () => {
+  test("a kind may declare the files it writes for later steps, each a name and a file in the story's spec folder, as an agent step does", () => {
+    expect(stepKindProblems("open-pr", kind({ produces: [{ name: "preview_url", file: "preview.md" }] }))).toEqual([]);
+    const plugin = defineNornPlugin({ name: "p", api: "^1.22", provides: { stepKinds: { preview: kind({ name: "preview", produces: [{ name: "preview_url", file: "preview.md" }] }) } } });
+    expect(plugin.provides.stepKinds?.preview?.produces).toEqual([{ name: "preview_url", file: "preview.md" }]);
+  });
+
+  test("a product is a name with a file, each named once", () => {
+    expect(stepKindProblems("open-pr", kind({ produces: "preview_url" as never }))).toEqual(["produces must be a list"]);
+    expect(stepKindProblems("open-pr", kind({ produces: ["preview_url" as never] }))).toEqual(["a product is {name, file}: the name later steps read it by and its file in the story's spec folder"]);
+    expect(stepKindProblems("open-pr", kind({ produces: [{ name: "Preview URL", file: "p.md" }] }))).toEqual(['produces "Preview URL" is not an input name']);
+    expect(stepKindProblems("open-pr", kind({ produces: [{ name: "url", file: "a.md" }, { name: "url", file: "b.md" }] }))).toEqual(["produces repeat"]);
+  });
+});
+
 describe("stepKindAnswerProblem", () => {
   const effect = kind();
   const wait = kind({ name: "await-merge", mode: "wait", outcomes: ["merged", "stale"] });

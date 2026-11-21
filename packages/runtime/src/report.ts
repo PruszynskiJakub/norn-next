@@ -173,7 +173,7 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   const text = textOf(req);
   const outcome = req.verb === "done" ? req.outcome : undefined;
   // before the receipt: once it is applied the next step may launch, and it must read what this run wrote
-  await readBackDocs(env, unit, undefined, producedOf(record));
+  await readBackDocs(env, unit, undefined, producedOf(env, record));
   let criteria: { report: CriterionVerdict[]; summary: CriteriaSummary } | undefined;
   if (req.verb === "done") {
     const checked = await checkCriteria(env, unit, live, req);

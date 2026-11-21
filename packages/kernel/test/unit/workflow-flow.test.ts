@@ -10,6 +10,7 @@ const KINDS: Record<string, StepKindInfo> = {
   ...STEP_KINDS,
   publish: { ...kind("publish", ["done"]), reads: ["notes"] },
   announce: { ...kind("announce", ["done"]), reads: [{ name: "notes", fallback: "announces with no notes" }, "diff"] },
+  preview: { ...kind("preview", ["done", "failed"]), produces: [{ name: "preview_url", file: "preview.md" }] },
 };
 const opts = (over: Partial<LoadWorkflowOptions> = {}): LoadWorkflowOptions => ({ stepKinds: KINDS, sharedFiles: {}, config: DEFAULT_KERNEL_CONFIG, inputs: HOST, ...over });
 const agent = (outcomes: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ agent: "Do the work.", outcomes, ...extra });
@@ -138,6 +139,22 @@ describe("the flow: a step reads only what every path to it produced", () => {
     ]);
     const optional = wf({ plan: agent({ done: "write", skip: "tell" }), write: agent({ done: "tell" }, { produces: NOTES }), tell: { announce: null, outcomes: { done: "$done" } } });
     expect(errorsOf(loadWorkflow(optional, opts()))).toEqual([]);
+  });
+
+  test("a step kind's product is produced on every outcome it answers, so a later step reads it, and only after it", () => {
+    const after = wf({ deploy: { preview: null, outcomes: { done: "check", failed: "check" } }, check: agent({ done: "$done" }, { inputs: ["spec", "preview_url"] }) });
+    expect(errorsOf(loadWorkflow(after, opts()))).toEqual([]);
+    const before = wf({ check: agent({ done: "deploy" }, { inputs: ["spec", "preview_url"] }), deploy: { preview: null, outcomes: { done: "$done", failed: "$done" } } });
+    expect(errorsOf(loadWorkflow(before, opts()))).toEqual([
+      { path: "/steps/check/inputs/1", message: "step 'check' reads `preview_url`, but no step produces it on the path check: give a step on that path produces: preview_url" },
+    ]);
+  });
+
+  test("a step kind and an agent step producing one name write the same file, or the workflow is refused", () => {
+    const doc = wf({ deploy: { preview: null, outcomes: { done: "note", failed: "note" } }, note: agent({ done: "$done" }, { produces: { preview_url: { file: "other.md" } } }) });
+    expect(errorsOf(loadWorkflow(doc, opts()))).toEqual([
+      { path: "/steps/note/produces/preview_url/file", message: "`preview_url` is produced as preview.md by step deploy and as other.md here: a produced name names one file" },
+    ]);
   });
 
   test("shared files are checked once flattened, and a refusal inside one names it", () => {
