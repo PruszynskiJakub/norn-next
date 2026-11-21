@@ -7,9 +7,11 @@
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { nodeExec } from "@norn/host-node";
+import { nodeAncestry, nodeExec } from "@norn/host-node";
 import { RUN_ENV } from "@norn/plugin-api";
 import { WRITES_ENV } from "@norn/runtime";
+import { findCommand } from "../../src/commands/index.ts";
+import { personOnlyRefusal } from "../../src/person-only.ts";
 
 export const MAIN = join(import.meta.dir, "..", "..", "src", "main.ts");
 export const TEST_PLUGIN = join(import.meta.dir, "fixtures", "test-harness");
@@ -48,13 +50,35 @@ export async function sh(cwd: string, ...argv: string[]): Promise<string> {
 /** The test harness agent's plans (fixtures/test-harness/agent.ts names what each does). */
 export type AgentPlan = "work" | "ask" | "ask-then-stuck" | "hang" | "protocol" | "findings" | "attended" | "permission" | "trust" | "logged-out" | "report" | "resolve" | "resolve-ask" | "slicer" | "slice-work" | "slice-ask";
 
+let belowAgent: Promise<string | null> | undefined;
+
+/**
+ * Why this test process cannot make a person's calls, or null. Every norn call of the tier runs
+ * below this process, so a launch's mark on it or on any process above it (an agent's session
+ * running the tier) has the CLI refuse each person-only command; asking the CLI's own rule, for a
+ * real person-only command, keeps the two from drifting apart.
+ */
+function personOnlyBlocked(): Promise<string | null> {
+  belowAgent ??= (async () => {
+    const approve = findCommand("story approve");
+    if (!approve?.personOnly) throw new Error("world: `story approve` is no longer a person-only command; name one that is");
+    const refused = await personOnlyRefusal(approve, { env: process.env, ancestry: nodeAncestry });
+    return refused ? `${refused.body.error} (${refused.body.code})` : null;
+  })();
+  return belowAgent;
+}
+
 /**
  * A fresh clone of an empty bare remote with one commit on main, and a norn home beside it. The
  * env empties HERDR_ENV, so a person's running herdr is never probed, and the launch env (RUN_ENV,
- * WRITES_ENV), so a run from inside an agent's session is not one: its person-only commands would be
- * refused. It names a git identity, so the agent's commits and the person's merge need no global config.
+ * WRITES_ENV) the norn calls would otherwise inherit. That cannot hide an agent's process above
+ * this one, which the CLI reads too, so below an agent's session it throws before building anything:
+ * there the tier's person-only calls would all be refused. It names a git identity, so the agent's
+ * commits and the person's merge need no global config.
  */
 export async function world(plan: AgentPlan = "work"): Promise<World> {
+  const blocked = await personOnlyBlocked();
+  if (blocked) throw new Error(`the cli integration tier cannot run below an agent's session: its person-only norn calls are refused there. Run it from a shell of your own, or leave it to CI. ${blocked}`);
   // realpath: macOS hands out /var under /private, and git names the canonical path
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "norn-e2e-")));
   const remote = join(dir, "remote.git");

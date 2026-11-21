@@ -16,7 +16,7 @@ bun run golden -- --update  # behaviour change: re-decide every golden case, rew
 bun run golden      # add the golden cases the scenarios in packages/kernel/scripts/golden/ produce
 ```
 
-To run the integration tests of one package, as you do after changing it: `bun test --config=bunfig.integration.toml --timeout=60000 packages/<pkg>`.
+To run the integration tests of one package, as you do after changing it: `bun test --config=bunfig.integration.toml --timeout=60000 packages/<pkg>`. The cli's integration tests cannot run inside a norn agent step: their person-only `norn` calls run below the agent's process, which the CLI refuses (`person_only`), so `world()` (`packages/cli/test/integration/world.ts`) fails every test at once with that reason. Run them from a shell of your own, or leave them to CI.
 
 ## Layout
 
