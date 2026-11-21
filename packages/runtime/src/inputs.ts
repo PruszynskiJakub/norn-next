@@ -55,6 +55,12 @@ export function runDirsEnv(worktree: string): Record<string, string> {
  * earlier run left (it died before it reported) would otherwise be collected as this run's.
  */
 export async function clearOut(files: HostFiles, worktree: string): Promise<void> {
+  // run/ and out/ are norn's own: one made a link is removed as itself, since emptying through it
+  // would delete the files it points at, outside the worktree too
+  for (const dir of [RUN_DIR, OUT_DIR]) {
+    const path = `${worktree}/${dir}`;
+    if (files.readLink && (await files.readLink(path)) !== null) await files.remove(path);
+  }
   await emptyFolder(files, `${worktree}/${OUT_DIR}`);
   await makeOut(files, worktree);
 }

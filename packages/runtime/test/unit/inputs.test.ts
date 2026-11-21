@@ -179,6 +179,21 @@ describe("the run folder", () => {
     expect(await h.files.read("/machine/repo/test-output/shots/a.png")).toBe("png");
     expect(await h.files.readLink(`${WORKTREE}/.agents/run/out/evidence`)).toBeNull();
   });
+
+  for (const linked of [".agents/run/out", ".agents/run"]) {
+    test(`a launch removes ${linked} made a link and never empties the folder it points at`, async () => {
+      const h = harness({ workflow: "handed" });
+      h.items.push(trackerItem(1, ITEM));
+      await h.files.write("/machine/repo/test-output/report.txt", "the agent's test output");
+      await h.files.write("/machine/repo/test-output/out/criteria.json", "{}");
+      await h.files.symlink("/machine/repo/test-output", `${WORKTREE}/${linked}`);
+      await tickUntil(h, has("agent.start"));
+      expect(await h.files.read("/machine/repo/test-output/report.txt")).toBe("the agent's test output");
+      expect(await h.files.read("/machine/repo/test-output/out/criteria.json")).toBe("{}");
+      expect(await h.files.readLink(`${WORKTREE}/${linked}`)).toBeNull();
+      expect(await h.files.list(`${WORKTREE}/.agents/run/out`)).toEqual([".gitignore"]);
+    });
+  }
 });
 
 describe("a workflow's sources", () => {
