@@ -20,9 +20,30 @@ A command marked *a person's command* below is refused with `person_only` (exit 
 | `.agents/norn.local.yaml` | you, in this repository: kept out of git, the file `norn init` writes |
 | `.agents/norn.yaml` | the team: committed, written by `norn init --commit` |
 
-The nearer file wins: the committed file over the local file over the user file over the built-in defaults. Maps merge key by key; lists and scalars replace. A key norn does not know is refused with the file it is in, never ignored; a slot (`tracker`, `forge`, `store`, `vcs`, an executor's `runner`) also takes the keys of the plugin it names, and that plugin checks them. `norn config show` prints the merged config and the file each key came from; `norn config set <key> <value>` changes one key in the local file, or in the committed file with `--commit` or the user file with `--user`.
+The nearer file wins: the committed file over the local file over the user file over the built-in defaults. Maps merge key by key; lists and scalars replace. A key norn does not know is refused with the file it is in, never ignored; a slot (`tracker`, `forge`, `store`, `vcs`, an executor's `runner`, a `runners:` entry) also takes the keys of the plugin it names, and that plugin checks them. `norn config show` prints the merged config and the file each key came from; `norn config set <key> <value>` changes one key in the local file, or in the committed file with `--commit` or the user file with `--user`.
 
-A slot names a plugin with `use`: the bundled ones are listed by `norn plugin list`, and `norn plugin add <spec>` installs another and pins it in the plugin lock. An executor pairs a harness (the agent: `claude`, `pi`) with a runner (where it runs: `headless`, `herdr`); an agent step runs on `executor`, or on the only executor when there is one.
+A slot names a plugin with `use`: the bundled ones are listed by `norn plugin list`, and `norn plugin add <spec>` installs another and pins it in the plugin lock.
+
+### Executors and runners
+
+A workflow names roles; this machine's config says what runs them. An **executor** is a harness (the agent: `claude`, `pi`) and its `model` and `args`. `bind:` maps an agent role, or one workflow's step as `<workflow>.<step>`, to an executor or a list of them; a step's binding outranks its role's, and a step bound to neither runs on `executor`, or on the only executor when there is one. The **runner** (where the agent runs: `headless`, `herdr`) follows the step's `attended:` from `runners:`:
+
+```yaml
+executors:
+  deep:  { harness: claude, model: opus }
+  other: { harness: pi }
+executor: deep
+bind:
+  builder:      [deep, other]   # tried in order
+  reviewer:     other
+  story.review: deep            # one step on another executor, without a new role
+runners: { person: herdr, agent: headless, none: headless }
+```
+
+- **The first executor that can run the step does.** It must be configured, have presence (a runner where a person can work beside the agent) when the step is `attended: person`, and a harness that can refuse a tool call when the step writes only docs. With none, the unit parks `stuck` before an agent starts, with the first one's rule (`agent.no_executor`, `agent.no_presence`, `agent.unguarded`) and every one's reason. A retry stays on the executor and runner its run started on.
+- **`runners:` defaults** to `headless` for `agent` and `none`, and to nothing for `person`: an attended step parks `agent.no_presence` until `runners.person` names a runner with presence (`norn config set runners.person herdr`). It never runs as an auto run with nobody beside it.
+- **An executor with a `runner:` of its own** runs every step there, whatever its attendance, as configs written before `runners:` do; an attended step on it parks `agent.no_presence` unless that runner has presence.
+- A run's record names its executor and runner together: `deep@person` is executor `deep` in the runner `runners.person` picks.
 
 ## Steps
 
@@ -36,7 +57,7 @@ A step is written with thirteen keys, and the set never grows: what an actor nee
 | `reads` | what an agent step's brief gives it ([Inputs](#inputs)); `norn.each` takes `[slices]` |
 | `produces` | what every outcome of an agent step produces, unless the outcome lists its own ([Outcomes](#outcomes)) |
 | `allow` | what an agent step may write: `docs:write` alone keeps it to the story's documents, `code:write` writes the worktree (the default) ([What an agent step writes](#what-an-agent-step-writes)) |
-| `attended` | `person`: a person stays alongside the agent in its pane and starts the step |
+| `attended` | who stays alongside the agent, which picks its runner: `person` (in a runner with presence; the person starts the step), `agent` (a supervisor), `none` (the default) ([Executors and runners](#executors-and-runners)) |
 | `limits` | an agent step's `deadline`, `nudges` and `retries`; a shell step's `timeout`, which it needs |
 | `outcomes` | where each outcome leads ([Outcomes](#outcomes)) |
 | `on` | what may move a waiting step, a person's or a wait step kind's, by signal ([Signals](#signals)) |
@@ -55,7 +76,7 @@ merge:
   on: { vcs.stale: { exit: stale }, vcs.unpushed: open-pr }
 ```
 
-A step kind's namespace is the slot it works over, `vcs.` (`update-branch`, `integrate`, `push`, `verify-base`) or `forge.` (`open-pr`, `await-merge`), so a workflow moves between providers unchanged; a kind over no slot is named after its plugin (`vercel.preview`), and `norn.each`, which runs the story's slices through `kernel.slice_workflow`, is the core's. A signal is named the same way (`vcs.stale`, `norn.timeout`). Each actor takes only its own keys, and a key of the older form in a step written with `by:` is refused with where it is written now (`skills` under `with:`, `inputs` as `reads:`, `timeout` under `limits:`, `writes: docs` as `allow: [docs:write]`). An agent role picks no executor: the config's `executor` runs it; a step that must name one, or a `model`, keeps the older form. `attended:` takes `person` alone for now.
+A step kind's namespace is the slot it works over, `vcs.` (`update-branch`, `integrate`, `push`, `verify-base`) or `forge.` (`open-pr`, `await-merge`), so a workflow moves between providers unchanged; a kind over no slot is named after its plugin (`vercel.preview`), and `norn.each`, which runs the story's slices through `kernel.slice_workflow`, is the core's. A signal is named the same way (`vcs.stale`, `norn.timeout`). Each actor takes only its own keys, and a key of the older form in a step written with `by:` is refused with where it is written now (`skills` under `with:`, `inputs` as `reads:`, `timeout` under `limits:`, `writes: docs` as `allow: [docs:write]`). An agent role picks no executor: the machine's `bind:` does ([Executors and runners](#executors-and-runners)); a step that must name one, or a `model`, in the workflow keeps the older form. The roles are the pack's: the shipped pack registers `builder`, `reviewer`, `qa`, `investigator` and `writer`, each with its purpose and the capabilities it may be granted, and a `supervisor`, which no step names.
 
 A workflow sets the stale signal's settings once, and names the step `norn story update-branch` re-enters:
 

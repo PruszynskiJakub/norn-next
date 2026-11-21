@@ -88,8 +88,8 @@ For each finding, suggest ONE concrete change, small enough to review in a minut
 | File | When |
 |---|---|
 | a skill, `.agents/skills/<name>/SKILL.md` | an agent's craft fell short the same way more than once |
-| a workflow, `.agents/workflows/<name>.yaml` | a missing check before review (lint, type check), a counter's `max`, a check's command or `timeout`, a step's `deadline`, `nudges`, `retries` or executor (`by`), what an outcome hands back |
-| a workflow's `defaults:`, or the norn config | the limits (`deadline`, `nudges`, `retries`, `stalled`) for every step of a workflow; an executor's `model` or `args` under `executors` in the person's config |
+| a workflow, `.agents/workflows/<name>.yaml` | a missing check before review (lint, type check), a counter's `max`, a check's command or `timeout`, a step's `deadline`, `nudges` or `retries`, what an outcome hands back |
+| a workflow's `defaults:`, or the norn config | the limits (`deadline`, `nudges`, `retries`, `stalled`) for every step of a workflow; the executors a role or one step runs on (`bind:`), an executor's `model` or `args` under `executors`, and the runner for each attendance (`runners:`) in the person's config |
 | contributor docs: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, coding standards | a repo fact an agent asked for or got wrong; a judgement call review kept finding |
 | the spec template: `SKILL.md` and `EXAMPLE.md` of the refine skill, `norn-refine` | asks and rejects that trace back to a gap in how specs are written |
 

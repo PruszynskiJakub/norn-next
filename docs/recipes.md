@@ -233,22 +233,28 @@ With the local tracker an item is a markdown file in the machine dir (or the fol
 
 ## Use another agent tool or model
 
-An executor is a harness in a runner, under a name. Add one, make it the default, or pick it per step:
+An executor is a harness and a model, under a name. Add one, make it the default, bind a role or one step to it, or give a role a list to fall back on:
 
 ```sh
-norn config set executors.pi "{harness: pi, runner: headless}"
+norn config set executors.pi "{harness: pi}"
 norn config set executor pi
 norn config set executors.claude.model opus
+norn config set bind.reviewer pi                 # every reviewer step
+norn config set bind.story.review claude         # the story workflow's review step only
+norn config set bind.builder "[claude, pi]"      # the first that can run the step
 ```
 
-In a workflow, `by: pi` on an agent step runs that step on the `pi` executor. `args` on an executor replaces its harness's default arguments whole (Claude Code's are `--permission-mode auto`).
+`args` on an executor replaces its harness's default arguments whole (Claude Code's are `--permission-mode auto`). An executor without a `runner:` of its own runs in the runner `runners:` picks for the step's attendance ([Reference › Executors and runners](reference.md#executors-and-runners)). A workflow in the older form names an executor for one step with `by: <executor>` beside `agent:`.
 
 ## Watch agents in Herdr panes
 
 ```sh
-norn config set executors.claude.runner herdr
+norn config set runners.person herdr             # attended steps, where you work beside the agent
+norn config set runners.none herdr               # every other step too, to watch it
 norn config set kernel.mode manual
 ```
+
+An executor that names a `runner:` of its own (`executors.claude.runner herdr`, as `norn init` writes it) runs every step there instead.
 
 The herdr runner opens one Herdr workspace per story and one tab per run, labelled `<unit> <step>`, with the agent in its pane: you can watch it and type into it. A run norn stops (its report applied, a retry, a deadline) ends its agent and keeps its tab, so every run of a story, attended or not, is a tab in the story's one workspace. The story's finish closes the tabs of its units that ended done, and the workspace with the last one; `norn tidy` closes the rest once the story ended. In auto mode norn starts each agent step in its pane on its own, and you can look in or type at any time; in manual mode you start each one with `norn run start <unit>`. An attended step always waits for `norn run start`, and then runs in its pane with you. A decision given by typing into the pane is not on norn's record; give it with `norn story answer` too.
 

@@ -25,7 +25,7 @@ norn is a small **kernel** (the workflow model, decide, the journal's write rule
 | step kinds | workflow steps beyond `agent`, `check`, `gate` and `slices` | `update-branch`, `integrate`, `push`, `verify-base`, `open-pr`, `await-merge` |
 | pack | workflows and skills shipped together | `sdlc` |
 
-An **executor** is a harness in a runner, under a name: `claude` in `headless`, say, or `pi` in `herdr`. A workflow step picks one with `by:`; without it, the config's default executor runs it. The bundled plugins ship in the binary; `norn plugin add <spec>` installs another (an npm spec, a git URL or a local path), and `norn plugin list` shows each plugin and what it provides.
+A workflow's agent step names a **role** (`by: builder`), which the pack registers with what its agent is for and the capabilities it may be granted. An **executor** is a harness and a model, under a name: `claude` on `opus`, say, or `pi`. Each machine binds roles, or one workflow's step, to executors with `bind:` (a list is tried in order), and the step's `attended:` picks the **runner** from `runners:`: one with presence (`herdr`) when a person stays beside the agent, `headless` otherwise. Whether an executor can run a step (configured, with presence for a person, a harness that can refuse a tool for a docs-only step) is a fact decide reads, so a step no executor can hold parks before any agent starts ([Reference › Executors and runners](reference.md#executors-and-runners)). The bundled plugins ship in the binary; `norn plugin add <spec>` installs another (an npm spec, a git URL or a local path), and `norn plugin list` shows each plugin and what it provides.
 
 The **runtime** hosts both: each tick it takes the lock, gathers the facts through the plugins, asks the kernel to decide, carries out each decision through the plugins, and writes the trace.
 
@@ -78,7 +78,7 @@ review:
     changes_requested: { to: implement, produces: [findings] }
 ```
 
-The worktree hooks hold it (below), so such a step runs only on an executor whose harness can refuse a tool call: on any other, the unit parks `stuck` (`agent.unguarded`) before an agent starts, naming the step and the executor. Another default executor lets it run. Writing the worktree is the default and needs no `allow:`. The older form says `writes: docs`, and picks an executor for one step with `by:` beside `agent:`.
+The worktree hooks hold it (below), so such a step runs only on an executor whose harness can refuse a tool call: on any other, the unit parks `stuck` (`agent.unguarded`) before an agent starts, naming the step and the executor. Another executor, bound to the role or the step, lets it run. Writing the worktree is the default and needs no `allow:`. The older form says `writes: docs`, and picks an executor for one step with `by:` beside `agent:`.
 
 ### Signals
 
@@ -110,7 +110,7 @@ A signal may carry a small `detail` (a failed check, a review's comments); the n
 
 ## Who does what: attended steps, gates and modes
 
-- An **attended step** (`attended: person`; `attended: true` in the older form) is an agent step done *with* a person in the agent's pane. A person always starts it.
+- An **attended step** (`attended: person`; `attended: true` in the older form) is an agent step done *with* a person in the agent's pane. A person always starts it, and it runs only in a runner with presence: on one without, it parks `stuck` (`agent.no_presence`) and never runs with nobody beside it. `attended: agent` names a supervisor beside the agent instead, and `none` (the default) nobody; each runs in the runner `runners:` gives it.
 - A **gate** is a step with no agent (`by: person`): a person approves it (`norn story approve <story>`) or rejects it with what to change (`norn story reject <story> --reason "…"`), and the reason goes into the next attempt's brief.
 - The **mode** says who starts the other agent steps. In **auto** mode norn starts the agent itself. In **manual** mode the step waits for a person, and `norn run start <unit>` starts it, for that step only. `norn init` picks auto with the headless runner, where nobody sits beside the agent, and manual with Herdr; a workflow's `mode` and `kernel.mode` in the config set it too.
 
@@ -212,8 +212,9 @@ A config left by norn 0.35 or earlier is never read: its keys mean other things 
 | slot | A kind of part a plugin provides: harness, tracker, forge, store, vcs, runner, step kind or pack. |
 | pack | Workflows, shared files and skills shipped together as one plugin. |
 | harness | The plugin for one agent tool (Claude Code, pi): its hooks, its launch, its events. |
-| runner | Where an agent process runs: headless or a Herdr pane. |
-| executor | A named harness in a runner, which an agent step runs on. |
+| runner | Where an agent process runs: headless or a Herdr pane, picked by the step's `attended:`. |
+| role | What an agent step's `by:` names: what its agent is for and the capabilities it may be granted, registered by the pack. |
+| executor | A named harness and model on this machine, which the config binds to an agent step's role or the step itself. |
 | store | Where run data, claims and the mailbox live: the machine dir or git refs. |
 | trace | The per-tick record of facts and decisions, kept outside the repository. |
 | verdict | How one acceptance criterion fared in QA: `pass`, `fail`, `person` or `unverified`. |
