@@ -102,9 +102,8 @@ export const RULE_IDS: readonly string[] = [
   "agent.died.retry",
   "agent.died.exhausted",
   "agent.retry.no_headless",
-  // the supervisor: a question of an attended: agent step, or a gate the person's policy grants
+  // the supervisor: a question of an attended: agent step; no gate is delegated to one yet
   "supervisor.ask",
-  "supervisor.gate",
   "supervisor.reserved",
   "supervisor.asks_spent",
   "supervisor.no_executor",

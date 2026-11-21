@@ -197,7 +197,6 @@ back as the unit's `corrupt_marked` fact.
 | (none) | | `agent.reported.rejected` | `park` (inbox `stuck`: the report's receipt was refused, e.g. an outcome the step does not declare; nothing is written, and a new report is applied as it comes) |
 | (none) | | `agent.retry.no_headless` | `park` (inbox `stuck`: a fresh session is needed and the executor cannot run headless) |
 | (none) | | `supervisor.ask` | `start_supervisor` (subject `ask`, with a `supervisor.started` intent: the question of an `attended: agent` step the person's `policy.stand_in.attended` grants, its `limits.asks` not spent and naming nothing only a person grants) |
-| (none) | | `supervisor.gate` | `start_supervisor` (subject `gate`: a gate `policy.stand_in.gates` grants, once every executor an agent step of its workflow may run on, and the supervisor's, runs inside an OS sandbox) |
 | (none) | | `supervisor.reserved` | `noop`: the question names a capability only a person grants (`question_reserved`), so it waits for them |
 | (none) | | `supervisor.asks_spent` | `noop`: the supervisor answered the step's `limits.asks` this visit, so the question waits in the mailbox |
 | (none) | | `supervisor.no_executor` | `noop`: no executor bound to the supervisor runs headless and denies a tool, so the question waits for the person |

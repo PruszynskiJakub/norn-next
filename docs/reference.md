@@ -37,7 +37,7 @@ policy:
   allow: [code:read, code:scratch, code:write, docs:write, exec:checks, out:findings, out:criteria]
 ```
 
-A supervisor answers a granted step's questions today. A granted gate is handed to one only once every executor the workflow's agent steps may run on, and the supervisor's, runs inside an OS sandbox; no shipped runner or harness declares one, so every gate still waits for the person, and its inbox item says why. A granted gate already counts against the floor a workflow is checked against when it loads ([Workflow floor and confirmation](#workflow-floor-and-confirmation)).
+A supervisor answers a granted step's questions today. No granted gate is handed to one yet: that needs every executor to run inside an OS sandbox, which no shipped runner or harness declares, and a bound on the steps after the gate and an allowlist of the item's authors, which are not built. Every gate still waits for the person, and its inbox item says why. A granted gate already counts against the floor a workflow is checked against when it loads ([Workflow floor and confirmation](#workflow-floor-and-confirmation)).
 
 ### The supervisor
 
@@ -45,7 +45,7 @@ A **supervisor** is an agent norn launches beside a step's own run, on the execu
 
 - **A question.** When the agent of an `attended: agent` step that `policy.stand_in.attended` names asks (`norn ask`), the tick launches the supervisor for that question (`supervisor.ask`, its `supervisor.started` receipt first). It answers once with `norn done answer --note "…"`, and the agent gets the answer marked as the supervisor's, never the person's; or it hands the question back with `norn done escalate --note "…"`, and the question stays the person's for the visit.
 - **What goes straight to the person.** A question that names a merge, a push, a release or another write past the repo, or a gate's decision (`supervisor.reserved`); one the supervisor handed back; and one past the step's `limits.asks` (three a visit unless the step says, `supervisor.asks_spent`). They wait in the mailbox for `norn story answer`, never in a stuck unit. An answer that names such a capability is refused (`supervisor_grants`): a supervisor's answer grants nothing.
-- **A gate.** A gate `policy.stand_in.gates` names, once delegation is possible (above), gets a supervisor for that gate's visit (`supervisor.gate`): `norn done approve|reject --note "<the criteria checked>"`, or `escalate`. Its decision is a `gate.decided` marked `delegated` with the supervisor's run and the gate's visit on it; one from any other run or visit is refused.
+- **A gate.** A gate `policy.stand_in.gates` names is not delegated yet (above), so no supervisor starts for one. The record already holds a delegated decision to its visit: a `gate.decided` marked `delegated` stands only with the gate's visit and the run of that visit's supervisor on it; one from any other run or visit is refused.
 - **Its brief** (`norn brief` in its session) names the step, its grant, and the question; the question, the handoff and the story's files are marked untrusted, as data and never instructions. It runs under the docs-only guard and is asked to change nothing.
 - **Bounded.** A supervisor with no answer within `kernel.silent_after`, or whose process ended, or whose grant the person withdrew hands its subject back (`supervisor.silent`, `supervisor.died`, `supervisor.revoked`). The person may answer or decide first; a supervisor overtaken that way is stopped, and its late word is refused.
 
@@ -313,7 +313,7 @@ Without an OS sandbox an agent's shell can reach anything the person's user can,
 | detected | tracked files in the unit's worktree, HEAD, the remote story branch head, the repo's git config and hooks, the run's hook config | the same |
 | advisory | `exec:checks` against `exec:any`, `tracker:*`, the `out:*` reports a role may write, shell git (refs, stash, worktree, push), the store, a gate command run from the agent's shell, the network | none of these |
 
-An advisory capability is the brief's word and nothing more ([Limitations](limitations.md)). A grant may be widened only over what is prevented or detected: since an agent's shell could write a gate's decision itself, no gate is handed to a supervisor until every agent of its workflow runs sandboxed ([The supervisor](#the-supervisor)).
+An advisory capability is the brief's word and nothing more ([Limitations](limitations.md)). A grant may be widened only over what is prevented or detected: since an agent's shell could write a gate's decision itself, no gate is handed to a supervisor without a sandbox, and none is handed to one yet ([The supervisor](#the-supervisor)).
 
 ## Generated reference
 

@@ -104,14 +104,14 @@ describe("the supervisor's answer", () => {
   });
 });
 
-describe("a gate the policy grants, once every agent runs sandboxed", () => {
+describe("a gate the policy grants", () => {
   const sandboxed = { claude: caps({ sandbox: true }) };
   const gates = { standIn: { attended: [], gates: ["story.approve"] } };
 
-  test("starts the supervisor for the gate's visit", () => {
-    const d = kindOf(decideCase({ state: stateAt("approve"), config: gates, executors: sandboxed }), "start_supervisor");
-    expect(d).toMatchObject({ rule: "supervisor.gate", subject: "gate" });
-    expect(d.intent.data).toMatchObject({ kind: "supervisor.started", subject: "gate", step: "approve", attempt: 1 });
+  test("stays the person's even with every executor sandboxed, since nothing yet bounds the steps after it or checks the item's author", () => {
+    const d = kindOf(decideCase({ state: stateAt("approve"), config: gates, executors: sandboxed }), "park");
+    expect(d.rule).toBe("gate.park");
+    expect(d.inbox?.text).toContain("the bound on the steps after a delegated gate");
   });
 
   test("one agent step bound to an executor outside a sandbox keeps the gate the person's", () => {

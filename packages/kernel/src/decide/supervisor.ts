@@ -8,7 +8,7 @@
 import type { Decision } from "../model/actions.ts";
 import { type ExecutorCapabilities, launchTarget } from "../model/capabilities.ts";
 import type { KernelConfig } from "../model/config.ts";
-import type { SupervisorRun, SupervisorSubject } from "../model/run-state.ts";
+import type { SupervisorRun } from "../model/run-state.ts";
 import type { AgentStepSpec, WorkflowGraph } from "../workflow/graph.ts";
 import type { DecideContext } from "./context.ts";
 import { ageMs, applyDecision, intentFor, noop, parkDecision, type UnitView } from "./unit-support.ts";
@@ -68,11 +68,14 @@ export function matchSupervisor(ctx: DecideContext, needsSandbox: boolean): Supe
 }
 
 /**
- * Why a gate granted to a stand-in must still go to the person, or null when it may be delegated: every
- * executor any agent step of the workflow may run on runs sandboxed, since any of them could otherwise
- * forge the decision, and so does the supervisor's.
+ * Why a gate granted to a stand-in must still go to the person, or null when it may be delegated. The
+ * sandbox is necessary but not enough: the design also makes delegation wait on a bound over the steps a
+ * gate reaches before the next person's gate and on an allowlist of the item's authors, and the sandbox
+ * reach here covers only this workflow's agent steps, not other units sharing the store or shell checks
+ * running repo scripts. Until those exist no gate is delegated, so a stand-in can never be the only
+ * thing between an unchecked story and its next effect.
  */
-export function delegationBlocked(ctx: DecideContext, graph: WorkflowGraph): string | null {
+export function delegationBlocked(ctx: DecideContext, graph: WorkflowGraph): string {
   for (const step of Object.values(graph.steps)) {
     if (!step.agent) continue;
     for (const e of stepCandidates(ctx.config, graph.name, step.name, step.agent)) {
@@ -81,8 +84,12 @@ export function delegationBlocked(ctx: DecideContext, graph: WorkflowGraph): str
     }
   }
   const supervisor = matchSupervisor(ctx, true);
-  return supervisor.ok ? null : supervisor.why;
+  return supervisor.ok ? DELEGATION_UNBUILT : supervisor.why;
 }
+
+/** Why a gate stays the person's once every executor is sandboxed. */
+export const DELEGATION_UNBUILT =
+  "the bound on the steps after a delegated gate and the allowlist of the item's authors are not built yet";
 
 /** The questions a supervisor answers for a step in one visit when its `limits.asks` says nothing. */
 export const DEFAULT_SUPERVISOR_ASKS = 3;
@@ -108,12 +115,12 @@ export function decideQuestion(v: UnitView): Decision | null {
   const asks = spec.asks ?? DEFAULT_SUPERVISOR_ASKS;
   const answered = v.state.supervised?.answered ?? 0;
   if (answered >= asks) return noop(v, "supervisor.asks_spent", `the supervisor answered ${answered} of the step's ${asks} (limits.asks) this visit, so the question waits for the person in the mailbox`);
-  return startSupervisor(v, "supervisor.ask", "ask", input);
+  return startSupervisor(v, input);
 }
 
 /**
- * A gate the person's policy grants to a stand-in: decided by the supervisor once nothing blocks the
- * delegation, else parked for the person saying why. While the supervisor works the gate stays in the
+ * A gate the person's policy grants to a stand-in: parked for the person saying why it is not delegated.
+ * A gate supervisor the state already holds is still watched, and while it works the gate stays in the
  * person's inbox too, and whoever decides first decides it.
  */
 export function decideGrantedGate(v: UnitView, prompt: string): Decision {
@@ -127,27 +134,27 @@ export function decideGrantedGate(v: UnitView, prompt: string): Decision {
   const handed = v.state.supervised?.escalated?.find((e) => e.input === "gate");
   if (handed) return park(`The supervisor handed this gate to you: ${handed.reason}`);
   const blocked = delegationBlocked(v.ctx, v.graph);
-  if (blocked !== null) return park(`policy.stand_in.gates grants this gate to a supervisor, but ${blocked}: without an OS sandbox an agent's shell could forge the decision, so it is yours to decide`);
-  return startSupervisor(v, "supervisor.gate", "gate");
+  const because = blocked === DELEGATION_UNBUILT ? "" : ": without an OS sandbox an agent's shell could forge the decision";
+  return park(`policy.stand_in.gates grants this gate to a supervisor, but ${blocked}${because}, so it is yours to decide`);
 }
 
 /** The park of a gate waiting on its decision. */
 export const GATE_PARK = "gate.park";
 
-function startSupervisor(v: UnitView, rule: string, subject: SupervisorSubject, input_id?: string): Decision {
-  const match = matchSupervisor(v.ctx, subject === "gate");
+function startSupervisor(v: UnitView, input_id: string): Decision {
+  const match = matchSupervisor(v.ctx, false);
   if (!match.ok) return noop(v, "supervisor.no_executor", `no supervisor can take it (${match.why}), so it waits for the person`);
   const run_id = v.ctx.nextId();
-  const input = input_id !== undefined ? { input_id } : {};
+  const subject = "ask";
   return {
     kind: "start_supervisor",
     unit: v.unit.id,
-    rule,
+    rule: "supervisor.ask",
     run_id,
     executor: match.executor,
     subject,
-    ...input,
-    intent: intentFor(v, { kind: "supervisor.started", run_id, executor: match.executor, subject, ...input }),
+    input_id,
+    intent: intentFor(v, { kind: "supervisor.started", run_id, executor: match.executor, subject, input_id }),
   };
 }
 

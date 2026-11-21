@@ -247,23 +247,82 @@
   },
   "decisions": [
     {
-      "kind": "start_supervisor",
+      "kind": "park",
       "unit": "gh-168",
-      "rule": "supervisor.gate",
-      "run_id": "01JD5G0000C73G79TPA9EMCVD5",
-      "executor": "claude",
-      "subject": "gate",
+      "rule": "gate.park",
+      "reason": "gate.park",
+      "inbox": {
+        "kind": "gate",
+        "unit": "gh-168",
+        "step": "ready",
+        "since": "2026-11-17T09:00:00.000Z",
+        "text": "Ship it?\n\npolicy.stand_in.gates grants this gate to a supervisor, but the bound on the steps after a delegated gate and the allowlist of the item's authors are not built yet, so it is yours to decide"
+      },
       "intent": {
-        "id": "01JD5G0000FWPMF8ZZQPVMTVA7",
+        "id": "01JD5G0000C73G79TPA9EMCVD5",
         "data": {
-          "kind": "supervisor.started",
-          "run_id": "01JD5G0000C73G79TPA9EMCVD5",
-          "executor": "claude",
-          "subject": "gate",
+          "kind": "unit.parked",
+          "reason": "gate.park",
           "step": "ready",
           "attempt": 1
         }
-      }
+      },
+      "state": {
+        "format": 1,
+        "unit": "gh-168",
+        "story": "gh-168",
+        "workflow": {
+          "name": "supervised",
+          "hash": "1a08ff22db16ad4c93fae04cb57ec20ae0c00cdbeef2120f22369d26d321a647",
+          "doc": {
+            "name": "supervised",
+            "description": "A build step a supervisor stays beside, then a person's gate.",
+            "start": "build",
+            "steps": {
+              "build": {
+                "outcomes": {
+                  "done": "ready"
+                },
+                "role": "builder",
+                "agent": "Build it.",
+                "attended": "agent",
+                "asks": 1
+              },
+              "ready": {
+                "outcomes": {
+                  "approve": "$done",
+                  "reject": {
+                    "to": "build",
+                    "counter": "ready.reject"
+                  }
+                },
+                "gate": "Ship it?"
+              }
+            },
+            "counters": {
+              "ready.reject": {
+                "max": 2
+              }
+            }
+          }
+        },
+        "step": "ready",
+        "attempt": 1,
+        "counters": {
+          "ready.reject": 0
+        },
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 1,
+        "visits": {
+          "ready": 1
+        },
+        "parked": {
+          "reason": "gate.park",
+          "since": "2026-11-17T09:00:00.000Z"
+        }
+      },
+      "expect_version": 1
     }
   ]
 }

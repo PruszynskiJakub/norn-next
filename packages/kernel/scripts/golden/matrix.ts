@@ -109,10 +109,10 @@ export const MATRIX: Scenario[] = [
   ),
   scenario(
     "supervisor-gate",
-    "A gate the person's policy grants to a stand-in: with every executor sandboxed the supervisor starts for the gate's visit; without a sandbox anywhere the gate waits for the person, saying why.",
+    "A gate the person's policy grants to a stand-in with every executor sandboxed: it still waits for the person, since nothing yet bounds the steps after a delegated gate or checks the item's author.",
     { files: { supervised: SUPERVISED_DOC }, config: config({ workflow: "supervised", standIn: { attended: [], gates: ["supervised.ready"] } }), capabilities: capabilities({ executors: { claude: executor({ sandbox: true }) } }) },
     (w) => seed(w, "gh-168", { workflow: "supervised", step: "ready" }),
-    ["supervisor.gate"],
+    ["gate.park"],
   ),
   scenario(
     "supervisor-gate-unsandboxed",
