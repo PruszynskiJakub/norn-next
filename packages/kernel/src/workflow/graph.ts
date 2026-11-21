@@ -3,7 +3,7 @@
  * compiled from it that applyReceipts and decide walk. The graph holds no `use` or `like` step and no
  * `max:`; every bounded edge names its counter, and every counter is declared.
  */
-import { Mode, NonEmpty, NonNegInt, OutcomeName, PosInt, StepName, Target, Verdict } from "@norn/schema";
+import { Mode, NonEmpty, NonNegInt, OutcomeName, PosInt, StepName, StepWrites, Target, Verdict } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
 import { BaseDoc, DocCounterName, HandBack, StepInputDoc, WorkflowDocument } from "./document.ts";
 
@@ -71,6 +71,8 @@ export const AgentStepSpec = Type.Object(
     hand_back: Type.Record(OutcomeName, HandBack),
     /** produced name → its file and outcomes; absent when the step produces nothing */
     produces: Type.Optional(Type.Record(Type.String(), ProducedFile)),
+    /** what the agent may write, as the hook guard holds it: `worktree` unless the step says `docs` */
+    writes: StepWrites,
     means: Type.Record(OutcomeName, Type.String()),
     verdict: Type.Record(OutcomeName, Verdict),
     /** limits resolved from the step, then the workflow's `defaults`, then the kernel config */

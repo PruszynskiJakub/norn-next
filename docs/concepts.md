@@ -63,6 +63,21 @@ A step hands a file to the steps after it by declaring it. An agent step's `prod
 
 A step kind may read a name with a fallback instead: it runs without the file, and says what it does then. `open-pr` reads `pr_body` that way, because the light path of a base update (only the base moved) reaches it again without `describe`, on a change an earlier pass already described.
 
+### What an agent step may write
+
+An agent step writes in its unit's worktree. `writes: docs` narrows that to the story's documents: the files in its spec folder, `.agents/specs/<story>/` (the spec, the handoffs, the slice files, `pr.md`), and files outside the repo, such as a findings file under `$TMPDIR`. The pack's review steps say it, so a review reports what needs changing as findings and never edits the code; QA and the build steps write their worktree.
+
+```yaml
+review:
+  agent: "Review this slice's diff against its acceptance criteria and the spec."
+  skills: [norn-review]
+  writes: docs
+  hand_back: { changes_requested: findings }
+  outcomes: { approve: integrate, changes_requested: implement }
+```
+
+The worktree hooks hold it (below), so a `writes: docs` step runs only on an executor whose harness can refuse a tool call: on any other, the unit parks `stuck` (`agent.unguarded`) before an agent starts, naming the step and the executor. `by:` on the step, or another default executor, lets it run. `writes: worktree` is the default and can be left out.
+
 ### Signals
 
 A **signal** is a fact about the world outside a waiting step, which a tick reads: the base moved under the story (`stale`), the story branch holds commits its change lacks (`unpushed`), the step has waited too long (`timeout`). `outcomes:` says how a step ends by itself; a step's `on:` block says what may move it along while it waits, with the same route shape:
@@ -124,7 +139,7 @@ Each unit works in its own git worktree, made by the vcs plugin in the machine d
 - **The spec and the handoff.** The story's spec is `.agents/specs/<story>/spec.md`, mirrored from the tracker item; each unit's **handoff** is `.agents/specs/<story>/handoffs/<unit>.md`, the unit's current state in prose (goal, proof, what is easy to miss, notes, the next action), rewritten by whoever works on it. The agent edits both in place; norn reads them back when it reports, and keeps them with the run data, never on the branch.
 - **Other inputs.** The last check's output, a rejection's findings and the like go to `.agents/inputs/`, rewritten for every run. A step lists the ones it reads under `inputs:`, by the names in [Reference › Inputs](reference.md#inputs).
 - **Produced files.** A file a step declares under `produces:` is written by its agent in the spec folder. norn reads it back with the spec and the handoff when the agent reports, and writes it into the worktree of a later step that lists its name, so a slice in its own worktree gets it too.
-- **Hooks.** The harness wires norn's hooks into the tool's local settings in that worktree (`.claude/settings.local.json` for Claude Code, an extension for pi). They feed norn the agent's events, keep it from ending a turn without a report, and refuse a file write outside the worktree or into norn's run state.
+- **Hooks.** The harness wires norn's hooks into the tool's local settings in that worktree (`.claude/settings.local.json` for Claude Code, an extension for pi). They feed norn the agent's events, keep it from ending a turn without a report, and refuse a file write outside the worktree or into norn's run state; on a `writes: docs` step, also one in the worktree outside the story's spec folder, with a reason telling the agent to hand back findings instead. They judge the agent tool's file writes (Claude Code's `Write`, `Edit`, `MultiEdit`, `NotebookEdit`; pi's `write`, `edit`), following a link to where a write really lands. A shell command is never judged, so `echo x > src/a.ts` or a formatter run from the shell gets through on any step: `writes: docs` keeps a review from editing code by mistake, not an agent set on it; the review skill asks the same of the agent in words.
 
 The branch, and the PR, hold only the code.
 

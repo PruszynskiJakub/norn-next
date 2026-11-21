@@ -1,0 +1,546 @@
+{
+  "name": "agent-unguarded",
+  "description": "A ready docs-only step (a review) whose executor's harness cannot deny a tool: the story waits for a person rather than run the agent with its writes unguarded.",
+  "step_kinds": {
+    "update-branch": {
+      "outcomes": [
+        "done",
+        "conflict",
+        "clean",
+        "resolved"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "integrate": {
+      "outcomes": [
+        "done",
+        "conflict"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "open-pr": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "push": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "await-merge": {
+      "outcomes": [
+        "merged",
+        "unpushed"
+      ],
+      "mode": "wait",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "slice": {
+        "name": "slice",
+        "description": "Build one slice test-first, check and review it, and integrate it into the story branch.",
+        "start": "implement",
+        "steps": {
+          "implement": {
+            "agent": "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps.",
+            "skills": [
+              "norn-implement"
+            ],
+            "inputs": [
+              "slice",
+              "spec",
+              "handoff",
+              "last_check",
+              "last_findings"
+            ],
+            "outcomes": {
+              "done": "test"
+            },
+            "means": {
+              "done": "every acceptance criterion (or rework point) has a passing test"
+            }
+          },
+          "test": {
+            "check": "{checks.test}",
+            "timeout": "10m",
+            "outcomes": {
+              "pass": "review",
+              "fail": {
+                "to": "implement",
+                "counter": "test.fail"
+              }
+            }
+          },
+          "review": {
+            "agent": "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch.",
+            "skills": [
+              "norn-review"
+            ],
+            "writes": "docs",
+            "inputs": [
+              "slice",
+              "spec",
+              "diff",
+              "last_findings"
+            ],
+            "hand_back": {
+              "changes_requested": "findings"
+            },
+            "outcomes": {
+              "approve": "integrate",
+              "changes_requested": {
+                "to": "implement",
+                "counter": "review.changes_requested"
+              }
+            },
+            "means": {
+              "approve": "all criteria met, no blocking findings",
+              "changes_requested": "blocking findings, handed back with --findings <file>"
+            }
+          },
+          "integrate": {
+            "integrate": null,
+            "outcomes": {
+              "done": "$done",
+              "conflict": {
+                "to": "merge",
+                "counter": "integrate.conflict"
+              }
+            }
+          },
+          "merge": {
+            "agent": "Slice mode: integrating this slice into the story branch conflicted; merge the story branch's commit the base_side input names into this slice in this worktree, resolve each conflict keeping the intent of both sides, prove it with the tests and commit the merge; never rebase.",
+            "skills": [
+              "norn-merge"
+            ],
+            "inputs": [
+              "slice",
+              "spec",
+              "base_side"
+            ],
+            "outcomes": {
+              "done": "integrate"
+            },
+            "means": {
+              "done": "conflicts resolved keeping the intent of both sides; tests pass"
+            }
+          }
+        },
+        "counters": {
+          "test.fail": {
+            "max": 5
+          },
+          "integrate.conflict": {
+            "max": 2,
+            "reset_on": "integrate.done"
+          },
+          "review.changes_requested": {
+            "max": 3
+          }
+        }
+      }
+    },
+    "pinned": []
+  },
+  "config": {
+    "counterDefaults": {
+      "checkFail": 5,
+      "gateReject": 2,
+      "conflict": 2,
+      "stale": 10,
+      "agentBack": 3
+    },
+    "silentAfterMs": 900000,
+    "maxNudges": 2,
+    "maxRetries": 1,
+    "deadlineMs": 3600000,
+    "mode": "auto",
+    "executor": "claude",
+    "workflow": "story",
+    "intakeWorkflowLabelPrefix": "norn:wf:",
+    "sliceWorkflow": "slice",
+    "base": "main",
+    "claimTtlMs": 600000,
+    "claimRenewBeforeMs": 400000
+  },
+  "facts": {
+    "tick_id": "01JD5G00000MR9XA8KKK8P87K1",
+    "now": "2026-11-17T09:00:00.000Z",
+    "holder": "machine-a",
+    "capabilities": {
+      "tracker": {
+        "assign": true,
+        "labels": true,
+        "comment": true,
+        "create": true,
+        "close": true
+      },
+      "forge": {
+        "draft": true,
+        "checks": true,
+        "raw_urls": true
+      },
+      "store": {
+        "shared": false,
+        "claims": "local",
+        "mailbox": true,
+        "artifacts": true
+      },
+      "executors": {
+        "claude": {
+          "blockStop": true,
+          "denyTool": false,
+          "injectContext": true,
+          "subagents": true,
+          "limits": true,
+          "paneInput": false,
+          "headless": true,
+          "attended": true
+        }
+      }
+    },
+    "stories": [
+      {
+        "key": "gh-116",
+        "item": {
+          "id": 116,
+          "key": "gh-116",
+          "title": "Story 116",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-116",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-116",
+            "state": {
+              "format": 1,
+              "unit": "gh-116",
+              "story": "gh-116",
+              "workflow": {
+                "name": "slice",
+                "hash": "c064a11256fc465abf9e46cc022d3fb35b7eb0bd423088e1d347543b4b5a9fd9",
+                "doc": {
+                  "name": "slice",
+                  "description": "Build one slice test-first, check and review it, and integrate it into the story branch.",
+                  "start": "implement",
+                  "steps": {
+                    "implement": {
+                      "agent": "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps.",
+                      "skills": [
+                        "norn-implement"
+                      ],
+                      "inputs": [
+                        "slice",
+                        "spec",
+                        "handoff",
+                        "last_check",
+                        "last_findings"
+                      ],
+                      "outcomes": {
+                        "done": "test"
+                      },
+                      "means": {
+                        "done": "every acceptance criterion (or rework point) has a passing test"
+                      }
+                    },
+                    "test": {
+                      "check": "{checks.test}",
+                      "timeout": "10m",
+                      "outcomes": {
+                        "pass": "review",
+                        "fail": {
+                          "to": "implement",
+                          "counter": "test.fail"
+                        }
+                      }
+                    },
+                    "review": {
+                      "agent": "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch.",
+                      "skills": [
+                        "norn-review"
+                      ],
+                      "writes": "docs",
+                      "inputs": [
+                        "slice",
+                        "spec",
+                        "diff",
+                        "last_findings"
+                      ],
+                      "hand_back": {
+                        "changes_requested": "findings"
+                      },
+                      "outcomes": {
+                        "approve": "integrate",
+                        "changes_requested": {
+                          "to": "implement",
+                          "counter": "review.changes_requested"
+                        }
+                      },
+                      "means": {
+                        "approve": "all criteria met, no blocking findings",
+                        "changes_requested": "blocking findings, handed back with --findings <file>"
+                      }
+                    },
+                    "integrate": {
+                      "integrate": null,
+                      "outcomes": {
+                        "done": "$done",
+                        "conflict": {
+                          "to": "merge",
+                          "counter": "integrate.conflict"
+                        }
+                      }
+                    },
+                    "merge": {
+                      "agent": "Slice mode: integrating this slice into the story branch conflicted; merge the story branch's commit the base_side input names into this slice in this worktree, resolve each conflict keeping the intent of both sides, prove it with the tests and commit the merge; never rebase.",
+                      "skills": [
+                        "norn-merge"
+                      ],
+                      "inputs": [
+                        "slice",
+                        "spec",
+                        "base_side"
+                      ],
+                      "outcomes": {
+                        "done": "integrate"
+                      },
+                      "means": {
+                        "done": "conflicts resolved keeping the intent of both sides; tests pass"
+                      }
+                    }
+                  },
+                  "counters": {
+                    "test.fail": {
+                      "max": 5
+                    },
+                    "integrate.conflict": {
+                      "max": 2,
+                      "reset_on": "integrate.done"
+                    },
+                    "review.changes_requested": {
+                      "max": 3
+                    }
+                  }
+                }
+              },
+              "step": "review",
+              "attempt": 1,
+              "counters": {
+                "test.fail": 0,
+                "integrate.conflict": 0,
+                "review.changes_requested": 0
+              },
+              "retries_used": 0,
+              "run": null,
+              "applied_through": 0,
+              "visits": {
+                "review": 1
+              }
+            },
+            "version": 1,
+            "receipts": [],
+            "session": null
+          }
+        ],
+        "mailbox": []
+      }
+    ],
+    "intake": []
+  },
+  "decisions": [
+    {
+      "kind": "park",
+      "unit": "gh-116",
+      "rule": "agent.unguarded",
+      "reason": "agent.unguarded",
+      "inbox": {
+        "kind": "stuck",
+        "unit": "gh-116",
+        "step": "review",
+        "since": "2026-11-17T09:00:00.000Z",
+        "text": "step 'review' is writes: docs, but executor 'claude' cannot deny a tool, so its writes would go unguarded; run it on an executor whose harness can (by:)"
+      },
+      "intent": {
+        "id": "01JD5G0000C73G79TPA9EMCVD5",
+        "data": {
+          "kind": "unit.parked",
+          "reason": "agent.unguarded",
+          "step": "review",
+          "attempt": 1
+        }
+      },
+      "state": {
+        "format": 1,
+        "unit": "gh-116",
+        "story": "gh-116",
+        "workflow": {
+          "name": "slice",
+          "hash": "c064a11256fc465abf9e46cc022d3fb35b7eb0bd423088e1d347543b4b5a9fd9",
+          "doc": {
+            "name": "slice",
+            "description": "Build one slice test-first, check and review it, and integrate it into the story branch.",
+            "start": "implement",
+            "steps": {
+              "implement": {
+                "agent": "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "inputs": [
+                  "slice",
+                  "spec",
+                  "handoff",
+                  "last_check",
+                  "last_findings"
+                ],
+                "outcomes": {
+                  "done": "test"
+                },
+                "means": {
+                  "done": "every acceptance criterion (or rework point) has a passing test"
+                }
+              },
+              "test": {
+                "check": "{checks.test}",
+                "timeout": "10m",
+                "outcomes": {
+                  "pass": "review",
+                  "fail": {
+                    "to": "implement",
+                    "counter": "test.fail"
+                  }
+                }
+              },
+              "review": {
+                "agent": "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch.",
+                "skills": [
+                  "norn-review"
+                ],
+                "writes": "docs",
+                "inputs": [
+                  "slice",
+                  "spec",
+                  "diff",
+                  "last_findings"
+                ],
+                "hand_back": {
+                  "changes_requested": "findings"
+                },
+                "outcomes": {
+                  "approve": "integrate",
+                  "changes_requested": {
+                    "to": "implement",
+                    "counter": "review.changes_requested"
+                  }
+                },
+                "means": {
+                  "approve": "all criteria met, no blocking findings",
+                  "changes_requested": "blocking findings, handed back with --findings <file>"
+                }
+              },
+              "integrate": {
+                "integrate": null,
+                "outcomes": {
+                  "done": "$done",
+                  "conflict": {
+                    "to": "merge",
+                    "counter": "integrate.conflict"
+                  }
+                }
+              },
+              "merge": {
+                "agent": "Slice mode: integrating this slice into the story branch conflicted; merge the story branch's commit the base_side input names into this slice in this worktree, resolve each conflict keeping the intent of both sides, prove it with the tests and commit the merge; never rebase.",
+                "skills": [
+                  "norn-merge"
+                ],
+                "inputs": [
+                  "slice",
+                  "spec",
+                  "base_side"
+                ],
+                "outcomes": {
+                  "done": "integrate"
+                },
+                "means": {
+                  "done": "conflicts resolved keeping the intent of both sides; tests pass"
+                }
+              }
+            },
+            "counters": {
+              "test.fail": {
+                "max": 5
+              },
+              "integrate.conflict": {
+                "max": 2,
+                "reset_on": "integrate.done"
+              },
+              "review.changes_requested": {
+                "max": 3
+              }
+            }
+          }
+        },
+        "step": "review",
+        "attempt": 1,
+        "counters": {
+          "test.fail": 0,
+          "integrate.conflict": 0,
+          "review.changes_requested": 0
+        },
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 1,
+        "visits": {
+          "review": 1
+        },
+        "parked": {
+          "reason": "agent.unguarded",
+          "since": "2026-11-17T09:00:00.000Z"
+        }
+      },
+      "expect_version": 1
+    }
+  ]
+}

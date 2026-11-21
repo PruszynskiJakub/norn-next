@@ -6,7 +6,7 @@
  * The schema checks the keys it knows and lets the rest through; `loadWorkflow` decides which key is
  * the head and refuses a step whose head is unknown.
  */
-import { Duration, Mode, NonEmpty, OUTCOME_NAME_PATTERN, OutcomeName, PosInt, StepName, StoredCounterName, Target, Verdict } from "@norn/schema";
+import { Duration, Mode, NonEmpty, OUTCOME_NAME_PATTERN, OutcomeName, PosInt, StepName, StepWrites, StoredCounterName, Target, Verdict } from "@norn/schema";
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
 
 const closed = { additionalProperties: false } as const;
@@ -103,6 +103,7 @@ function stepDoc<R extends TSchema, O extends TSchema>(route: R, onRoute: O) {
       model: Type.Optional(NonEmpty),
       criteria: Type.Optional(Type.Literal("required")),
       hand_back: Type.Optional(Type.Record(OutcomeName, HandBack, { ...closed, minProperties: 1 })),
+      writes: Type.Optional(StepWrites),
       deadline: Type.Optional(Duration),
       nudges: Type.Optional(Type.Integer({ minimum: 0 })),
       retries: Type.Optional(Type.Integer({ minimum: 0 })),

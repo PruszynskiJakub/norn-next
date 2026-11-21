@@ -91,6 +91,7 @@ steps:
   review:
     agent: "Review the story-level rework against the findings it answers and the spec: it fixes what they ask and nothing else."
     skills: [norn-review]
+    writes: docs
     inputs: [spec, diff, last_findings]
     hand_back: { changes_requested: findings }
     outcomes:

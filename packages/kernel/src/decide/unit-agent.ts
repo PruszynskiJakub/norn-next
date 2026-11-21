@@ -73,6 +73,9 @@ function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
   const executor = executorOf(v, spec);
   const caps = capsOf(v, executor);
   if (!caps) return parkDecision(v, "agent.no_executor", "stuck", { text: `executor '${executor}' is not configured` });
+  // a docs-only step is held by the write guard alone: on a harness that cannot deny a tool it would run unguarded
+  if (spec.writes === "docs" && !caps.denyTool)
+    return parkDecision(v, "agent.unguarded", "stuck", { text: `step '${v.state.step}' is writes: docs, but executor '${executor}' cannot deny a tool, so its writes would go unguarded; run it on an executor whose harness can (by:)` });
   // a person's `run.requested` starts this visit's agent once; manual mode still holds the next step
   if (personDrives(v)) return parkDecision(v, "agent.ready.manual", "manual", { text: spec.instructions });
   // a run a person started may open where they watch it (a pane); one nobody started must run headless

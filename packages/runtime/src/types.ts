@@ -5,6 +5,7 @@
  */
 import type { BriefInputs, Decision, KernelConfig, SessionFacts } from "@norn/kernel";
 import type { HostContext, IntakeQuery, NornPlugin, PluginResult, RunnerSplitRequest } from "@norn/plugin-api";
+import type { StepWrites } from "@norn/schema";
 import type { RepoWorkflows } from "./repo-workflows.ts";
 
 /** One slot as the config selects it: the provider's name and the config its factory validates. */
@@ -69,6 +70,8 @@ export interface AgentRunRequest {
   brief: BriefInputs;
   /** the harness session to resume rather than start fresh */
   resume?: string;
+  /** what the step lets the agent write; `docs` is held by the write guard alone, so it needs a harness that can deny a tool */
+  writes?: StepWrites;
 }
 
 /** How this launcher can run an agent: with nobody watching (auto mode needs it), or where a person works beside it. */

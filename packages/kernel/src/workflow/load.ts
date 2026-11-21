@@ -244,6 +244,7 @@ function agentSpec(s: WorkflowStepDoc, d: NonNullable<WorkflowDocument["defaults
     criteria: s.criteria === "required",
     hand_back: { ...(s.hand_back ?? {}) },
     ...(s.produces !== undefined && { produces: Object.fromEntries(Object.entries(producesOn(s)).map(([name, on]) => [name, { file: s.produces?.[name]?.file as string, on }])) }),
+    writes: s.writes ?? "worktree",
     means: { ...(s.means ?? {}) },
     verdict: { ...(s.verdict ?? {}) },
     deadline_ms: deadline === undefined ? config.deadlineMs : parseDuration(deadline),

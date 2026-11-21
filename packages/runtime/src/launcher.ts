@@ -178,6 +178,9 @@ export class HarnessLauncher implements AgentLauncher {
   async start(run: AgentRunRequest): Promise<PluginResult<{ handle: string }>> {
     const e = this.opts.executors[run.executor];
     if (!e) return fail("not_found", `no executor ${JSON.stringify(run.executor)} is configured`, false);
+    // decide parks such a step before it starts; this holds when the executor's harness changed under a run on the record
+    if (run.writes === "docs" && !e.harness.capabilities.denyTool)
+      return fail("invalid", `step ${run.step} is writes: docs, but ${e.harness.name} (executor ${run.executor}) cannot deny a tool, so its writes would go unguarded`, false);
     const { ctx } = this.opts;
     const installed = await this.install(e.harness, run.worktree);
     if (!installed.ok) return installed;

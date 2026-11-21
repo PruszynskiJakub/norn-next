@@ -52,6 +52,7 @@ const WORKFLOW: LoadedWorkflow = {
           attended: false,
           criteria: false,
           hand_back: {},
+          writes: "worktree",
           means: {},
           verdict: {},
           deadline_ms: null,

@@ -259,6 +259,16 @@ export const WORKFLOWS: Record<string, string> = {
     "    means: { done: the thing is built }",
     "",
   ].join("\n"),
+  "reviewed.yaml": [
+    "name: reviewed",
+    "start: review",
+    "steps:",
+    "  review:",
+    "    agent: Review the thing.",
+    "    writes: docs",
+    "    outcomes: { approve: $done }",
+    "",
+  ].join("\n"),
   "handed.yaml": [
     "name: handed",
     "start: build",

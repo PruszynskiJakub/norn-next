@@ -169,6 +169,7 @@ back as the unit's `corrupt_marked` fact.
 | `agent.ready.manual` | `noop` | `agent.ready.manual` | `park` (inbox `manual`), until a person starts the step's agent with a `run.requested` receipt (`norn run start`), which lifts it for that visit only and has the run judged as an auto run |
 | `agent.ready.manual.no_runner` | `noop` | `agent.ready.no_headless` | `park` (inbox `manual`: auto mode, the executor lacks `headless`) |
 | (none) | | `agent.no_executor` | `park` (inbox `stuck`: the step's executor is not configured) |
+| (none) | | `agent.unguarded` | `park` (inbox `stuck`: the step is `writes: docs` and its executor's harness cannot deny a tool) |
 | (attended) | `noop` | `agent.ready.attended` | `park` (inbox `attended`) |
 | `agent.queued` | `noop` | dropped: every due agent starts; no cap bounds the runs at once | |
 | `agent.start.wait_active` | `noop` | dropped: the act protocol records a run before launching it, so no second run starts beside one on the record | |

@@ -181,8 +181,8 @@ describe("this repo's workflows, as norn loads them", () => {
     // what a step does is the one key beside these; its text (agent, check, gate) is the repo's own
     // `on:` is compared with the outcomes: the released norn reads only the form that routes signals under
     // `outcomes:`, so the repo's copies keep it until a release reads `on:`, and both forms load to one graph
-    // `produces:` likewise: the released norn refuses the key, so the copies leave it out until a release reads it
-    const NOT_KIND = new Set(["outcomes", "on", "skills", "inputs", "produces", "means", "hand_back", "timeout", "exits"]);
+    // `produces:` and `writes:` likewise: the released norn refuses the keys, so the copies leave them out until a release reads them
+    const NOT_KIND = new Set(["outcomes", "on", "skills", "inputs", "produces", "means", "hand_back", "writes", "timeout", "exits"]);
     // a counter's name follows the exit its edge leaves by, and the copies name their exits apart: compare its bound
     const bounded = (w: Written, outcomes: Record<string, unknown>) =>
       Object.fromEntries(

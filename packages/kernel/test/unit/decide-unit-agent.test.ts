@@ -32,6 +32,20 @@ describe("a ready agent step", () => {
     expect(d.inbox?.text).toContain("codex");
   });
 
+  test("a docs-only step on an executor whose harness cannot deny a tool parks the unit rather than run it unguarded", () => {
+    const wf = loaded(graph({ build: { agent: agentSpec({ writes: "docs" }) } }));
+    const d = kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf], executors: { claude: caps({ denyTool: false }) } }), "park");
+    expect(d.rule).toBe("agent.unguarded");
+    expect(d.inbox?.text).toContain("claude");
+    expect(d.inbox?.text).toContain("writes: docs");
+  });
+
+  test("a docs-only step starts where the harness denies a tool, and a step that writes its worktree starts either way", () => {
+    const docs = loaded(graph({ build: { agent: agentSpec({ writes: "docs" }) } }));
+    expect(decideCase({ state: stateAt("build", {}, docs), workflows: [docs] })?.rule).toBe("agent.start");
+    expect(decideCase({ state: stateAt("build"), executors: { claude: caps({ denyTool: false }) } })?.rule).toBe("agent.start");
+  });
+
   test("a park is a unit.parked receipt and the state that applies it, so state and facts agree on the next tick", () => {
     const d = kindOf(decideCase({ state: stateAt("build", { applied_through: 6 }), config: { mode: "manual" } }), "park");
     expect(d.intent.data).toEqual({ kind: "unit.parked", reason: "agent.ready.manual", step: "build", attempt: 1 });
