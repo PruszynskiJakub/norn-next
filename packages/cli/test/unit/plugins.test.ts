@@ -19,6 +19,7 @@ import {
   type PluginLock,
   readLock,
   renderLock,
+  picks,
   resolvePlugins,
   withEntry,
   withoutEntry,
@@ -103,6 +104,19 @@ describe("resolving the config's picks", () => {
     const p = await config();
     p.packs = ["ops"];
     expect(failureOf(resolvePlugins({ config: p, bundled: BUNDLED_PLUGINS, lock: lockOf(), installed: [] })).body.details).toMatchObject({ slot: "pack", name: "ops" });
+  });
+
+  test("the runner each attendance picks for an executor without its own is a pick, named at its runners: key", async () => {
+    const c = await config("runners: { person: tmux }\n");
+    c.executors.claude = { harness: "claude" };
+    expect(picks(c).filter((p) => p.slot === "runners")).toEqual([
+      { slot: "runners", noun: "runner", name: "tmux", at: "runners.person" },
+      { slot: "runners", noun: "runner", name: "headless", at: "runners.agent" },
+      { slot: "runners", noun: "runner", name: "headless", at: "runners.none" },
+    ]);
+    expect(failureOf(resolvePlugins({ config: c, bundled: BUNDLED_PLUGINS, lock: lockOf(), installed: [] })).body.details).toMatchObject({ slot: "runner", name: "tmux" });
+    // an executor with a runner of its own leaves runners: unpicked
+    expect(picks(await config("runners: { person: tmux }\n")).filter((p) => p.slot === "runners")).toEqual([{ slot: "runners", noun: "runner", name: "headless", at: "executors.claude.runner" }]);
   });
 
   test("an installed plugin fills a slot the bundled ones do not", async () => {

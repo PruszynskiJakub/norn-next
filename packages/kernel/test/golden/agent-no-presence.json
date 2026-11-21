@@ -557,7 +557,7 @@
         "unit": "gh-140",
         "step": "refine",
         "since": "2026-11-17T09:00:00.000Z",
-        "text": "step 'refine' is attended: person, but executor 'claude' runs where no person can sit beside it; bind the step to an executor whose runner has presence, or set runners.person to one (herdr)"
+        "text": "step 'refine' is attended: person, but executor 'claude' runs in a runner without presence, where nobody could work beside its agent: give it one with presence (norn config set executors.claude.runner herdr), or bind the step to an executor that has one"
       },
       "intent": {
         "id": "01JD5G0000C73G79TPA9EMCVD5",
@@ -707,7 +707,7 @@
         "unit": "gh-141",
         "step": "refine",
         "since": "2026-11-17T09:00:00.000Z",
-        "text": "step 'refine' is attended: person, but executor 'claude' runs where no person can sit beside it; bind the step to an executor whose runner has presence, or set runners.person to one (herdr)"
+        "text": "step 'refine' is attended: person, but executor 'claude' runs in a runner without presence, where nobody could work beside its agent: give it one with presence (norn config set executors.claude.runner herdr), or bind the step to an executor that has one"
       },
       "intent": {
         "id": "01JD5G0000FWPMF8ZZQPVMTVA7",

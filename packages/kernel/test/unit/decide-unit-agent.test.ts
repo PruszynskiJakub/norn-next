@@ -116,9 +116,12 @@ describe("a ready agent step", () => {
     for (const requested of [undefined, { by: "ann", at: NOW }]) {
       const d = kindOf(decideCase({ state: stateAt("build", requested ? { requested } : {}, wf), workflows: [wf], executors: headless }), "park");
       expect(d).toMatchObject({ rule: "agent.no_presence", inbox: { kind: "stuck" } });
-      expect(d.inbox?.text).toContain("claude");
-      expect(d.inbox?.text).toContain("runners.person");
+      expect(d.inbox?.text).toContain("norn config set executors.claude.runner herdr");
     }
+    // an executor that runs in the runner runners.person picks is fixed there
+    const bound = loaded(graph({ build: { agent: agentSpec({ attended: "person", role: "builder" }) } }));
+    const d = kindOf(decideCase({ state: stateAt("build", {}, bound), workflows: [bound], executors: { "deep@person": caps({ attended: false }) }, config: { bind: { builder: ["deep"] } } }), "park");
+    expect(d.inbox?.text).toContain("norn config set runners.person herdr");
   });
 
   test("auto mode on an executor that cannot run headless waits for a person", () => {

@@ -9,6 +9,7 @@
  */
 import { RUN_ENV } from "@norn/plugin-api";
 import { installSkills, REPO_WORKFLOWS_DIR, repoFileOf, repoSkills, type RuntimeEnv, SKILLS_DIR, shellQuote } from "@norn/runtime";
+import { runnerPicks } from "./config/derive.ts";
 import { problemText } from "./config/load.ts";
 import type { NornConfig } from "./config/schema.ts";
 import type { CliContext } from "./context.ts";
@@ -59,8 +60,8 @@ export function toolsNeeded(config: NornConfig | null): Array<{ tool: string; wh
   const uses = [config.tracker.use, config.forge.use];
   if (uses.includes("github")) out.push({ tool: "gh", why: "the github tracker or forge calls the GitHub CLI", install: "install the GitHub CLI (https://cli.github.com) and run gh auth login" });
   const executors = Object.values(config.executors);
-  if (executors.some((e) => (typeof e.runner === "string" ? e.runner : e.runner.use) === "herdr"))
-    out.push({ tool: "herdr", why: "an executor runs in the herdr runner", install: "install herdr, or norn config set executors.<name>.runner headless" });
+  const herdr = runnerPicks(config).find((r) => r.name === "herdr");
+  if (herdr) out.push({ tool: "herdr", why: "an executor runs in the herdr runner", install: `install herdr, or norn config set ${herdr.at.replace(/^executors\.[^.]+\./, "executors.<name>.")} headless` });
   if (executors.some((e) => e.harness === "claude")) out.push({ tool: "claude", why: "an executor runs the claude harness", install: "install Claude Code (https://claude.com/claude-code)" });
   if (executors.some((e) => e.harness === "pi")) out.push({ tool: "pi", why: "an executor runs the pi harness", install: "install the pi coding agent (https://pi.dev), or norn config set executors.<name>.harness claude" });
   return out;

@@ -57,15 +57,19 @@ function matchExecutor(v: UnitView, spec: AgentStepSpec, executor: string): Matc
   const target = capsOf(v, byAttendance) ? byAttendance : executor;
   const caps = capsOf(v, target);
   const runsElsewhere = Object.keys(v.ctx.facts.capabilities.executors).some((k) => k.startsWith(`${executor}@`));
+  const fixPresence = `set runners.person to a runner with presence (norn config set runners.person herdr)`;
   if (!caps && runsElsewhere && spec.attended === "person")
-    return { ok: false, rule: "agent.no_presence", text: `step '${v.state.step}' is attended: person, but executor '${executor}' has no runner for it: set runners.person to a runner with presence (herdr)` };
+    return { ok: false, rule: "agent.no_presence", text: `step '${v.state.step}' is attended: person, but no runner is set for it to run executor '${executor}' in: ${fixPresence}` };
   if (!caps && runsElsewhere) return { ok: false, rule: "agent.no_executor", text: `executor '${executor}' has no runner for attended: ${spec.attended}: set runners.${spec.attended}` };
   if (!caps) return { ok: false, rule: "agent.no_executor", text: `executor '${executor}' is not configured` };
   if (spec.attended === "person" && !caps.attended)
     return {
       ok: false,
       rule: "agent.no_presence",
-      text: `step '${v.state.step}' is attended: person, but executor '${target}' runs where no person can sit beside it; bind the step to an executor whose runner has presence, or set runners.person to one (herdr)`,
+      text:
+        target === executor
+          ? `step '${v.state.step}' is attended: person, but executor '${executor}' runs in a runner without presence, where nobody could work beside its agent: give it one with presence (norn config set executors.${executor}.runner herdr), or bind the step to an executor that has one`
+          : `step '${v.state.step}' is attended: person, but runners.person runs executor '${executor}' without presence, where nobody could work beside its agent: ${fixPresence}`,
     };
   const guardless = unguardedText(v, spec, target, caps);
   if (guardless) return { ok: false, rule: "agent.unguarded", text: guardless };

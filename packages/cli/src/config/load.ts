@@ -75,6 +75,9 @@ function crossProblems(config: NornConfig): { executor: string; problems: Config
     problems.push({ layer: "merged", path: "/executor", message: `names ${config.executor}, which is not under \`executors\` (${names.join(", ")})` });
     executor = "";
   }
+  for (const [key, bound] of Object.entries(config.bind ?? {}))
+    for (const name of typeof bound === "string" ? [bound] : bound)
+      if (!names.includes(name)) problems.push({ layer: "merged", path: `/bind/${key}`, message: `names ${name}, which is not under \`executors\` (${names.join(", ")})` });
   return { executor, problems };
 }
 

@@ -607,6 +607,13 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `executors.<name>.model` | string | none |
 | `executors.<name>.args` | list of strings | none |
 | `executor` | string | derived: the only executor |
+| `runners.person` | string or map | derived: none, so an attended step parks until one with presence (herdr) is set |
+| `runners.person.use` | string | none |
+| `runners.agent` | string or map | `"headless"` |
+| `runners.agent.use` | string | none |
+| `runners.none` | string or map | `"headless"` |
+| `runners.none.use` | string | none |
+| `bind.<role>` | string or list of strings | none |
 | `packs` | list of strings (one) | `["sdlc"]` |
 | `plugins.<name>` | string | none |
 | `base` | string | `"main"` |
@@ -632,7 +639,7 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `checks.<name>` | string | derived: `checks.test` is "bun test", which the shipped workflows' test steps run; init detects the repo's own |
 | `sources.<name>` | string | none |
 
-Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner` take the keys of the plugin they name; that plugin checks them.
+Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner`, `runners.person`, `runners.agent`, `runners.none` take the keys of the plugin they name; that plugin checks them.
 
 ### Shipped workflows
 

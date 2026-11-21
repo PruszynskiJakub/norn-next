@@ -81,7 +81,7 @@ function typeName(s: Schema): string {
 }
 
 /** Keys that open a map: a record's keys are names a person picks, shown as a placeholder. */
-const RECORD_KEY: Record<string, string> = { executors: "<name>", plugins: "<name>", checks: "<name>", sources: "<name>" };
+const RECORD_KEY: Record<string, string> = { executors: "<name>", plugins: "<name>", checks: "<name>", sources: "<name>", bind: "<role>" };
 
 /**
  * Every key a config file can hold, walked from the file's schema: a map's own keys nest
@@ -129,6 +129,9 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   base_ref: { derived: "the remote's fetched copy of `base` (`origin/main`), else `base`" },
   holder: { derived: "user@ the machine's LocalHostName, else its hostname, fixed in `~/.norn/holder.json` on first use" },
   executor: { derived: "the only executor" },
+  "runners.person": { derived: "none, so an attended step parks until one with presence (herdr) is set" },
+  "runners.agent": "headless",
+  "runners.none": "headless",
   "tracker.intake.assignee": "me",
   "kernel.mode": d.mode,
   "kernel.workflow": d.workflow,

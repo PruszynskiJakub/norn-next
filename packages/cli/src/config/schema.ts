@@ -34,7 +34,25 @@ export const TrackerSlot = Type.Object({ use: Name, intake: Intake }, open);
 export const RunnerChoice = Type.Union([Name, Slot]);
 /** the agent's extra arguments; they replace the harness's defaults whole (claude's are `--permission-mode auto`) */
 const AgentArgs = Type.Array(NonEmpty);
-export const Executor = Type.Object({ harness: Name, runner: RunnerChoice, model: Type.Optional(NonEmpty), args: Type.Optional(AgentArgs) }, closed);
+/**
+ * An executor: a harness and the model it runs, on this machine and its accounts. Its runner is the one
+ * `runners` picks for each step's attendance, unless it names one of its own, which then runs every step.
+ */
+export const Executor = Type.Object({ harness: Name, runner: Type.Optional(RunnerChoice), model: Type.Optional(NonEmpty), args: Type.Optional(AgentArgs) }, closed);
+
+/**
+ * The runner an executor without one of its own runs in, by who stays beside the step's agent: the
+ * person (a runner with presence, such as herdr), a supervisor, or nobody. Absent: headless for agent and
+ * none, and none for person, so an attended step parks until one is set.
+ */
+export const Runners = Type.Object({ person: Type.Optional(RunnerChoice), agent: Type.Optional(RunnerChoice), none: Type.Optional(RunnerChoice) }, closed);
+export const DEFAULT_RUNNERS = { agent: "headless", none: "headless" } as const;
+
+/**
+ * An agent role, or a workflow's step as `<workflow>.<step>`, to the executor it runs on, or a list
+ * tried in order: the first that can run the step does. A step's binding outranks its role's.
+ */
+export const Bind = Type.Record(Name, Type.Union([Name, Type.Array(Name, { minItems: 1, uniqueItems: true })]), closed);
 
 export const Counters = Type.Object(
   {
@@ -87,8 +105,12 @@ export const NornConfig = Type.Object(
     store: Slot,
     vcs: Slot,
     executors: Type.Record(Name, Executor, { minProperties: 1 }),
-    /** the executor an agent step runs on when it names none; absent: the only executor */
+    /** the executor an agent step runs on when it names none and `bind` binds neither its step nor its role; absent: the only executor */
     executor: Type.Optional(Name),
+    /** the runner each attendance picks for an executor without its own */
+    runners: Type.Optional(Runners),
+    /** which executors each agent role, or one workflow's step, runs on */
+    bind: Type.Optional(Bind),
     /** the workflows' pack; one for now, as the runtime loads a single pack */
     packs: Type.Array(Name, { minItems: 1, maxItems: 1 }),
     /** non-bundled plugins by name: the spec `norn plugin add` installs */
@@ -133,6 +155,10 @@ export const ConfigLayer = Type.Object(
       ),
     ),
     executor: Type.Optional(Name),
+    runners: Type.Optional(
+      Type.Object({ person: Type.Optional(Type.Union([Name, partial(Slot, "open")])), agent: Type.Optional(Type.Union([Name, partial(Slot, "open")])), none: Type.Optional(Type.Union([Name, partial(Slot, "open")])) }, closed),
+    ),
+    bind: Type.Optional(Bind),
     packs: Type.Optional(Type.Array(Name, { minItems: 1, maxItems: 1 })),
     plugins: Type.Optional(Type.Record(Name, NonEmpty)),
     base: Type.Optional(NonEmpty),

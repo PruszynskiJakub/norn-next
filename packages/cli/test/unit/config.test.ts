@@ -206,6 +206,37 @@ describe("the runtime config derived from the person's", () => {
     expect(found.map((p) => `${p.layer} ${p.path}`)).toEqual(["repo /executors/claude/args"]);
   });
 
+  test("an executor without a runner of its own runs under one name per attendance, in the runner runners: picks, headless for agent and none unless set", async () => {
+    const BARE = LOCAL_CONFIG.replace("claude: { harness: claude, runner: headless }", "deep: { harness: claude, model: opus }");
+    const plain = runtimeConfigOf(await loaded({ local: BARE }), "me@box");
+    expect(plain.executors).toEqual({
+      "deep@agent": { name: "claude", runner: { name: "headless" }, model: "opus" },
+      "deep@none": { name: "claude", runner: { name: "headless" }, model: "opus" },
+    });
+    expect(plain.kernel.executor).toBe("deep");
+    const panes = runtimeConfigOf(await loaded({ local: `${BARE}runners: { person: herdr, none: { use: headless, kill_grace_ms: 500 } }\n` }), "me@box");
+    expect(panes.executors).toEqual({
+      "deep@person": { name: "claude", runner: { name: "herdr" }, model: "opus" },
+      "deep@agent": { name: "claude", runner: { name: "headless" }, model: "opus" },
+      "deep@none": { name: "claude", runner: { name: "headless", config: { kill_grace_ms: 500 } }, model: "opus" },
+    });
+    // an executor that names its runner keeps it, whatever runners: says
+    const own = runtimeConfigOf(await loaded({ local: `${LOCAL_CONFIG}runners: { person: herdr }\n` }), "me@box");
+    expect(own.executors).toEqual({ claude: { name: "claude", runner: { name: "headless" } } });
+    expect((await problems({ local: `${BARE}runners: { everyone: herdr }\n` })).map((p) => `${p.path} ${p.message}`)).toEqual(["/runners unknown property 'everyone'"]);
+  });
+
+  test("bind: maps an agent role or a workflow's step to an executor or a fallback list, each one configured", async () => {
+    const two = `${LOCAL_CONFIG}  other: { harness: pi, runner: headless }\nexecutor: claude\n`;
+    const c = await loaded({ local: `${two}bind: { builder: [other, claude], reviewer: other, story.review: claude }\n` });
+    expect(runtimeConfigOf(c, "me@box").kernel.bind).toEqual({ builder: ["other", "claude"], reviewer: ["other"], "story.review": ["claude"] });
+    expect(runtimeConfigOf(await loaded({ local: two }), "me@box").kernel.bind).toBeUndefined();
+    expect((await problems({ local: `${two}bind: { builder: [other, codex] }\n` })).map((p) => `${p.layer} ${p.path} ${p.message}`)).toEqual([
+      "merged /bind/builder names codex, which is not under `executors` (claude, other)",
+    ]);
+    expect([...new Set((await problems({ local: `${two}bind: { builder: [] }\n` })).map((p) => p.path))]).toEqual(["/bind/builder"]);
+  });
+
   test("an executor key no harness reads is a config error rather than a setting ignored", async () => {
     const found = await problems({ user: LOCAL_CONFIG, repo: "executors: { claude: { effort: high } }\n" });
     expect(found.map((p) => `${p.layer} ${p.path} ${p.message}`)).toEqual(["repo /executors/claude unknown property 'effort'"]);
@@ -319,6 +350,16 @@ describe("writing a config file", () => {
     expect(setKeyInText(text, "kernel.mode", "auto")).toBe("# mine\nformat: 1\nbase: main # trunk soon\nkernel:\n  mode: auto\n");
     expect(setKeyInText(null, "base", "dev")).toBe("format: 1\nbase: dev\n");
     expect(setKeyInText("format: 1\nbase: dev\n", "base", undefined)).toBe("format: 1\n");
+  });
+
+  test("a bind: key names a workflow's step with a dot, which a dotted key keeps whole", async () => {
+    expect(setKeyInText("format: 1\n", "bind.story.review", "deep")).toBe("format: 1\nbind:\n  story.review: deep\n");
+    const c = await loaded({ local: LOCAL_CONFIG });
+    const r = planSet(c, LOCAL_CONFIG, "local", "bind.story.review", "claude");
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    expect(getKey(r.next.config, "bind.story.review")).toBe("claude");
+    const bad = planSet(c, LOCAL_CONFIG, "local", "bind.story.review", "codex");
+    expect(bad.ok ? [] : bad.problems.map((p) => p.path)).toEqual(["/bind/story.review"]);
   });
 
   test("a set that would break the config is refused before anything is written", async () => {
