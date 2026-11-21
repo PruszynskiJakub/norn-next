@@ -68,7 +68,7 @@ describe("a changed repo workflow is held for the person's confirmation", () => 
     const wider = ship({ review: "{ by: reviewer, do: Review it., outcomes: { approve: ready, changes_requested: { to: build, max: 2 } } }" });
     const env = envWith({ "ship.yaml": wider });
     expect(loaded(env, "ship").pinned.hash).toBe(packShip.pinned.hash);
-    expect(env.held.ship?.changes).toEqual(["step review: allow [docs:write] → [code:write]"]);
+    expect(env.held.ship?.changes).toEqual(["step review: allow [docs:write] → its role's"]);
     expect(env.held.ship?.running).toEqual({ hash: packShip.pinned.hash, from: "pack" });
     expect(env.held.ship?.current.pinned.hash).not.toBe(packShip.pinned.hash);
     const gate = envWith({ "ship.yaml": ship({ ready: "{ by: person, do: Merge whenever., outcomes: { approve: merge, reject: { to: build, max: 2 } } }" }) });
@@ -86,7 +86,7 @@ describe("a changed repo workflow is held for the person's confirmation", () => 
     expect(envWith({ "ship.yaml": wider.replace("Build it.", "Build it well.") }, confirmed).held).toEqual({});
     // back to the pack's own allow: still changes what the person confirmed, so it is held on their revision
     const back = envWith({ "ship.yaml": ship().replace("Build it.", "Build it well.") }, confirmed);
-    expect(back.held.ship?.changes).toEqual(["step review: allow [code:write] → [docs:write]"]);
+    expect(back.held.ship?.changes).toEqual(["step review: allow its role's → [docs:write]"]);
     expect(loaded(back, "ship").pinned.hash).toBe(current.pinned.hash);
     // and so is the repo's file removed, which leaves the pack's
     expect(envWith({}, confirmed).held.ship?.running).toEqual({ hash: current.pinned.hash, from: "confirmed" });

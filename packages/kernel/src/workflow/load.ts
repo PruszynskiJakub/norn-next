@@ -54,6 +54,8 @@ export interface LoadWorkflowOptions {
    * the shipped pack's. A pinned revision already holds its role, so loading it needs none.
    */
   roles?: readonly string[];
+  /** each role → the capabilities it may be granted; a step's `allow:` asking for more is refused. Absent: only unknown capabilities are */
+  roleAllow?: Readonly<Record<string, readonly string[]>>;
   /**
    * Check the floor (`floorErrors`): `delegated` names the gates of this workflow a policy grant lets a
    * stand-in decide. Left out for a pinned revision, which must load to its hash whatever the policy
@@ -90,7 +92,7 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
   const written: WorkflowFile = lifted.doc;
   const signals: Record<string, SignalDeclaration> = { ...opts.signals, ...BUILTIN_SIGNALS };
   const byKeys = schema.value.signals !== undefined || schema.value.entries !== undefined;
-  const flat = flatten(written, opts.sharedFiles, { stepKinds: opts.stepKinds, signals, ...(opts.roles && { roles: opts.roles }) });
+  const flat = flatten(written, opts.sharedFiles, { stepKinds: opts.stepKinds, signals, ...(opts.roles && { roles: opts.roles }), ...(opts.roleAllow && { roleAllow: opts.roleAllow }) });
   if (!flat.ok) return byKeys ? fail(flat.errors.map(inWorkflowKeys)) : flat;
   const { steps: flatSteps, included } = flat.flat;
   const inShared = (e: WorkflowError): WorkflowError => {
@@ -344,6 +346,7 @@ function agentSpec(s: WorkflowStepDoc, d: NonNullable<WorkflowDocument["defaults
     executor: s.by ?? null,
     ...(s.model !== undefined && { model: s.model }),
     ...(s.role !== undefined && { role: s.role }),
+    ...(s.allow !== undefined && { allow: [...s.allow] }),
     attended: s.attended === true ? "person" : s.attended === "agent" ? "agent" : "none",
     criteria: s.criteria === "required",
     hand_back: { ...(s.hand_back ?? {}) },

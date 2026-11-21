@@ -39,7 +39,7 @@ const OVERRIDABLE: readonly string[] = OVERRIDABLE_OUTCOMES;
 
 /** The keys beside its head each built-in kind takes; a plugin kind takes `description`, `outcomes` and its configSchema's keys, and `on` when it waits. */
 const KEYS_OF: Readonly<Record<string, readonly string[]>> = {
-  agent: ["description", "outcomes", "means", "verdict", "skills", "inputs", "produces", "attended", "role", "by", "model", "criteria", "hand_back", "writes", "deadline", "nudges", "retries"],
+  agent: ["description", "outcomes", "means", "verdict", "skills", "inputs", "produces", "attended", "role", "allow", "by", "model", "criteria", "hand_back", "writes", "deadline", "nudges", "retries"],
   check: ["description", "outcomes", "timeout", "exits"],
   gate: ["description", "outcomes", "on"],
   slices: ["description", "outcomes"],

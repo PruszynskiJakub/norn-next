@@ -24,7 +24,6 @@ steps:
     by: reviewer
     do: "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch."
     with: { skills: [norn-review] }
-    allow: [docs:write]
     reads: [slice, spec, diff, findings?]
     outcomes:
       approve:

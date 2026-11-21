@@ -15,6 +15,7 @@ import { type ExecutorCapabilities, launchTarget } from "../model/capabilities.t
 import type { ClassifiedOutcome } from "../model/receipts.ts";
 import type { RunInfo } from "../model/run-state.ts";
 import type { SessionFacts } from "../session/view.ts";
+import { codeLevelOf, docsOnlyGrant, grantOf } from "../model/grant.ts";
 import type { AgentStepSpec } from "../workflow/graph.ts";
 import { ageMs, applyDecision, intentFor, noop, parkDecision, type UnitView } from "./unit-support.ts";
 
@@ -104,6 +105,7 @@ export function decideAgent(v: UnitView, spec: AgentStepSpec): Decision {
 }
 
 function briefOf(v: UnitView, spec: AgentStepSpec) {
+  const grant = grantOf(spec, v.ctx.config);
   return {
     workflow: v.state.workflow.name,
     hash: v.state.workflow.hash,
@@ -113,13 +115,17 @@ function briefOf(v: UnitView, spec: AgentStepSpec) {
     inputs: structuredClone(spec.inputs),
     ...(spec.model !== undefined && { model: spec.model }),
     ...(v.state.rework_from !== undefined && { rework_from: v.state.rework_from }),
+    ...(grant !== null && { grant }),
   };
 }
 
 /** A docs-only step is held by the write guard alone: on a harness that cannot deny a tool it would run unguarded, so no agent starts, fresh or retried. */
 function unguardedText(v: UnitView, spec: AgentStepSpec, executor: string, caps: ExecutorCapabilities): string | null {
-  if (spec.writes !== "docs" || caps.denyTool) return null;
-  return `step '${v.state.step}' is writes: docs, but executor '${executor}' cannot deny a tool, so its writes would go unguarded; run it on an executor whose harness can (by:)`;
+  if (caps.denyTool) return null;
+  if (spec.writes === "docs") return `step '${v.state.step}' is writes: docs, but executor '${executor}' cannot deny a tool, so its writes would go unguarded; run it on an executor whose harness can (by:)`;
+  const grant = grantOf(spec, v.ctx.config);
+  if (!docsOnlyGrant(grant)) return null;
+  return `step '${v.state.step}' may change no code (code:${codeLevelOf(grant)}), but executor '${executor}' cannot deny a tool, so its writes would go unguarded; bind the step to an executor whose harness can (bind:)`;
 }
 
 function unguarded(v: UnitView, spec: AgentStepSpec, executor: string, caps: ExecutorCapabilities): Decision | null {

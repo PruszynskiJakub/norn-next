@@ -95,6 +95,7 @@ export function kernelConfigOf(config: NornConfig, executor: string): KernelConf
     claimTtlMs: k.claim_ttl ? durationMs(k.claim_ttl) : d.claimTtlMs,
     claimRenewBeforeMs: k.claim_renew_before ? durationMs(k.claim_renew_before) : d.claimRenewBeforeMs,
     ...(config.sources !== undefined && Object.keys(config.sources).length > 0 && { sources: { ...config.sources } }),
+    ...(config.policy?.capabilities !== undefined && { capabilities: [...config.policy.capabilities] }),
     ...(config.bind !== undefined && Object.keys(config.bind).length > 0 && { bind: Object.fromEntries(Object.entries(config.bind).map(([k, b]) => [k, typeof b === "string" ? [b] : [...b]])) }),
   };
 }

@@ -4,6 +4,7 @@
  */
 import { Mode, NonEmpty, PosInt } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
+import { CapabilitySchema } from "./grant.ts";
 
 const closed = { additionalProperties: false } as const;
 const Count = Type.Integer({ minimum: 0 });
@@ -40,6 +41,14 @@ export const KernelConfig = Type.Object(
      * a tool when the step writes only docs. A step's binding outranks its role's. Absent: none.
      */
     bind: Type.Optional(Type.Record(NonEmpty, Type.Array(NonEmpty, { minItems: 1 }))),
+    /**
+     * Each agent role the pack registers → the capabilities it may be granted, which a step's `allow:`
+     * narrows and `capabilities` caps into the step's grant. Absent: no step is narrowed, as for a step
+     * in the older form; a role this registry lacks grants nothing.
+     */
+    roles: Type.Optional(Type.Record(NonEmpty, Type.Array(CapabilitySchema))),
+    /** the capabilities the person's policy lets any step be granted (`policy.capabilities`); absent: every one */
+    capabilities: Type.Optional(Type.Array(CapabilitySchema)),
     /** the workflow a story takes at intake when its item names none */
     workflow: NonEmpty,
     /**

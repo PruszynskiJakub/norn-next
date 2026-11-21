@@ -5,7 +5,7 @@
  * key its plugin registers, so registry lookups, derived counter names (`<step>.<outcome>`) and
  * `reset_on` keep one dot, and a pin's hash never depends on which form a file used.
  */
-import { BUILTIN_STEP_KINDS, type SignalDeclaration, STEP_KEYS, STEP_KEYWORDS } from "@norn/plugin-api";
+import { BUILTIN_STEP_KINDS, CAPABILITIES, type SignalDeclaration, STEP_KEYS, STEP_KEYWORDS } from "@norn/plugin-api";
 import { AGENT_ROLES, check } from "@norn/schema";
 import type { TSchema } from "@sinclair/typebox";
 import { ExitsDoc, SkillsDoc } from "./document.ts";
@@ -15,11 +15,10 @@ import type { StepKindInfo } from "./load.ts";
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** The capabilities `allow:` may ask for while the pinned document holds only `writes:`. */
-const CAPABILITIES: readonly string[] = ["code:write", "docs:write"];
+const KNOWN: readonly string[] = CAPABILITIES;
 
-/** The keys only the step form holds: one beside an older head key mixes the two forms. */
-const FORM_ONLY: readonly string[] = ["do", "with", "reads", "allow", "limits"];
+/** The keys only the step form holds: one beside an older head key mixes the two forms. `allow` is pinned as written, so a pinned step holds it too. */
+const FORM_ONLY: readonly string[] = ["do", "with", "reads", "limits"];
 const BUILTIN: readonly string[] = BUILTIN_STEP_KINDS;
 const KEYWORDS: readonly string[] = STEP_KEYWORDS;
 const KEYS: readonly string[] = STEP_KEYS;
@@ -51,6 +50,8 @@ export interface SurfaceNames {
   signals: Readonly<Record<string, SignalDeclaration>>;
   /** the agent roles the host registers that do a step; absent, the shipped pack's (`AGENT_ROLES`) */
   roles?: readonly string[];
+  /** each role → the capabilities it may be granted, which `allow:` narrows; absent, `allow:` is checked only against the known capabilities */
+  roleAllow?: Readonly<Record<string, readonly string[]>>;
 }
 
 type Lowered = { step: Obj } | { errors: WorkflowError[] };
@@ -90,14 +91,14 @@ export function lowerActor(name: string, step: Obj, names: SurfaceNames): Lowere
   if (by === "person") return person(name, step, names);
   if (by === "shell") return shell(name, step);
   if (by.includes(".")) return stepKind(name, step, by, names);
-  if (roles.includes(by)) return agent(name, step, by);
+  if (roles.includes(by)) return agent(name, step, by, names.roleAllow?.[by]);
   const bare = Object.hasOwn(names.stepKinds, by) ? names.stepKinds[by] : undefined;
   const ns = bare && namespaceOf(bare);
   if (bare) return refused(`${at}/by`, ns ? `\`${by}\` is a step kind: name it \`${ns}.${by}\`` : `\`${by}\` is a step kind its host names no namespace for: write the step with the head key \`${by}:\``);
   return refused(`${at}/by`, `\`${by}\` is not an actor: name an agent role (${roles.join(", ")}), person, shell, or a step kind as <namespace>.<kind>`);
 }
 
-function agent(name: string, step: Obj, role: string): Lowered {
+function agent(name: string, step: Obj, role: string, baseline: readonly string[] | undefined): Lowered {
   const at = `/steps/${name}`;
   const errors = onlyKeys(name, step, "agent", ["by", "do", "with", "reads", "produces", "allow", "attended", "limits", "outcomes", "description"]);
   // the role is pinned, as the config's bind: maps it to an executor on each tick
@@ -112,9 +113,14 @@ function agent(name: string, step: Obj, role: string): Lowered {
   if (step.reads !== undefined) out.inputs = step.reads;
   if (Array.isArray(step.allow)) {
     step.allow.forEach((c, i) => {
-      if (!CAPABILITIES.includes(String(c))) errors.push({ path: `${at}/allow/${i}`, message: `\`${String(c)}\` is not a capability a step may ask for: name ${CAPABILITIES.join(" or ")}` });
+      const path = `${at}/allow/${i}`;
+      if (!KNOWN.includes(String(c))) errors.push({ path, message: `\`${String(c)}\` is not a capability a step may ask for: name one of ${KNOWN.join(", ")}` });
+      else if (baseline !== undefined && !baseline.includes(String(c)))
+        errors.push({ path, message: `role ${role} may not be granted \`${String(c)}\`: allow: narrows a role's capabilities (${baseline.join(", ") || "none"}), never widens them` });
     });
-    // asking for no code write narrows the agent to the story's documents
+    // pinned as written: the grant is decided each tick from the role, this list and the policy
+    out.allow = step.allow;
+    // asking for no code write narrows the agent to the story's documents, as the hook guard holds it
     if (!step.allow.includes("code:write")) out.writes = "docs";
   }
   // person keeps the older form's pin, and none is the pin's default

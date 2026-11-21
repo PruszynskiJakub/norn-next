@@ -50,7 +50,6 @@ steps:
       merge of its parents, a base change the resolver dropped included. Judge whether it keeps the intent
       of both sides. Report `redescribe` when the merge danger pr.md describes no longer holds.
     with: { skills: [norn-review] }
-    allow: [docs:write]
     reads: [spec, resolution]
     outcomes:
       approve:

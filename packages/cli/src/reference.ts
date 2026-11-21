@@ -63,6 +63,8 @@ const patternProps = (s: Schema): Schema | undefined => Object.values((s.pattern
 function typeName(s: Schema): string {
   if (Array.isArray(s.anyOf)) {
     const branches = s.anyOf as Schema[];
+    // a long closed list is named by its title, and spelled out where the title is explained
+    if (branches.every((b) => "const" in b) && typeof s.title === "string") return s.title;
     if (branches.every((b) => "const" in b)) return branches.map((b) => `\`${JSON.stringify(b.const)}\``).join(" or ");
     return branches.map(typeName).join(" or ");
   }
@@ -74,7 +76,8 @@ function typeName(s: Schema): string {
   if (s.type === "array") {
     const items = s.items as Schema;
     const one = typeof s.maxItems === "number" && s.maxItems === 1 ? " (one)" : "";
-    return `list of ${typeName(items)}s${one}`;
+    const item = typeName(items);
+    return `list of ${item.endsWith("y") ? `${item.slice(0, -1)}ies` : `${item}s`}${one}`;
   }
   if (s.type === "object") return "map";
   return "any";
@@ -147,6 +150,7 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   "trace.retain": durationText(DEFAULT_TRACE_RETAIN_MS),
   "policy.stand_in.attended": { derived: "none: no step's presence is taken by a stand-in" },
   "policy.stand_in.gates": { derived: "none: every gate is the person's" },
+  "policy.capabilities": { derived: "none: every capability a role names may be granted" },
   "checks.<name>": { derived: `\`checks.test\` is ${JSON.stringify(DEFAULT_CHECKS.test)}, which the shipped workflows' test steps run; init detects the repo's own` },
   "kernel.counters.check_fail": d.counterDefaults.checkFail,
   "kernel.counters.gate_reject": d.counterDefaults.gateReject,

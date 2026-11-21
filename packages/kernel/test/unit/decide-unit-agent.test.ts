@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { Capability } from "@norn/plugin-api";
 import { caps, decideCase, graph, agentSpec, kindOf, loaded, minutesAgo, minutesAhead, receipt, run, session, stateAt, NOW } from "./decide-unit-fixtures.ts";
 
 describe("a ready agent step", () => {
@@ -580,5 +581,33 @@ describe("an answer to a session that cannot take it", () => {
       const d = kindOf(decideCase({ ...c, receipts: answered }), "apply_receipts");
       expect([d.rule, d.undelivered]).toEqual(["receipts.apply", undefined]);
     }
+  });
+});
+
+describe("the effective grant", () => {
+  const roles: Record<string, Capability[]> = { builder: ["code:write", "docs:write", "exec:any"], reviewer: ["code:read", "docs:write", "exec:checks", "out:findings"], qa: ["code:scratch", "exec:any"] };
+  const roleStep = (role: string, over: Parameters<typeof agentSpec>[0] = {}) => loaded(graph({ build: { agent: agentSpec({ role, ...over }) } }));
+
+  test("a step that names a role is briefed and launched with its role's capabilities, narrowed by allow: and capped by the policy", () => {
+    const wf = roleStep("builder", { allow: ["code:write", "exec:any"] });
+    const d = kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf], config: { roles, capabilities: ["code:write", "docs:write"] } }), "start_run");
+    expect(d.brief.grant).toEqual(["code:write"]);
+    const retry = kindOf(decideCase({ state: stateAt("build", { run: run() }, wf), workflows: [wf], session: session("ended"), config: { roles } }), "retry_run");
+    expect(retry.brief.grant).toEqual(["code:write", "exec:any"]);
+  });
+
+  test("a step in the older form, or a host with no role registry, is briefed with no grant", () => {
+    expect(kindOf(decideCase({ state: stateAt("build"), config: { roles } }), "start_run").brief.grant).toBeUndefined();
+    const wf = roleStep("builder");
+    expect(kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf] }), "start_run").brief.grant).toBeUndefined();
+  });
+
+  test("a grant that may only read code is held by the write guard, so a harness that cannot deny a tool parks it", () => {
+    const wf = roleStep("reviewer");
+    const d = kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf], executors: { claude: caps({ denyTool: false }) }, config: { roles } }), "park");
+    expect(d.rule).toBe("agent.unguarded");
+    expect(d.inbox?.text).toContain("may change no code (code:read)");
+    const scratch = roleStep("qa");
+    expect(decideCase({ state: stateAt("build", {}, scratch), workflows: [scratch], executors: { claude: caps({ denyTool: false }) }, config: { roles } })?.rule).toBe("agent.start");
   });
 });

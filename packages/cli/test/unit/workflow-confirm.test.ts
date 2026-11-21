@@ -23,13 +23,13 @@ const repoWith = (files: Record<string, string>) =>
 const workflowsCheck = async (m: ReturnType<typeof repoWith>) =>
   (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; ok: boolean; warning?: string; do_instead?: string }>).find((c) => c.name === "workflows");
 
-/** The pack's file with its first `allow: [docs:write]` dropped: a repo copy that lets its reviewer write the code. */
+/** The pack's file with its first review run by a builder: a repo copy that lets its review write the code. */
 const widened = (file: string): string => {
   const text = SDLC_PACK.workflows[file] as string;
-  if (!text.includes("    allow: [docs:write]\n")) throw new Error(`${file} has no allow: [docs:write] to drop`);
-  return text.replace("    allow: [docs:write]\n", "");
+  if (!text.includes("    by: reviewer\n")) throw new Error(`${file} has no reviewer to widen`);
+  return text.replace("    by: reviewer\n", "    by: builder\n");
 };
-const HELD_QUICK = "workflow quick is held for the person's confirmation (step review: allow [docs:write] → [code:write]); new rounds run the pack's revision, not the repo's file: a person runs norn workflow confirm quick";
+const HELD_QUICK = "workflow quick is held for the person's confirmation (step review: by reviewer → builder); new rounds run the pack's revision, not the repo's file: a person runs norn workflow confirm quick";
 
 describe("a repo copy of a pack workflow held on upgrade is impossible to miss", () => {
   test("every tick says new rounds run the pack's revision, and watch says it once", async () => {

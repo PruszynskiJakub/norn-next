@@ -43,7 +43,6 @@ steps:
     by: reviewer
     do: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
     with: { skills: [norn-review] }
-    allow: [docs:write]
     reads: [spec, diff, findings?]
     outcomes:
       approve:

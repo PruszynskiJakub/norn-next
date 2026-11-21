@@ -4,6 +4,7 @@
  * harness-neutral, so every harness gets the same text and the CLI's `brief` prints exactly what a
  * launch sent.
  */
+import type { Capability } from "@norn/plugin-api";
 import { type HandBack, OUT_ENV, type ReportName, REPORT_TYPES, reportPath, type Verdict } from "@norn/schema";
 import type { BriefInputs } from "../model/actions.ts";
 
@@ -129,14 +130,63 @@ export function renderStepReminder(input: ReportHintInput): string {
   return `norn: this session works step ${input.step} of ${input.unit}. Report exactly once: ${reportWays(input, c)}. Run \`${c.brief}\` for the rest.`;
 }
 
+const NO_REMOTE = "Never `git push`, never switch branches or worktrees, and never change the remote (a pull request, an issue, a comment): only norn does, under a receipt.";
+const GRANTED_REMOTE = "Never `git push`, never switch branches or worktrees, and change nothing on the remote beyond what your grant names: the rest only norn does, under a receipt.";
+
 const RULES: readonly string[] = [
   "Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes.",
-  "Never `git push`, never switch branches or worktrees, and never change the remote (a pull request, an issue, a comment): only norn does, under a receipt.",
+  NO_REMOTE,
   "Never edit norn's run state (its data folder outside the worktree): a hand-edited file fails validation and makes the unit corrupt.",
   "Of the norn commands, run only the four this brief names; every other one is the person's.",
   "A subagent you start works under these rules though it never sees this brief: tell it the ones its work can break.",
   "A usage limit is not a reason to report stuck: it resets on its own, and the session continues after it.",
 ];
+
+/** What each capability lets a step do, as its Rules say it. */
+const CAPABILITY_RULES: Readonly<Record<Capability, string>> = {
+  "code:read":
+    "read the code and change none of it. norn notes the worktree, its commits and refs, the git config and hooks and the remote story branch when the run starts, and checks them again once you report: a tracked change, a commit, a moved ref or remote branch, or a changed git config or hook refuses `norn done`.",
+  "code:scratch":
+    "change the code only to try things out: norn resets it to where the run started once you report. A lockfile it resets without a word; any other tracked change or a commit refuses an outcome that passes the step, so nothing you stubbed can pass behind the reset.",
+  "code:write": "change the code the step needs, and commit it: only commits reach the next step.",
+  "docs:write": "write the story's documents in its spec folder and the handoff.",
+  "exec:checks": "run the repo's checks (tests, type checks, lints) and commands that only read; nothing that installs, publishes or reaches the network for anything else.",
+  "exec:any": "run any command the step needs, in this worktree.",
+  "out:criteria": `write the criteria report to \`$${OUT_ENV}\`.`,
+  "out:findings": `write findings to \`$${OUT_ENV}\`.`,
+  "out:evidence": `write evidence files to \`$${OUT_ENV}\`.`,
+  "tracker:comment": "comment on the story's item.",
+  "tracker:label": "label the story's item.",
+  "read:any": "read anything the story holds.",
+  answer: "answer the step agent's questions on the person's behalf, labelled as yours.",
+  "decide:granted": "decide the gates the person's policy grants you, citing the criteria you checked.",
+  escalate: "hand anything outside your grant to the person.",
+};
+
+/** The capabilities that change something on the remote, which lift the rule that only norn does. */
+const REMOTE_CAPABILITIES: readonly Capability[] = ["tracker:comment", "tracker:label"];
+
+function namedList(items: readonly string[]): string {
+  const named = items.map((s) => `\`${s}\``);
+  return named.length <= 1 ? (named[0] ?? "") : `${named.slice(0, -1).join(", ")} and ${named.at(-1)}`;
+}
+
+/** The Rules: a grant's own lines first, then the generic rules with the remote rule fitted to it. */
+function ruleLines(grant: readonly Capability[] | undefined): string[] {
+  if (grant === undefined) return [...RULES];
+  const named = grant.length === 0 ? "This step is granted nothing: it may only read." : `This step is granted ${namedList(grant)}, and nothing else.`;
+  const remote = grant.some((c) => REMOTE_CAPABILITIES.includes(c));
+  return [named, ...grant.map((c) => `\`${c}\`: ${CAPABILITY_RULES[c]}`), ...RULES.map((r) => (r === NO_REMOTE && remote ? GRANTED_REMOTE : r))];
+}
+
+/** The closing line on what becomes of the code, by what the grant lets the step keep. */
+function keepLine(grant: readonly Capability[] | undefined, c: BriefCommands): string {
+  if (grant === undefined || grant.includes("code:write"))
+    return `Commit your work before \`${c.done}\`: a done is refused while \`git status\` shows changes outside norn's own files, as only commits reach the next step.`;
+  if (grant.includes("code:scratch"))
+    return `Nothing you change in the code is kept: norn resets the worktree once you report, and \`${c.done}\` with an outcome that passes the step is refused while a tracked file other than a lockfile differs or a commit was made.`;
+  return `Leave the code as the run found it: \`${c.done}\` is refused while a tracked file outside norn's own differs, or a commit was made, since the run started.`;
+}
 
 function inputLine(input: BriefInputs["inputs"][number]): string {
   if (typeof input === "string") return `- \`${input}\``;
@@ -294,12 +344,12 @@ export function renderBrief(input: BriefRenderInput): string {
     );
   out.push("## Outputs", "", ...outputLines(input, c), "");
   if (input.history && input.history.length > 0) out.push("## History", "", "What this unit's steps did this round, oldest first:", "", ...input.history.map((l) => `- ${l}`), "");
-  out.push("## Rules", "", ...RULES.map((r) => `- ${r}`), "");
+  out.push("## Rules", "", ...ruleLines(b.grant).map((r) => `- ${r}`), "");
   out.push("## Finish with exactly one of", "", ...finishLines(input, c), "");
   out.push(
     "Report exactly once, from the worktree root, with the outcome whose meaning is true. A refused report says what to do instead: do exactly that, then report again. After a report succeeds, end your turn.",
     "",
-    `Commit your work before \`${c.done}\`: a done is refused while \`git status\` shows changes outside norn's own files, as only commits reach the next step.`,
+    keepLine(b.grant, c),
     "",
     `After a long session or a lost thread, run \`${c.brief}\` again: it is rendered from the unit's record each time.`,
     "",

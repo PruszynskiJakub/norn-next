@@ -3,7 +3,7 @@
  * has it), then merged over the defaults and checked whole. Any problem is a config error, exit 6:
  * norn never runs on a config it had to guess at.
  */
-import type { HostFiles } from "@norn/plugin-api";
+import { CAPABILITIES, type Capability, type HostFiles } from "@norn/plugin-api";
 import { check } from "@norn/schema";
 import { parse } from "yaml";
 import { configFailure } from "../output.ts";
@@ -99,7 +99,14 @@ export function narrowPolicy(layers: Readonly<Record<Layer, ConfigLayer | null>>
     }
     if (kept !== undefined) standIn[list] = kept;
   }
-  return Object.keys(standIn).length > 0 ? { stand_in: standIn } : {};
+  // absent from the user's file caps nothing, so a repo file narrows from every capability
+  let capabilities: Capability[] | undefined;
+  for (const layer of LAYERS) {
+    const named = layers[layer]?.policy?.capabilities;
+    if (named === undefined) continue;
+    capabilities = layer === "user" ? [...named] : (capabilities ?? [...CAPABILITIES]).filter((c) => named.includes(c));
+  }
+  return { ...(Object.keys(standIn).length > 0 && { stand_in: standIn }), ...(capabilities !== undefined && { capabilities }) };
 }
 
 /** Merge parsed layers over the defaults and check the whole. */

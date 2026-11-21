@@ -3,6 +3,7 @@
  * setting silently ignored; a slot's own keys (beside `use`) belong to the plugin that fills it, and
  * that plugin's factory validates them.
  */
+import { CAPABILITIES } from "@norn/plugin-api";
 import { Mode, NonEmpty, OUTCOME_NAME_PATTERN, PosInt } from "@norn/schema";
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
 
@@ -103,7 +104,14 @@ const StepRefs = Type.Array(StepRef, { uniqueItems: true });
  * (`attended`) and the gates a supervisor may decide (`gates`). Granted in the user's own file only: a
  * repo file, which an agent in its step can change, may narrow a list and never widen it.
  */
-export const Policy = Type.Object({ stand_in: Type.Optional(Type.Object({ attended: Type.Optional(StepRefs), gates: Type.Optional(StepRefs) }, closed)) }, closed);
+export const Policy = Type.Object(
+  {
+    stand_in: Type.Optional(Type.Object({ attended: Type.Optional(StepRefs), gates: Type.Optional(StepRefs) }, closed)),
+    /** the capabilities any step may be granted, which caps every role's; absent: every one */
+    capabilities: Type.Optional(Type.Array(Type.Union(CAPABILITIES.map((c) => Type.Literal(c)), { title: "capability" }), { uniqueItems: true })),
+  },
+  closed,
+);
 export type Policy = Static<typeof Policy>;
 /** The keys a repo file can only narrow, and the user's file alone grants. */
 export const POLICY_KEY = "policy";

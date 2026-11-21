@@ -21,6 +21,8 @@ import {
   type SignalSourceDefinition,
   type StepKindDefinition,
   stepRoles,
+  type Capability,
+  type RoleDefinition,
   type Store,
   type Tracker,
   type Vcs,
@@ -157,6 +159,11 @@ export function delegatedGates(standIn: StandIn, doc: unknown, file: string): st
  * command over one file. A shared file that does not parse is named in the failure of every workflow
  * that does not load without it.
  */
+/** Each role a pack registers → the capabilities it may be granted, as decide and the loader read them. */
+export function roleCapabilities(roles: Readonly<Record<string, RoleDefinition>>): Record<string, Capability[]> {
+  return Object.fromEntries(Object.entries(roles).map(([name, r]) => [name, [...r.allow]]));
+}
+
 export function loadPackWorkflows(
   pack: Pack,
   stepKinds: Readonly<Record<string, ProvidedStepKind>>,
@@ -173,6 +180,7 @@ export function loadPackWorkflows(
   }
   const byName: Record<string, WorkflowLoad> = {};
   const roles = pack.roles && stepRoles(pack.roles);
+  const roleAllow = pack.roles && roleCapabilities(pack.roles);
   for (const [file, text] of Object.entries(pack.workflows)) {
     const name = file.replace(/\.ya?ml$/, "");
     const doc = parseYaml(text);
@@ -181,7 +189,7 @@ export function loadPackWorkflows(
       continue;
     }
     const floor = { delegated: delegatedGates(standIn, doc.value, name) };
-    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config, signals, inputs: HOST_INPUTS, specFiles: SPEC_FOLDER_FILES, floor, ...(roles && { roles }) });
+    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config, signals, inputs: HOST_INPUTS, specFiles: SPEC_FOLDER_FILES, floor, ...(roles && { roles }), ...(roleAllow && { roleAllow }) });
     byName[name] = load.ok || sharedBroken.length === 0 ? load : { ok: false, errors: [...sharedBroken, ...load.errors] };
   }
   return ok(byName);

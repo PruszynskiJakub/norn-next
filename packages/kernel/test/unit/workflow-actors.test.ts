@@ -54,6 +54,7 @@ describe("a step names its actor with by:", () => {
           skills: ["norn-review"],
           inputs: ["spec", "diff"],
           writes: "docs",
+          allow: ["docs:write"],
           role: "reviewer",
           attended: true,
           deadline: "2h",
@@ -125,10 +126,20 @@ describe("a step names its actor with by:", () => {
     );
   });
 
-  test("allow: without docs:write alone leaves the agent its worktree write", () => {
-    const older = wf({ a: { agent: "Do it.", role: "builder", outcomes: { done: "$done" } } });
-    pinsAlike(wf({ a: { by: "builder", do: "Do it.", allow: ["code:write"], outcomes: { done: "$done" } } }), older);
-    pinsAlike(wf({ a: { by: "builder", do: "Do it.", allow: ["code:write", "docs:write"], outcomes: { done: "$done" } } }), older);
+  test("allow: is pinned as written, and one without code:write narrows the agent to its documents", () => {
+    const step = (allow: string[]) => loaded(loadWorkflow(wf({ a: { by: "builder", do: "Do it.", allow, outcomes: { done: "$done" } } }), opts())).pinned.doc.steps.a;
+    expect(step(["code:write"])).toEqual({ agent: "Do it.", role: "builder", allow: ["code:write"], outcomes: { done: "$done" } });
+    expect(step(["code:write", "docs:write"])).toEqual({ agent: "Do it.", role: "builder", allow: ["code:write", "docs:write"], outcomes: { done: "$done" } });
+    expect(step(["docs:write", "exec:any"])).toEqual({ agent: "Do it.", role: "builder", allow: ["docs:write", "exec:any"], writes: "docs", outcomes: { done: "$done" } });
+    expect(loaded(loadWorkflow(wf({ a: { by: "builder", do: "Do it.", allow: ["exec:any"], outcomes: { done: "$done" } } }), opts())).graph.steps.a?.agent?.allow).toEqual(["exec:any"]);
+  });
+
+  test("allow: narrows its role's capabilities and never widens them, when the host registers what each role may be granted", () => {
+    const roleAllow = { builder: ["code:write", "docs:write", "exec:any"], writer: ["docs:write"] };
+    expect(refusals(wf({ a: { by: "writer", do: "Do it.", allow: ["docs:write", "code:write"], outcomes: { done: "$done" } } }), { roleAllow })).toEqual([
+      { path: "/steps/a/allow/1", message: "role writer may not be granted `code:write`: allow: narrows a role's capabilities (docs:write), never widens them" },
+    ]);
+    expect(refusals(wf({ a: { by: "builder", do: "Do it.", allow: ["docs:write"], outcomes: { done: "$done" } } }), { roleAllow })).toEqual([]);
   });
 
   test("a pinned document lowered from with: loads again with the same hash", () => {
@@ -316,9 +327,9 @@ describe("refusals of the step form", () => {
     ]);
   });
 
-  test("allow: asks for code:write or docs:write", () => {
-    expect(refusals(wf({ a: { by: "builder", do: "Do it.", allow: ["docs:write", "net:any"], outcomes: { done: "$done" } } }))).toEqual([
-      { path: "/steps/a/allow/1", message: "`net:any` is not a capability a step may ask for: name code:write or docs:write" },
-    ]);
+  test("allow: asks only for capabilities norn knows", () => {
+    const [refusal] = refusals(wf({ a: { by: "builder", do: "Do it.", allow: ["docs:write", "net:any"], outcomes: { done: "$done" } } }));
+    expect(refusal?.path).toBe("/steps/a/allow/1");
+    expect(refusal?.message).toStartWith("`net:any` is not a capability a step may ask for: name one of code:read, code:scratch, code:write, docs:write");
   });
 });

@@ -33,7 +33,7 @@ describe("norn-pack-sdlc", () => {
   test("registers the roles a step names with by:, each with its purpose and capabilities, and the supervisor, which does no step", () => {
     expect(Object.fromEntries(Object.entries(SDLC_PACK.roles ?? {}).map(([name, r]) => [name, r.allow]))).toEqual({
       builder: ["code:write", "docs:write", "exec:any"],
-      reviewer: ["code:read", "exec:checks", "out:findings"],
+      reviewer: ["code:read", "docs:write", "exec:checks", "out:findings"],
       qa: ["code:scratch", "exec:any", "out:criteria", "out:evidence", "out:findings"],
       investigator: ["code:scratch", "exec:any", "out:findings", "tracker:comment", "tracker:label"],
       writer: ["docs:write"],

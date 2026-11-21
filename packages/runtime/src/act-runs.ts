@@ -5,7 +5,7 @@
  * never launches again; between the launch and it, the launcher's idempotence by run id keeps a replay
  * to the one session.
  */
-import type { DecisionOf, ReceiptData, ReceiptIntent, RunInfo } from "@norn/kernel";
+import { type DecisionOf, docsOnlyGrant, type ReceiptData, type ReceiptIntent, type RunInfo } from "@norn/kernel";
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import { ensureWorktree } from "./branches.ts";
 import { stopDetachedCheck } from "./checks-detached.ts";
@@ -62,7 +62,8 @@ async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"r
   const unit = unitOf(d);
   const worktree = await ensureWorktree(t.env, unit);
   if (!worktree.ok) return worktree;
-  const writes = unitInFacts(t.facts, unit)?.state?.workflow.doc.steps[d.brief.step]?.writes;
+  // a grant that may change no code is guarded as a docs-only step is, whatever its pin says
+  const writes = docsOnlyGrant(d.brief.grant ?? null) ? "docs" : unitInFacts(t.facts, unit)?.state?.workflow.doc.steps[d.brief.step]?.writes;
   const request = {
     unit,
     run_id: d.run_id,

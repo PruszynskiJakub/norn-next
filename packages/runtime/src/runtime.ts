@@ -9,7 +9,7 @@ import { briefRenderInput } from "./brief-context.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { createHarnessLauncher, DEFAULT_HOOK_COMMAND } from "./executors.ts";
 import { NO_REPO_WORKFLOWS, overlayRepoWorkflows } from "./repo-workflows.ts";
-import { delegatedGates, loadPackWorkflows, type ResolvedSlots, resolveSlots, signalDeclarations } from "./resolve.ts";
+import { delegatedGates, loadPackWorkflows, type ResolvedSlots, resolveSlots, roleCapabilities, signalDeclarations } from "./resolve.ts";
 import { holdChanged } from "./confirm.ts";
 import { newTickId, tick } from "./tick.ts";
 import type { AgentLauncher, AgentRunRequest, Runtime, RuntimeDeps } from "./types.ts";
@@ -48,6 +48,9 @@ function launcherOf(deps: Omit<RuntimeDeps, "tickId">, slots: ResolvedSlots, env
 export function createRuntimeEnv(deps: Omit<RuntimeDeps, "tickId">): PluginResult<RuntimeEnv> {
   const slots = resolveSlots(deps.ctx, deps.plugins, deps.config);
   if (!slots.ok) return slots;
+  // decide grants from the pack's roles unless the config names its own
+  const packRoles = slots.value.pack.roles;
+  if (packRoles && deps.config.kernel.roles === undefined) deps = { ...deps, config: { ...deps.config, kernel: { ...deps.config.kernel, roles: roleCapabilities(packRoles) } } };
   const repoWorkflows = deps.repoWorkflows ?? NO_REPO_WORKFLOWS;
   const signals = signalDeclarations(slots.value.signals);
   const overlaid = loadPackWorkflows(overlayRepoWorkflows(slots.value.pack, repoWorkflows), slots.value.stepKinds, deps.config.kernel, signals, deps.config.standIn);

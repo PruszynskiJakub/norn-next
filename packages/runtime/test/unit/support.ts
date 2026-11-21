@@ -16,6 +16,7 @@ import {
   type NornPlugin,
   ok,
   type PluginResult,
+  type RoleDefinition,
   type StepKindDefinition,
   type StepKindOutcome,
   type Tracker,
@@ -263,6 +264,8 @@ export const WORKFLOWS: Record<string, string> = {
     "    means: { done: the thing is built }",
     "",
   ].join("\n"),
+  "granted.yaml": ["name: granted", "start: review", "steps:", "  review:", "    by: reviewer", "    do: Review the thing.", "    outcomes: { approve: $done }", ""].join("\n"),
+  "widened.yaml": ["name: widened", "start: review", "steps:", "  review:", "    by: reviewer", "    do: Review the thing.", "    allow: [code:write]", "    outcomes: { approve: $done }", ""].join("\n"),
   "reviewed.yaml": [
     "name: reviewed",
     "start: review",
@@ -520,6 +523,8 @@ export interface HarnessOptions {
   formerHolders?: string[];
   /** plugins beside the fakes and the local store, such as one providing a signal a workflow routes */
   plugins?: NornPlugin[];
+  /** the roles the test pack registers; absent, it registers none and no step is narrowed */
+  roles?: Record<string, RoleDefinition>;
 }
 
 export function harness(opts: HarnessOptions = {}): Harnessed {
@@ -548,7 +553,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
       vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped, dirty, untracked) } },
       harness: { fake: HARNESS },
       stepKinds: fakeStepKinds(stepAnswers, stepCalls),
-      packs: { test: { workflows: WORKFLOWS, shared: {}, skills: {} } },
+      packs: { test: { workflows: WORKFLOWS, shared: {}, skills: {}, ...(opts.roles && { roles: opts.roles }) } },
     },
   });
   const plugins: NornPlugin[] = [providers, localStorePlugin, ...(opts.plugins ?? [])];

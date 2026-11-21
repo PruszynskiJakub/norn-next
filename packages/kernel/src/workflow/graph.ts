@@ -5,6 +5,7 @@
  */
 import { Attendance, Mode, NonEmpty, NonNegInt, OutcomeName, PosInt, StepName, StepWrites, Target, Verdict } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
+import { CapabilitySchema } from "../model/grant.ts";
 import { BaseDoc, DocCounterName, HandBack, SourcesDoc, StepInputDoc, WorkflowDocument } from "./document.ts";
 
 const closed = { additionalProperties: false } as const;
@@ -70,6 +71,8 @@ export const AgentStepSpec = Type.Object(
     model: Type.Optional(NonEmpty),
     /** the agent role the step names, which the config's `bind:` maps to executors; absent for a step in the older form */
     role: Type.Optional(NonEmpty),
+    /** the capabilities the step's `allow:` asks of its role; absent, all of the role's */
+    allow: Type.Optional(Type.Array(CapabilitySchema)),
     /** who stays beside the agent, which picks the runner: the person, a supervisor, or nobody */
     attended: Attendance,
     criteria: Type.Boolean(),

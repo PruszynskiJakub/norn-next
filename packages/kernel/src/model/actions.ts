@@ -8,6 +8,7 @@ import { TrackerItem } from "@norn/plugin-api";
 import { IsoTime, NonEmpty, PosInt, StepName, TaggedUnion } from "@norn/schema";
 import { type Static, type TProperties, Type } from "@sinclair/typebox";
 import { StepInputDoc } from "../workflow/document.ts";
+import { CapabilitySchema } from "./grant.ts";
 import { ReceiptIntent, RejectedReceipt } from "./receipts.ts";
 import { RunState } from "./run-state.ts";
 
@@ -57,6 +58,8 @@ export const BriefInputs = Type.Object(
     model: Type.Optional(NonEmpty),
     /** the receipt whose findings or failure the run reworks (a red check, a reject), when there is one */
     rework_from: Type.Optional(PosInt),
+    /** the step's effective grant, which the launcher guards, detection checks and the brief's Rules state; absent: nothing narrows it */
+    grant: Type.Optional(Type.Array(CapabilitySchema)),
   },
   { ...closed, title: "BriefInputs" },
 );

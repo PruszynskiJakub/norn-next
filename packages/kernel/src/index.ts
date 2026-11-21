@@ -19,6 +19,7 @@ export { type AnsweredAsk, type BriefCommands, type BriefInputView, type BriefPr
 export * from "./model/actions.ts";
 export * from "./model/capabilities.ts";
 export * from "./model/config.ts";
+export * from "./model/grant.ts";
 export * from "./model/facts.ts";
 export * from "./model/receipts.ts";
 export * from "./model/run-state.ts";

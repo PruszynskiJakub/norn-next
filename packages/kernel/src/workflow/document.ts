@@ -10,6 +10,7 @@
  */
 import { Duration, Mode, NonEmpty, OUTCOME_NAME_PATTERN, OutcomeName, PosInt, StepName, StepWrites, StoredCounterName, Target, Verdict } from "@norn/schema";
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
+import { CapabilitySchema } from "../model/grant.ts";
 
 const closed = { additionalProperties: false } as const;
 
@@ -173,6 +174,8 @@ function stepProps<R extends TSchema, O extends TSchema, P extends TSchema>(rout
     ),
     /** the agent role a step written with `by:` names, which the config's `bind:` maps to an executor */
     role: Type.Optional(Type.String({ pattern: "^[a-z][a-z0-9_-]*$" })),
+    /** what a step written with `by:` asks of its role's capabilities, which decide narrows its grant by */
+    allow: Type.Optional(Type.Array(CapabilitySchema, { minItems: 1, uniqueItems: true })),
     by: Type.Optional(Type.String({ minLength: 1, description: "The executor that runs the agent; default the config's" })),
     model: Type.Optional(NonEmpty),
     criteria: Type.Optional(Type.Literal("required")),

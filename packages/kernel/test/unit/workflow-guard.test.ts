@@ -53,7 +53,12 @@ describe("guardChanges", () => {
   test("who stays beside an agent step, and what it may write", () => {
     expect(guardChanges(doc(), doc((d) => void (d.steps.build.attended = "person")))).toEqual(["step build: attended none → person"]);
     expect(guardChanges(doc((d) => void (d.steps.build.attended = "person")), doc((d) => void (d.steps.build.attended = "agent")))).toEqual(["step build: attended person → agent"]);
-    expect(guardChanges(doc(), doc((d) => void delete d.steps.review.allow))).toEqual(["step review: allow [docs:write] → [code:write]"]);
+    expect(guardChanges(doc(), doc((d) => void delete d.steps.review.allow))).toEqual(["step review: allow [docs:write] → its role's"]);
+    expect(guardChanges(doc(), doc((d) => void (d.steps.review.allow = ["docs:write", "exec:checks"])))).toEqual(["step review: allow [docs:write] → [docs:write, exec:checks]"]);
+  });
+
+  test("the role a step names, as it grants the step's capabilities", () => {
+    expect(guardChanges(doc(), doc((d) => void (d.steps.review.by = "builder")))).toEqual(["step review: by reviewer → builder"]);
   });
 
   test("an agent step added or removed counts only for an attended: or allow: of its own", () => {

@@ -154,3 +154,35 @@ describe("report hints", () => {
     expect(text).not.toContain("norn ask");
   });
 });
+
+describe("the brief's Rules render the step's effective grant", () => {
+  const rules = (md: string) => md.slice(md.indexOf("## Rules"), md.indexOf("## Finish with exactly one of"));
+  const finish = (md: string) => md.slice(md.indexOf("## Finish with exactly one of"));
+  const granted = (grant: NonNullable<BriefRenderInput["brief"]["grant"]>) => renderBrief(input({ brief: { ...input().brief, grant } }));
+
+  test("a grant is named whole, each capability says what it lets the step do, and anything else is not the step's", () => {
+    const r = rules(granted(["code:read", "docs:write", "exec:checks", "out:findings"]));
+    expect(r).toContain("- This step is granted `code:read`, `docs:write`, `exec:checks` and `out:findings`, and nothing else.");
+    expect(r).toContain("- `code:read`: read the code and change none of it.");
+    expect(r).toContain("a tracked change, a commit, a moved ref or remote branch, or a changed git config or hook refuses `norn done`");
+    expect(r).toContain("- `exec:checks`: run the repo's checks");
+    expect(r).toContain("- `out:findings`: write findings");
+  });
+
+  test("a step that may not keep code is told to leave it as it was, not to commit it", () => {
+    expect(finish(granted(["code:read"]))).toContain("Leave the code as the run found it");
+    expect(finish(granted(["code:read"]))).not.toContain("Commit your work before");
+    const scratch = granted(["code:scratch", "exec:any"]);
+    expect(rules(scratch)).toContain("- `code:scratch`: change the code only to try things out: norn resets it to where the run started once you report.");
+    expect(finish(scratch)).toContain("Nothing you change in the code is kept");
+    expect(finish(granted(["code:write"]))).toContain("Commit your work before `norn done`");
+    expect(finish(renderBrief(input()))).toContain("Commit your work before `norn done`");
+  });
+
+  test("a grant to post on the story's item lifts the rule that only norn changes the remote, for that alone", () => {
+    const r = rules(granted(["code:scratch", "tracker:comment", "tracker:label"]));
+    expect(r).toContain("- `tracker:comment`: comment on the story's item.");
+    expect(r).toContain("Never `git push`, never switch branches or worktrees, and change nothing on the remote beyond what your grant names");
+    expect(rules(granted(["code:read"]))).toContain("never change the remote (a pull request, an issue, a comment)");
+  });
+});

@@ -9,8 +9,8 @@
  * records once. It is refused, never guessed at, when the run is not the unit's live one or `done`
  * names an outcome the step does not route.
  */
-import { type BriefInputs, checkCriteriaReport, HANDOFF_MAX_BYTES, producedOn, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
-import type { HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
+import { type BriefInputs, checkCriteriaReport, grantOf, HANDOFF_MAX_BYTES, producedOn, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
+import type { Capability, HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
 import { parseUnitId, STORE_ID_PATTERN } from "@norn/plugin-api";
 import { type CriterionVerdict, type Finding, type Note, REPORT_TYPES, reportPath, type Verdict } from "@norn/schema";
 import { branchOf, baseRefOf, cutFrom } from "./branches.ts";
@@ -86,7 +86,7 @@ async function liveAgent(env: RuntimeEnv, unit: string): Promise<Refusable<{ rec
   return { ok: true, value: { record, live } };
 }
 
-function briefInputsOf(record: UnitJournal, live: LiveStep, spec: { skills: string[]; inputs: BriefInputs["inputs"]; model?: string }): BriefInputs {
+function briefInputsOf(record: UnitJournal, live: LiveStep, spec: { skills: string[]; inputs: BriefInputs["inputs"]; model?: string }, grant: Capability[] | null): BriefInputs {
   const state = record.state as NonNullable<UnitJournal["state"]>;
   // the state's rework belongs to the visit it is at; a live run of any other visit was not sent back by it
   const sameVisit = state.step === live.step && state.attempt === live.attempt;
@@ -99,6 +99,7 @@ function briefInputsOf(record: UnitJournal, live: LiveStep, spec: { skills: stri
     inputs: structuredClone(spec.inputs),
     ...(spec.model !== undefined && { model: spec.model }),
     ...(sameVisit && state.rework_from !== undefined && { rework_from: state.rework_from }),
+    ...(grant !== null && { grant }),
   };
 }
 
@@ -107,7 +108,8 @@ export async function briefOf(env: RuntimeEnv, unit: string): Promise<Refusable<
   if (!found.ok) return found;
   const { record, live } = found.value;
   const doc = record.state?.workflow.doc.steps[live.step];
-  const brief = briefInputsOf(record, live, { skills: doc?.skills ?? [], inputs: doc?.inputs ?? [], ...(doc?.model !== undefined && { model: doc.model }) });
+  const grant = doc ? grantOf({ ...(doc.role !== undefined && { role: doc.role }), ...(doc.allow !== undefined && { allow: doc.allow }) }, env.config.kernel) : null;
+  const brief = briefInputsOf(record, live, { skills: doc?.skills ?? [], inputs: doc?.inputs ?? [], ...(doc?.model !== undefined && { model: doc.model }) }, grant);
   const input = await renderInputFrom(env, record, brief, live.run.id);
   if (!input.ok) return refuse(`cannot brief ${unit}: ${input.failure.message}`, "tell the person: the unit's workflow does not load", input.failure.code);
   return { ok: true, value: { unit, run_id: live.run.id, markdown: renderBrief(input.value) } };
