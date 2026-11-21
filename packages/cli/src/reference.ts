@@ -150,7 +150,7 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   "trace.retain": durationText(DEFAULT_TRACE_RETAIN_MS),
   "policy.stand_in.attended": { derived: "none: no step's presence is taken by a stand-in" },
   "policy.stand_in.gates": { derived: "none: every gate is the person's" },
-  "policy.capabilities": { derived: "none: every capability a role names may be granted" },
+  "policy.allow": { derived: "none: every capability a role names may be granted" },
   "checks.<name>": { derived: `\`checks.test\` is ${JSON.stringify(DEFAULT_CHECKS.test)}, which the shipped workflows' test steps run; init detects the repo's own` },
   "kernel.counters.check_fail": d.counterDefaults.checkFail,
   "kernel.counters.gate_reject": d.counterDefaults.gateReject,

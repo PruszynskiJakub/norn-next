@@ -47,7 +47,7 @@ export const KernelConfig = Type.Object(
      * in the older form; a role this registry lacks grants nothing.
      */
     roles: Type.Optional(Type.Record(NonEmpty, Type.Array(CapabilitySchema))),
-    /** the capabilities the person's policy lets any step be granted (`policy.capabilities`); absent: every one */
+    /** the capabilities the person's policy lets any step be granted (`policy.allow`); absent: every one */
     capabilities: Type.Optional(Type.Array(CapabilitySchema)),
     /** the workflow a story takes at intake when its item names none */
     workflow: NonEmpty,

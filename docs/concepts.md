@@ -63,22 +63,23 @@ A step hands a file to the steps after it by declaring it. An agent step's `prod
 
 A step kind may read a name with a fallback instead: it runs without the file, and says what it does then. `open-pr` reads `pr_body` that way, because the light path of a base update (only the base moved) reaches it again without `describe`, on a change an earlier pass already described.
 
-### What an agent step may write
+### What an agent step may do
 
-An agent step writes in its unit's worktree. `allow: [docs:write]` narrows that to the story's documents: the files in its spec folder, `.agents/specs/<story>/` (the spec, the handoffs, the slice files, `pr.md`), the reports in the run folder's `out/` (`$NORN_OUT`, where its findings go), and files outside the repo. The pack's review steps say it, so a review reports what needs changing as findings and never edits the code; QA and the build steps write their worktree.
+An agent step's role says what its agent may be granted, and its `allow:` may narrow that, never widen it; the person's `policy.allow` caps both. What is left is the step's **grant**, stated in its brief under Rules. Its code level matters most: a builder keeps what it changes (`code:write`), QA changes the code only to try things out and norn resets it once QA reports (`code:scratch`), and a review only reads it (`code:read`), so it reports what needs changing as findings and never edits the code.
 
 ```yaml
 review:
-  by: reviewer
+  by: reviewer                # code:read, docs:write, exec:checks, out:findings
   do: "Review this slice's diff against its acceptance criteria and the spec."
   with: { skills: [norn-review] }
-  allow: [docs:write]
   outcomes:
     approve: integrate
     changes_requested: { to: implement, produces: [findings] }
 ```
 
-The worktree hooks hold it (below), so such a step runs only on an executor whose harness can refuse a tool call: on any other, the unit parks `stuck` (`agent.unguarded`) before an agent starts, naming the step and the executor. Another executor, bound to the role or the step, lets it run. Writing the worktree is the default and needs no `allow:`. The older form says `writes: docs`, and picks an executor for one step with `by:` beside `agent:`.
+A step that may only read code writes only the story's documents: its spec folder, `.agents/specs/<story>/` (the spec, the handoffs, the slice files, `pr.md`), the reports in the run folder's `out/` (`$NORN_OUT`), and files outside the repo. The worktree hooks hold that (below), so such a step runs only on an executor whose harness can refuse a tool call: on any other, the unit parks `stuck` (`agent.unguarded`) before an agent starts, naming the step and the executor. Another executor, bound to the role or the step, lets it run.
+
+A shell write gets past the hooks, so a step that may not keep code is also checked: before its agent starts norn notes what the agent could change (a snapshot, under a receipt), `norn done` refuses what its level does not allow, and before the report routes the next tick kills the run's processes, checks again and resets what a scratch run changed. A change it finds only then parks the unit for the person. What this catches and what it cannot is in [Reference › What an agent step may do](reference.md#what-an-agent-step-may-do); `exec:` and `tracker:` capabilities are the brief's word alone. The older form names no role and says `writes: docs` to keep a step to its documents.
 
 ### Signals
 
@@ -116,7 +117,7 @@ A signal may carry a small `detail` (a failed check, a review's comments); the n
 
 Checks and the git and forge steps always run on their own. Gates, attended steps and a waiting merge always wait for a person, in either mode.
 
-What a person stands on is theirs to set. The **policy** (`policy:`, granted in `~/.norn/config.yaml` alone; a repo file may only narrow it) names what may stand in for them: the gates a supervisor may decide and the attended steps whose presence it may take. No stand-in acts on it until a runner gives agents an OS sandbox, but every workflow already loads on a **floor**: a person's step no grant delegates stands on every path to a step whose kind reaches past the repo, spends money or writes to the forge (`forge.await-merge`, which marks the draft ready). And a repo workflow whose change touches a person's step, `attended:` or `allow:` is **held** until the person confirms it (`norn workflow confirm`): new rounds run the revision they last confirmed, or the pack's ([Workflow floor and confirmation](reference.md#workflow-floor-and-confirmation)).
+What a person stands on is theirs to set. The **policy** (`policy:`, granted in `~/.norn/config.yaml` alone; a repo file may only narrow it) names what may stand in for them: the gates a supervisor may decide and the attended steps whose presence it may take; its `capabilities` caps what any step may be granted. No stand-in acts on it until a runner gives agents an OS sandbox, but every workflow already loads on a **floor**: a person's step no grant delegates stands on every path to a step whose kind reaches past the repo, spends money or writes to the forge (`forge.await-merge`, which marks the draft ready). And a repo workflow whose change touches a person's step, `attended:` or `allow:` is **held** until the person confirms it (`norn workflow confirm`): new rounds run the revision they last confirmed, or the pack's ([Workflow floor and confirmation](reference.md#workflow-floor-and-confirmation)).
 
 Some commands are a person's alone: deciding a gate (`norn story approve`, `reject`), answering a question (`norn story answer`), starting a round (`norn story round`), taking a story to this machine (`norn story take`), updating a finished story's branch (`norn story update-branch`), closing a story (`norn story close`), starting, stopping or rerunning a run (`norn run start`, `stop`, `rerun`), confirming a held workflow (`norn workflow confirm`), setting the policy (`norn config set policy.…`) and `norn tidy`. norn refuses each of them inside an agent's session, the process tree every launch marks with `NORN_UNIT` and `NORN_RUN_ID`, whatever the harness or runner (`person_only`, exit 3). It reads the mark in the command's own env and in the env each process above it was started with, so an agent that clears the variables in its shell is still refused; what remains open is in [Limitations](limitations.md#limits-of-the-design). The agent asks instead (`norn ask "…"`). A person working in an attended step's pane types into that same session, so they run these from a shell of their own. No flag lifts the refusal.
 
@@ -216,6 +217,7 @@ A config left by norn 0.35 or earlier is never read: its keys mean other things 
 | harness | The plugin for one agent tool (Claude Code, pi): its hooks, its launch, its events. |
 | runner | Where an agent process runs: headless or a Herdr pane, picked by the step's `attended:`. |
 | role | What an agent step's `by:` names: what its agent is for and the capabilities it may be granted, registered by the pack. |
+| grant | What an agent step may do: its role's capabilities, narrowed by its `allow:` and capped by the person's policy; its code level says whether the step keeps, resets or may not change the code. |
 | executor | A named harness and model on this machine, which the config binds to an agent step's role or the step itself. |
 | store | Where run data, claims and the mailbox live: the machine dir or git refs. |
 | trace | The per-tick record of facts and decisions, kept outside the repository. |

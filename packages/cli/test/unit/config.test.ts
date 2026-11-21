@@ -349,11 +349,11 @@ describe("policy: granted in the user's file only; a repo file may narrow it, ne
   });
 
   test("capabilities caps every step's grant: the user's list, cut by a repo file's; a repo file alone narrows every capability, and none set caps nothing", async () => {
-    expect((await loaded({ user: "policy: { capabilities: [code:read, docs:write] }\n", local: LOCAL_CONFIG })).config.policy).toEqual({ capabilities: ["code:read", "docs:write"] });
-    expect((await loaded({ user: "policy: { capabilities: [code:read, docs:write] }\n", local: `${LOCAL_CONFIG}policy: { capabilities: [docs:write, exec:any] }\n` })).config.policy).toEqual({ capabilities: ["docs:write"] });
-    expect((await loaded({ local: `${LOCAL_CONFIG}policy: { capabilities: [code:write, code:write2] }\n` }).catch(() => null))).toBeNull();
-    expect((await loaded({ local: `${LOCAL_CONFIG}policy: { capabilities: [docs:write, exec:any] }\n` })).config.policy).toEqual({ capabilities: ["docs:write", "exec:any"] });
-    expect(runtimeConfigOf(await loaded({ user: "policy: { capabilities: [code:read] }\n", local: LOCAL_CONFIG }), "me@box").kernel.capabilities).toEqual(["code:read"]);
+    expect((await loaded({ user: "policy: { allow: [code:read, docs:write] }\n", local: LOCAL_CONFIG })).config.policy).toEqual({ allow: ["code:read", "docs:write"] });
+    expect((await loaded({ user: "policy: { allow: [code:read, docs:write] }\n", local: `${LOCAL_CONFIG}policy: { allow: [docs:write, exec:any] }\n` })).config.policy).toEqual({ allow: ["docs:write"] });
+    expect((await loaded({ local: `${LOCAL_CONFIG}policy: { allow: [code:write, code:write2] }\n` }).catch(() => null))).toBeNull();
+    expect((await loaded({ local: `${LOCAL_CONFIG}policy: { allow: [docs:write, exec:any] }\n` })).config.policy).toEqual({ allow: ["docs:write", "exec:any"] });
+    expect(runtimeConfigOf(await loaded({ user: "policy: { allow: [code:read] }\n", local: LOCAL_CONFIG }), "me@box").kernel.capabilities).toEqual(["code:read"]);
     expect("capabilities" in runtimeConfigOf(await loaded({ local: LOCAL_CONFIG }), "me@box").kernel).toBe(false);
   });
 

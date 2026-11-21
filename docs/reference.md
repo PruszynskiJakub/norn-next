@@ -22,16 +22,19 @@ A command marked *a person's command* below is refused with `person_only` (exit 
 
 The nearer file wins: the committed file over the local file over the user file over the built-in defaults, for every key but the policy ([Policy](#policy)). Maps merge key by key; lists and scalars replace. A key norn does not know is refused with the file it is in, never ignored; a slot (`tracker`, `forge`, `store`, `vcs`, an executor's `runner`, a `runners:` entry) also takes the keys of the plugin it names, and that plugin checks them. `norn config show` prints the merged config and the file each key came from; `norn config set <key> <value>` changes one key in the local file, or in the committed file with `--commit` or the user file with `--user`.
 
-A slot names a plugin with `use`: the bundled ones are listed by `norn plugin list`, and `norn plugin add <spec>` installs another and pins it in the plugin lock.
+A slot names a plugin with `use`: the bundled ones are listed by `norn plugin list`, and `norn plugin add <spec>` installs another and pins it in the plugin lock. `norn plugin add` and `norn plugin update` are a person's commands: they name the effects the plugin's step kinds declare (`outward`, `cost`, `forge-write`), which the floor reads, and record them as accepted in `<norn home>/plugins/accepted/`. A plugin whose kinds later declare other effects is refused (`plugin_effects`) until the person runs `norn plugin update <name>`; one installed before acceptance existed loads while its kinds declare none. The effects of a kind over a slot (`forge.await-merge`, `vcs.push`, …) are the core's, whichever plugin provides it.
 
 ### Policy
 
 `policy:` is what the person lets stand in for them, each step named `<workflow>.<step>`: `stand_in.gates`, the gates a supervisor may decide, and `stand_in.attended`, the `attended: person` steps whose presence a supervisor may take. It is the one key whose order is reversed: only `<norn home>/config.yaml` grants it, and a repo file, which an agent inside its step can change, may only narrow it. Each repo file that sets a list keeps only what it names of the user file's list, so a grant only a repo file makes is no grant. `norn config set policy.…` is a person's command, and it says so when a repo file narrows what it wrote.
 
+`policy.allow` caps every step's grant: the capabilities any role may be granted on this machine, every one when no file sets it; a repo file narrows it from the user file's list, or from every capability when the user file sets none ([What an agent step may do](#what-an-agent-step-may-do)).
+
 ```yaml
 policy:
   stand_in:
     gates: [story.human-qa]          # only the user file grants this
+  allow: [code:read, code:scratch, code:write, docs:write, exec:checks, out:findings, out:criteria]
 ```
 
 No stand-in acts on a grant yet: until a runner gives the agent an OS sandbox, every gate waits for the person and every attended step for its person ([Limitations](limitations.md)). A granted gate already counts against the floor a workflow is checked against when it loads ([Workflow floor and confirmation](#workflow-floor-and-confirmation)).
@@ -68,7 +71,7 @@ A step is written with thirteen keys, and the set never grows: what an actor nee
 | `with` | how the actor works: an agent's `skills`, a shell step's `exits` (exit code → outcome), a step kind's settings |
 | `reads` | what an agent step's brief gives it ([Inputs](#inputs)); `norn.each` takes `[slices]` |
 | `produces` | what every outcome of an agent step produces, unless the outcome lists its own ([Outcomes](#outcomes)) |
-| `allow` | what an agent step may write: `docs:write` alone keeps it to the story's documents, `code:write` writes the worktree (the default) ([What an agent step writes](#what-an-agent-step-writes)) |
+| `allow` | what an agent step asks of its role's capabilities: it narrows them, never widens them ([What an agent step may do](#what-an-agent-step-may-do)) |
 | `attended` | who stays alongside the agent, which picks its runner: `person` (in a runner with presence; the person starts the step), `agent` (a supervisor), `none` (the default) ([Executors and runners](#executors-and-runners)) |
 | `limits` | an agent step's `deadline`, `nudges` and `retries`; a shell step's `timeout`, which it needs |
 | `outcomes` | where each outcome leads ([Outcomes](#outcomes)) |
@@ -248,16 +251,52 @@ A step kind may produce files too, under the same rule: its plugin declares each
 
 The bundled `describe` steps produce `pr_body`, which `open-pr` reads. `open-pr` reads it with a fallback: a base update's light path reaches `open-pr` again without `describe`, and then it reads the `pr.md` an earlier pass left, else opens the change with norn's footer alone. A unit that pinned its workflow before `produces:` existed loads it to the same graph and hash.
 
-## What an agent step writes
+## What an agent step may do
 
-An agent step's `allow:` says where its agent may write, as the worktree hooks hold it ([Concepts](concepts.md#what-an-agent-step-may-write)); the older form says `writes: worktree` or `writes: docs`.
+An agent step's **grant** is what its agent may do: the capabilities its role may be granted (the pack registers each role with them), narrowed by the step's `allow:`, capped by the person's `policy.allow` ([Policy](#policy)). `allow:` names only capabilities its role has: asking for more is refused when the workflow loads (`role writer may not be granted \`code:write\``). decide works the grant out on each tick from the pinned role and `allow:` and the config, and the brief states it under Rules ([Concepts](concepts.md#what-an-agent-step-may-do)). A step in the older form names no role, so nothing narrows it: it writes what its `writes:` says.
 
-| `allow:` | The agent may write | Needs |
+| Capability | The agent may |
+|---|---|
+| `code:write` | change the code and keep it: its commits reach the next step |
+| `code:scratch` | change the code for the run alone: norn resets it once the agent reports |
+| `code:read` | only read the code (also a grant that names no code level) |
+| `docs:write` | write the story's documents in its spec folder, and the handoff |
+| `exec:any`, `exec:checks` | run any command, or only the repo's checks and commands that read |
+| `out:criteria`, `out:findings`, `out:evidence` | write that report to `$NORN_OUT` |
+| `tracker:comment`, `tracker:label` | comment on or label the story's item |
+| `read:any`, `answer`, `decide:granted`, `escalate` | the supervisor's, which no step names |
+
+The shipped roles: `builder` (`code:write`, `docs:write`, `exec:any`), `reviewer` (`code:read`, `docs:write`, `exec:checks`, `out:findings`), `qa` (`code:scratch`, `exec:any`, `out:criteria`, `out:evidence`, `out:findings`), `investigator` (`code:scratch`, `exec:any`, `out:findings`, `tracker:comment`, `tracker:label`), `writer` (`docs:write`) and `supervisor`.
+
+### The three code levels
+
+| Level | Held by | At `norn done` |
 |---|---|---|
-| left out, or with `code:write` (`writes: worktree`) | its unit's worktree, and the temp folders (`$TMPDIR`, `/tmp`) | nothing |
-| `[docs:write]` (`writes: docs`) | the story's spec folder in the worktree (`.agents/specs/<story>/`), the run folder's `out/` (`$NORN_OUT`), and the temp folders | an executor whose harness can refuse a tool call (`denyTool`); on any other the unit parks `stuck` with `agent.unguarded` before an agent starts |
+| `code:write` | `git status` | refused while changes outside norn's own files are not committed (`dirty_worktree`) |
+| `code:scratch` | a snapshot and its check | a lockfile changed is reset without a word; any other tracked change, or a commit, refuses an outcome whose verdict is `pass` (`code_changed`), so nothing stubbed can pass behind the reset; on any other outcome everything the run changed is reset, commits included |
+| `code:read` | the docs-only guard, a snapshot and its check | refused while a tracked file outside norn's own differs, or a commit was made, since the run started (`code_changed`) |
 
-Every step is refused a write into norn's run state. Only the agent tool's file writes are judged; a shell command is not. `allow:` (or `writes:`) on a step that is not an agent step is refused when the workflow loads, and so is a capability other than `code:write` and `docs:write`.
+A step that may change no code (`code:read`) runs under the docs-only guard: its file-tool writes go only to the story's spec folder (`.agents/specs/<story>/`), the run folder's `out/` (`$NORN_OUT`) and the temp folders (`$TMPDIR`, `/tmp`), and it needs an executor whose harness can refuse a tool call (`denyTool`): on any other the unit parks `stuck` with `agent.unguarded` before an agent starts. The older form's `writes: docs` (and `allow: [docs:write]`) asks for the same guard. Every step is refused a write into norn's run state. norn's own files never count as a change: the run folder, the story's spec folder and what it installed for the executor (its hooks, its skill links). A file a `code:read` or `code:scratch` run leaves untracked refuses its done until it is removed.
+
+### Detection, as receipted effects
+
+Before the agent of a step that may not keep code starts, norn writes the run's intent and then a `run.snapshot` receipt: HEAD, the tracked tree as the worktree holds it, the repo's refs (all but the remote-tracking ones and norn's own), its git config and hooks, and the remote's copy of the story branch. A retry is checked against its visit's first snapshot. A snapshot that cannot be taken (a vcs without one, git failing) parks the unit `stuck` (`run.snapshot.failed`) and the agent never starts.
+
+`norn done` compares at once and refuses what the level does not allow, saying what changed and how to put it back. Before the report routes, the next tick's `agent.check` kills the run's process group, so a write left running in the background cannot land after the check, compares again, and resets what the level resets under a `run.checking` intent and a `run.checked` receipt, safe to run again after a crash. A change only this check finds (it landed after `norn done`), or a check that cannot be done, refuses the report and parks the unit `stuck` (`run.check.refused`, `run.check.failed`): it never passes. At either level a moved remote story branch, a changed git config or a changed hook refuses too; another ref that moved (a sibling unit's branch, a person's tag) is only noted, as norn cannot tell who moved it.
+
+Every agent run's launch pins a digest of its hook config (norn's hooks, and any setting that turns hooks off), and `norn done` is refused (`hooks_changed`) once it differs.
+
+### What is enforced, honestly
+
+Without an OS sandbox an agent's shell can reach anything the person's user can, so norn claims only this:
+
+| Level | Without an OS sandbox | With one (not built yet) |
+|---|---|---|
+| prevented | file-tool writes (the hook guard); a plugin step kind whose effects the person has not accepted | the store, `.git/refs`, `.git/hooks`, `.git/config`, the main checkout, the network |
+| detected | tracked files in the unit's worktree, HEAD, the remote story branch head, the repo's git config and hooks, the run's hook config | the same |
+| advisory | `exec:checks` against `exec:any`, `tracker:*`, the `out:*` reports a role may write, shell git (refs, stash, worktree, push), the store, a gate command run from the agent's shell, the network | none of these |
+
+An advisory capability is the brief's word and nothing more ([Limitations](limitations.md)).
 
 ## Generated reference
 
@@ -713,7 +752,7 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `sources.<name>` | string | none |
 | `policy.stand_in.attended` | list of strings | derived: none: no step's presence is taken by a stand-in |
 | `policy.stand_in.gates` | list of strings | derived: none: every gate is the person's |
-| `policy.capabilities` | list of capabilities | derived: none: every capability a role names may be granted |
+| `policy.allow` | list of capabilities | derived: none: every capability a role names may be granted |
 
 Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner`, `runners.person`, `runners.agent`, `runners.none` take the keys of the plugin they name; that plugin checks them.
 

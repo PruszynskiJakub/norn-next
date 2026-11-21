@@ -108,7 +108,7 @@ export const Policy = Type.Object(
   {
     stand_in: Type.Optional(Type.Object({ attended: Type.Optional(StepRefs), gates: Type.Optional(StepRefs) }, closed)),
     /** the capabilities any step may be granted, which caps every role's; absent: every one */
-    capabilities: Type.Optional(Type.Array(Type.Union(CAPABILITIES.map((c) => Type.Literal(c)), { title: "capability" }), { uniqueItems: true })),
+    allow: Type.Optional(Type.Array(Type.Union(CAPABILITIES.map((c) => Type.Literal(c)), { title: "capability" }), { uniqueItems: true })),
   },
   closed,
 );
