@@ -22,7 +22,11 @@ import { handoffArtifact, readStoryDoc } from "./story-docs.ts";
 const RESERVED: ReadonlyArray<{ name: string; words: RegExp }> = [
   { name: "merge", words: /\bmerg(e|es|ed|ing)\b/i },
   { name: "push", words: /\b(force-)?push(es|ed|ing)?\b/i },
-  { name: "a remote write", words: /\b(deploy|publish|release|tag)(s|ed|ing)?\b|\b(close|reopen|delete) (the |an |a )?(issue|pull request|pr|branch)\b|\b(comment|label)(s|ed|ing)? on\b/i },
+  {
+    name: "a remote write",
+    words:
+      /\b(deploy(s|ed|ing)?|publish(es|ed|ing)?|releas(e|es|ed|ing)|tag(s|ged|ging)?)\b|\b(clos(e|es|ed|ing)|reopen(s|ed|ing)?|delet(e|es|ed|ing)) (the |this |that |its |an |a )?(issue|pull request|pr|branch)(es|s)?\b|\b(comment(s|ed|ing)?|label(s|ed|led|ing|ling)?) on\b/i,
+  },
   { name: "a gate's decision", words: /\b(approv|reject)(e|es|ed|ing)? (the |this |a )?gate\b|\bnorn story (approve|reject|answer)\b/i },
 ];
 

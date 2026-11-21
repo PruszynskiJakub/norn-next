@@ -118,6 +118,37 @@ describe("the supervisor of an attended: agent step", () => {
     expect(h.launcher.of("start")).toHaveLength(1);
   });
 
+  const RESERVED_WORDS: [string, string][] = [
+    ["Should I deploy it to staging?", "a remote write"],
+    ["Is it fine that the build publishes the package?", "a remote write"],
+    ["Can version 2 be released today?", "a remote write"],
+    ["Shall I close this PR?", "a remote write"],
+    ["Should I be closing the issue now?", "a remote write"],
+    ["May I approve the gate myself?", "a gate's decision"],
+    ["Can you go ahead approving this gate?", "a gate's decision"],
+  ];
+
+  for (const [question, name] of RESERVED_WORDS) {
+    test(`a question naming ${name} (${JSON.stringify(question)}) goes to the person and no supervisor starts`, async () => {
+      const h = harness({ workflow: "supervised", kernel: GRANT });
+      await asked(h, question);
+      const reports = await tickUntil(h, has("supervisor.reserved"));
+      const reserved = reports.flatMap((r) => r.decisions).find((d) => d.rule === "supervisor.reserved");
+      expect(reserved?.kind === "noop" ? reserved.reason : "").toBe(`the question names ${name}, which only the person grants, so it waits for them`);
+      expect(h.launcher.of("start")).toHaveLength(1);
+    });
+  }
+
+  test("its answer naming what only the person grants is refused, whichever it names", async () => {
+    const h = harness({ workflow: "supervised", kernel: GRANT });
+    await asked(h, "Which database should the cache use?");
+    const sup = await supervisorOf(h);
+    for (const [i, [text, name]] of [...RESERVED_WORDS.map(([q, n]) => [`Yes. ${q.replace("?", ".")}`, n] as const), ["Merge it.", "merge"] as const, ["Push it.", "push"] as const].entries()) {
+      const r = await reportRun(h.env, "lt-1", sup.id, { verb: "done", outcome: "answer", text }, `sup-grant-${i}`);
+      expect(r.ok ? null : { code: r.refusal.code, error: r.refusal.error }).toEqual({ code: "supervisor_grants", error: `a supervisor's answer may not grant ${name}: only the person grants that` });
+    }
+  });
+
   test("without the person's grant the question waits for them", async () => {
     const h = harness({ workflow: "supervised" });
     await asked(h, "Which database should the cache use?");
