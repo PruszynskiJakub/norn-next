@@ -257,6 +257,14 @@ describe("an agent run, judged from its session", () => {
     expect(out.state.ended).toBe("stuck");
   });
 
+  test("a dead session of a docs-only step is not retried on an executor whose harness cannot deny a tool: the unit parks as at the start", () => {
+    const wf = loaded(graph({ build: { agent: agentSpec({ writes: "docs" }) } }));
+    const d = kindOf(decideCase({ state: stateAt("build", { run: run() }, wf), workflows: [wf], session: session("ended"), executors: { claude: caps({ denyTool: false }) } }), "park");
+    expect(d.rule).toBe("agent.unguarded");
+    expect(d.inbox?.text).toContain("writes: docs");
+    expect(decideCase({ state: stateAt("build", { run: run() }, wf), workflows: [wf], session: session("ended") })?.rule).toBe("agent.died.retry");
+  });
+
   test("a dead session that stopped on a harness error keeps the error in the receipt and the stuck reason", () => {
     const error = "pi stopped on an error: Codex error: The 'gpt-6.1-sol' model is not supported";
     const out = kindOf(decideCase({ state: stateAt("build", { run: run(), retries_used: 1 }), session: session("ended", { error }) }), "apply_receipts");
