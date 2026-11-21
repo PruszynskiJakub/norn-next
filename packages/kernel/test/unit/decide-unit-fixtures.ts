@@ -37,6 +37,7 @@ export function agentSpec(over: Partial<AgentStepSpec> = {}): AgentStepSpec {
     attended: false,
     criteria: false,
     hand_back: {},
+    writes: "worktree",
     means: {},
     verdict: {},
     deadline_ms: 60 * 60_000,

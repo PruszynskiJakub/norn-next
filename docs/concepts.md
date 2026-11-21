@@ -54,6 +54,21 @@ A **step** is one node of a workflow. Its head key says what happens there:
 
 A step written `use:` brings in a shared file's steps, and `like:` copies another step. An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). A step's `outcomes:` maps each outcome to the next step, `$done` or `$stuck`. Every route back (a failed test sends the story back to `implement`) carries a **counter** with a max, derived from the kind of edge and named `<step>.<outcome>`: a check's `fail` 5, a gate's `reject` 2, a `conflict` 2, `stale` 10, an agent sending work back 3. `max:` on an edge changes its bound, and the `kernel.counters` config keys change the defaults.
 
+### What an agent step may write
+
+An agent step writes in its unit's worktree. `writes: docs` narrows that to the story's documents: the files in its spec folder, `.agents/specs/<story>/` (the spec, the handoffs, the slice files, `pr.md`), and files outside the repo, such as a findings file under `$TMPDIR`. The pack's review steps say it, so a review reports what needs changing as findings and never edits the code; QA and the build steps write their worktree.
+
+```yaml
+review:
+  agent: "Review this slice's diff against its acceptance criteria and the spec."
+  skills: [norn-review]
+  writes: docs
+  hand_back: { changes_requested: findings }
+  outcomes: { approve: integrate, changes_requested: implement }
+```
+
+The worktree hooks hold it (below), so a `writes: docs` step runs only on an executor whose harness can refuse a tool call: on any other, the unit parks `stuck` (`agent.unguarded`) before an agent starts, naming the step and the executor. `by:` on the step, or another default executor, lets it run. `writes: worktree` is the default and can be left out.
+
 ### Signals
 
 A **signal** is a fact about the world outside a waiting step, which a tick reads: the base moved under the story (`stale`), the story branch holds commits its change lacks (`unpushed`), the step has waited too long (`timeout`). `outcomes:` says how a step ends by itself; a step's `on:` block says what may move it along while it waits, with the same route shape:
@@ -114,7 +129,7 @@ Each unit works in its own git worktree, made by the vcs plugin in the machine d
 - **Skills.** The pack's skills go to `.agents/skills/<name>/`, linked from the harness's own folder (`.claude/skills/<name>`, `.pi/skills/<name>`), in every unit worktree before a launch and in the main checkout when `norn init` or `norn doctor` runs, so a person's own session finds the skills a person runs (`/norn-fsd`, `/norn-fsd-round`, `/norn-retro`, `/norn-triage`). They are ignored by git. A skill folder the repo commits, or a person keeps, under the same name is theirs and wins over the pack's.
 - **The spec and the handoff.** The story's spec is `.agents/specs/<story>/spec.md`, mirrored from the tracker item; each unit's **handoff** is `.agents/specs/<story>/handoffs/<unit>.md`, the unit's current state in prose (goal, proof, what is easy to miss, notes, the next action), rewritten by whoever works on it. The agent edits both in place; norn reads them back when it reports, and keeps them with the run data, never on the branch.
 - **Other inputs.** The last check's output, a rejection's findings and the like go to `.agents/inputs/`, rewritten for every run.
-- **Hooks.** The harness wires norn's hooks into the tool's local settings in that worktree (`.claude/settings.local.json` for Claude Code, an extension for pi). They feed norn the agent's events, keep it from ending a turn without a report, and refuse a file write outside the worktree or into norn's run state.
+- **Hooks.** The harness wires norn's hooks into the tool's local settings in that worktree (`.claude/settings.local.json` for Claude Code, an extension for pi). They feed norn the agent's events, keep it from ending a turn without a report, and refuse a file write outside the worktree or into norn's run state; on a `writes: docs` step, also one in the worktree outside the story's spec folder, with a reason telling the agent to hand back findings instead. They judge the agent tool's file writes (Claude Code's `Write`, `Edit`, `MultiEdit`, `NotebookEdit`; pi's `write`, `edit`), following a link to where a write really lands. A shell command is never judged, so `echo x > src/a.ts` or a formatter run from the shell gets through on any step: `writes: docs` keeps a review from editing code by mistake, not an agent set on it; the review skill asks the same of the agent in words.
 
 The branch, and the PR, hold only the code.
 

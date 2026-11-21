@@ -20,6 +20,7 @@ steps:
   review:
     agent: "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch."
     skills: [norn-review]
+    writes: docs
     inputs: [slice, spec, diff, last_findings]
     hand_back: { changes_requested: findings }
     outcomes:

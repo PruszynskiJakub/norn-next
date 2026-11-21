@@ -255,6 +255,13 @@ export const MATRIX: Scenario[] = [
     ["agent.no_executor"],
   ),
   scenario(
+    "agent-unguarded",
+    "A ready docs-only step (a review) whose executor's harness cannot deny a tool: the story waits for a person rather than run the agent with its writes unguarded.",
+    { files: shippedFiles("slice"), capabilities: capabilities({ executors: { claude: executor({ denyTool: false }) } }) },
+    (w) => seed(w, "gh-116", { workflow: "slice", step: "review" }),
+    ["agent.unguarded"],
+  ),
+  scenario(
     "agent-not-headless",
     "An executor that cannot run headless: in auto mode a ready step waits for a person, and a run that died cannot be retried in a fresh session without one.",
     { files: shippedFiles("slice"), capabilities: capabilities({ executors: { claude: executor({ headless: false }) } }) },

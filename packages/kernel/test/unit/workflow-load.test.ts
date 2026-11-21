@@ -160,12 +160,32 @@ describe("the shipped workflows", () => {
     expect(w.graph.steps["approve-slices"]?.outcomes).toEqual(["approve", "reject"]);
     expect(w.graph.steps["human-qa"]).toMatchObject({ outcomes: ["approve", "reject"], signals: [{ name: "stale" }] });
     expect(w.graph.steps.qa?.agent).toMatchObject({ criteria: true, hand_back: { fail: "findings" }, nudges: CONFIG.maxNudges, deadline_ms: CONFIG.deadlineMs });
+    // a review never edits code, and QA may write its evidence
+    expect([w.graph.steps.review?.agent?.writes, w.graph.steps["resolution-review"]?.agent?.writes, w.graph.steps.qa?.agent?.writes]).toEqual(["docs", "docs", "worktree"]);
     expect(w.graph.base).toEqual({ stale: "conflict", step: "update", verify: "test" });
   });
 });
 
 const agent = (outcomes: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ agent: "Do the work.", outcomes, ...extra });
 const wf = (steps: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ name: "t", start: Object.keys(steps)[0], steps, ...extra });
+
+describe("writes", () => {
+  test("an agent step writes its worktree unless it declares writes: docs", () => {
+    const w = loaded(loadWorkflow(wf({ build: agent({ done: "review" }), review: agent({ done: "again" }, { writes: "docs" }), again: agent({ done: "$done" }, { writes: "worktree" }) }), opts()));
+    expect([w.graph.steps.build?.agent?.writes, w.graph.steps.review?.agent?.writes]).toEqual(["worktree", "docs"]);
+  });
+
+  test("a step that never names writes pins none, so the hash of a workflow written before it stays", () => {
+    const w = loaded(loadWorkflow(wf({ build: agent({ done: "$done" }) }), opts()));
+    expect(w.pinned.doc.steps.build).not.toHaveProperty("writes");
+  });
+
+  test("writes takes worktree or docs, and only on an agent step", () => {
+    expect(new Set(errorsOf(loadWorkflow(wf({ build: agent({ done: "$done" }, { writes: "everything" }) }), opts())).map((e) => e.path))).toEqual(new Set(["/steps/build/writes"]));
+    const errors = errorsOf(loadWorkflow(wf({ test: { check: "bun test", timeout: "5m", writes: "docs", outcomes: { pass: "$done", fail: "$stuck" } } }), opts()));
+    expect(errors).toEqual([{ path: "/steps/test/writes", message: "`writes` is not a key of a check step" }]);
+  });
+});
 
 describe("refusals", () => {
   test("an unknown head key names the missing step kind", () => {

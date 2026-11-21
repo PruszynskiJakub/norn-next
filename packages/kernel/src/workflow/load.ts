@@ -216,6 +216,7 @@ function agentSpec(s: WorkflowStepDoc, d: NonNullable<WorkflowDocument["defaults
     attended: s.attended ?? false,
     criteria: s.criteria === "required",
     hand_back: { ...(s.hand_back ?? {}) },
+    writes: s.writes ?? "worktree",
     means: { ...(s.means ?? {}) },
     verdict: { ...(s.verdict ?? {}) },
     deadline_ms: deadline === undefined ? config.deadlineMs : parseDuration(deadline),

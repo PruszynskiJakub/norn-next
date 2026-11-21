@@ -4,7 +4,7 @@
  * flat workflow document it pins, so a hook process needs no loaded workflows to answer.
  */
 import { type KernelReceipt, OVERRIDABLE_OUTCOMES, type RunInfo, type RunState, type UnitJournal } from "@norn/kernel";
-import type { HandBack, Verdict } from "@norn/schema";
+import type { HandBack, StepWrites, Verdict } from "@norn/schema";
 
 const CLASSIFIED: ReadonlySet<string> = new Set(OVERRIDABLE_OUTCOMES);
 
@@ -69,6 +69,19 @@ export function liveStepOf(state: RunState | null, unapplied: readonly KernelRec
     verdict: agent ? { ...(doc.verdict ?? {}) } : {},
     handBack: agent ? { ...(doc.hand_back ?? {}) } : {},
   };
+}
+
+/**
+ * The step a run was started at and what it lets the agent write, from the run's start receipt and
+ * the workflow the unit pins; null when the record holds no start of that run. A run that is no
+ * longer live is held to its own step's rule, not to the step the unit has moved on to.
+ */
+export function runWrites(unit: UnitJournal, runId: string): { step: string; writes: StepWrites } | null {
+  const started = unit.receipts.findLast((r) => r.data.kind === "run.started" && r.data.run_id === runId);
+  if (started?.data.kind !== "run.started") return null;
+  const step = started.data.step ?? (unit.state?.run?.id === runId ? unit.state.run.step : undefined);
+  if (step === undefined) return null;
+  return { step, writes: unit.state?.workflow.doc.steps[step]?.writes ?? "worktree" };
 }
 
 /** The run's newest report on the record that still stands, applied or not yet. */

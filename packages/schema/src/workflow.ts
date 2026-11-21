@@ -17,6 +17,14 @@ import { Verdict } from "./criteria.ts";
 export const HandBack = Type.Union([Type.Literal("findings"), Type.Literal("evidence")]);
 export type HandBack = Static<typeof HandBack>;
 
+/**
+ * What an agent step may write: `worktree` (the default), its unit's worktree; `docs`, only the
+ * story's documents in its spec folder and the roots outside the worktree a write may land in. The
+ * write guard holds it, so a `docs` step runs only on a harness that can deny a tool.
+ */
+export const StepWrites = Type.Union([Type.Literal("worktree"), Type.Literal("docs")]);
+export type StepWrites = Static<typeof StepWrites>;
+
 /** Full outcome edge: `{ to, counter?, means? }`. */
 export const OutcomeEdge = Type.Object(
   {
@@ -110,6 +118,7 @@ function stepTypes<S extends TSchema>(outcome: S) {
       hand_back: Type.Optional(
         Type.Record(OutcomeName, HandBack, { minProperties: 1, additionalProperties: false, description: "Outcome → what its norn done must come with" }),
       ),
+      writes: Type.Optional(Type.Union(StepWrites.anyOf, { description: "worktree (default): the unit's worktree; docs: only the story's documents in its spec folder" })),
       /**
        * Declared outcomes. May also override classified routes by naming
        * `silent`, `died`, `timeout`, `stalled`, `ask`, `stuck`.

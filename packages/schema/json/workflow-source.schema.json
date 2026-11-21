@@ -213,6 +213,19 @@
                     }
                   }
                 },
+                "writes": {
+                  "description": "worktree (default): the unit's worktree; docs: only the story's documents in its spec folder",
+                  "anyOf": [
+                    {
+                      "const": "worktree",
+                      "type": "string"
+                    },
+                    {
+                      "const": "docs",
+                      "type": "string"
+                    }
+                  ]
+                },
                 "by": {
                   "minLength": 1,
                   "description": "Name from config.agents; default config.agent",
@@ -1154,6 +1167,7 @@
                 "retries": {},
                 "criteria": {},
                 "hand_back": {},
+                "writes": {},
                 "by": {},
                 "outcomes": {},
                 "means": {},

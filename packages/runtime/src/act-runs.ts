@@ -61,6 +61,7 @@ async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"r
   const unit = unitOf(d);
   const worktree = await ensureWorktree(t.env, unit);
   if (!worktree.ok) return worktree;
+  const writes = unitInFacts(t.facts, unit)?.state?.workflow.doc.steps[d.brief.step]?.writes;
   const request = {
     unit,
     run_id: d.run_id,
@@ -70,6 +71,7 @@ async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"r
     worktree: worktree.value,
     brief: d.brief,
     ...(d.kind === "start_run" && d.resume !== undefined ? { resume: d.resume } : {}),
+    ...(writes !== undefined && { writes }),
   };
   const acted = await t.env.journal.act(unit, {
     intent: d.intent,

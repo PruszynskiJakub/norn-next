@@ -239,6 +239,22 @@ describe("harness launcher start", () => {
   });
 });
 
+describe("harness launcher start of a docs-only step", () => {
+  test("is refused on a harness that cannot deny a tool, before anything is installed or launched", async () => {
+    const s = setup({ bgHarness: { denyTool: false } });
+    const refused = await s.launcher.start(run({ executor: "bg", attended: false, writes: "docs" }));
+    expect(refused).toMatchObject({ ok: false, failure: { code: "invalid", retryable: false } });
+    expect(!refused.ok && refused.failure.message).toContain("writes: docs");
+    expect([s.bgHarness.installs, s.bgHarness.launches, s.bg.starts]).toEqual([[], [], []]);
+  });
+
+  test("starts on a harness that denies a tool, and a step that writes its worktree starts on either", async () => {
+    const s = setup({ bgHarness: { denyTool: false } });
+    expect((await s.launcher.start(run({ writes: "docs" }))).ok).toBe(true);
+    expect((await s.launcher.start(run({ executor: "bg", attended: false, run_id: "01JRUN0000000000000000000B" }))).ok).toBe(true);
+  });
+});
+
 describe("the norn a launched agent runs", () => {
   const CLI = ["/opt/my tools/bun", "/src/cli/main.ts"];
   const withShim = (s: ReturnType<typeof setup>, over: Partial<HarnessLauncher["opts"]> = {}) =>
