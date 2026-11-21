@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parse } from "yaml";
+import { REPO_ROOT } from "../../../../test/support/repo-root.ts";
 import { outcomeEdge, toJsonSchema, validate } from "../../src/index.ts";
 
 /** §11 slice workflow example of the rules, as a file writes it: one head key per step. */
@@ -55,6 +58,10 @@ counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, qa_loop: { max: 2 },
 const example = () => parse(SLICE_EXAMPLE) as Record<string, any>;
 const errorsOf = (v: unknown) => {
   const r = validate("workflow-source", v);
+  return r.ok ? [] : r.errors;
+};
+const sharedErrorsOf = (v: unknown) => {
+  const r = validate("workflow-shared", v);
   return r.ok ? [] : r.errors;
 };
 const modelErrorsOf = (v: unknown) => {
@@ -139,8 +146,9 @@ describe("workflow schema", () => {
     ["agent with an empty orientation", (w: any) => (w.steps.merge.agent = " ")],
     ["two head keys", (w: any) => (w.steps.merge.check = "bun test")],
     ["a skill named twice", (w: any) => (w.steps.merge.skills = ["merge", "merge"])],
-    ["a meaning inside a route", (w: any) => (w.steps.merge.outcomes.done = { to: "integrate", means: "x" })],
-    ["a verdict inside a route", (w: any) => (w.steps.qa.outcomes.pass = { to: "integrate", verdict: "pass" })],
+    ["a meaning inside a check's route", (w: any) => (w.steps.test.outcomes.pass = { to: "review", means: "x" })],
+    ["a verdict inside a gate's route", (w: any) => (w.steps["human-qa"].outcomes.approve = { to: "integrate", verdict: "pass" })],
+    ["a verdict on an outcome that is not one", (w: any) => (w.steps.qa.outcomes.pass = { to: "integrate", verdict: "great" })],
     ["means on a check", (w: any) => (w.steps.test.means = { pass: "green" })],
     ["a verdict that is not one", (w: any) => (w.steps.qa.verdict.pass = "great")],
     ["agent with no outcomes", (w: any) => (w.steps.merge.outcomes = {})],
@@ -242,15 +250,48 @@ describe("workflow-source and workflow-shared schemas", () => {
     }
   });
 
-  test("neither schema accepts a meaning or verdict inside a route, nor a step in the old wording", () => {
-    const routed = { agent: "Do it.", outcomes: { done: { to: "$done", means: "done" } } };
-    const judged = { agent: "Do it.", outcomes: { done: { to: "$done", verdict: "pass" } }, means: { done: "done" } };
+  test("an agent step says what an outcome means, needs and produces on the outcome, and lists what every outcome produces", () => {
+    const qa = {
+      agent: "Check it.",
+      produces: ["criteria", { name: "notes", file: "notes.md" }],
+      outcomes: {
+        pass: { to: "$done", verdict: "pass", means: "every criterion observed" },
+        fail: { to: "$stuck", max: 2, verdict: "fail", means: "a criterion fails", produces: ["criteria", "findings"] },
+      },
+    };
+    expect(errorsOf(source(qa))).toEqual([]);
+    const leaves = { agent: "Review it.", outcomes: { approve: { exit: "approved", means: "no blocking findings" }, rework: { exit: "rework", produces: ["findings"] } } };
+    expect(sharedErrorsOf(shared(leaves))).toEqual([]);
+    expect(sharedErrorsOf(shared(qa))).toEqual([]);
+  });
+
+  test("neither schema accepts an outcome's meaning, verdict or produces beside a route a person or a command takes, nor a step in the old wording", () => {
+    const gateMeans = { gate: "Approve?", outcomes: { approve: { to: "$done", means: "fine" } } };
+    const checkVerdict = { check: "bun test", timeout: "5m", outcomes: { pass: { to: "$done", verdict: "pass" } } };
     const exitMeans = { check: "bun test", timeout: "5m", outcomes: { pass: { exit: "tested", means: "green" } } };
-    for (const step of [routed, judged]) expect(validate("workflow-source", source(step)).ok).toBe(false);
-    expect(validate("workflow-shared", shared(exitMeans)).ok).toBe(false);
+    const gateProduces = { gate: "Approve?", produces: ["findings"], outcomes: { approve: "$done" } };
+    for (const step of [gateMeans, checkVerdict, gateProduces]) expect({ step, ok: validate("workflow-source", source(step)).ok }).toEqual({ step, ok: false });
+    for (const step of [gateMeans, exitMeans, gateProduces]) expect({ step, ok: validate("workflow-shared", shared(step)).ok }).toEqual({ step, ok: false });
     const old = { type: "agent", skill: "a", instructions: "Do it.", outcomes: { done: { to: "$done", means: "done" } } };
     expect(validate("workflow-source", source(old)).ok).toBe(false);
     expect(validate("workflow-shared", shared(old)).ok).toBe(false);
+  });
+
+  test("an outcome object refuses a key it has no use for, and a produced file entry holds its name and file only", () => {
+    const step = (outcome: unknown, extra: Record<string, unknown> = {}) => source({ agent: "Do it.", outcomes: { done: outcome }, ...extra });
+    for (const bad of [step({ to: "$done", mean: "x" }), step({ to: "$done", produces: [{ name: "n", file: "n.md", on: ["done"] }] }), step("$done", { produces: [{ name: "n" }] }), step({ to: "$done", produces: ["Not A Name"] })])
+      expect({ bad, ok: validate("workflow-source", bad).ok }).toEqual({ bad, ok: false });
+  });
+});
+
+describe("the shipped workflows against the schemas a person writes against", () => {
+  const dir = join(REPO_ROOT, "packages", "pack-sdlc", "assets", "workflows");
+  const yamls = (d: string) => readdirSync(d).filter((f) => f.endsWith(".yaml"));
+  test.each(yamls(dir))("%s validates against workflow-source", (file) => {
+    expect(errorsOf(parse(readFileSync(join(dir, file), "utf8")))).toEqual([]);
+  });
+  test.each(yamls(join(dir, "shared")))("shared/%s validates against workflow-shared", (file) => {
+    expect(sharedErrorsOf(parse(readFileSync(join(dir, "shared", file), "utf8")))).toEqual([]);
   });
 });
 

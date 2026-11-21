@@ -214,10 +214,13 @@ function stepTypes<S extends TSchema>(outcome: S) {
 /**
  * The step shapes as a file writes them: one head key says what happens (`agent: <orientation>`,
  * `check: <command>`, `gate: <decision>`, or a verb with no value), the loader reads each into the
- * model's `type`-tagged step. `outcomes:` holds only routes; an agent step's meanings and verdicts sit
- * beside it in `means:` and `verdict:`.
+ * model's `type`-tagged step. An agent step's outcome may be an object saying everything about the
+ * outcome (`agentRoute`: its route, `means`, `verdict` and `produces`), and its step-level `produces:`
+ * lists what every outcome produces unless the outcome lists its own; the older sibling maps (`means:`,
+ * `verdict:`, `criteria:`, `hand_back:`, `produces:` as a map of files) still load. Any other step's
+ * outcome is a route only.
  */
-function fileStepTypes<R extends TSchema>(route: R, onRoute: TSchema) {
+function fileStepTypes<R extends TSchema>(route: R, agentRoute: TSchema, onRoute: TSchema) {
   const routes = openOutcomes(route);
   /** What may interrupt a waiting step from outside: signal name → route, with the signal's parameters (`after:` for `timeout`). */
   const on = Type.Optional(
@@ -230,7 +233,8 @@ function fileStepTypes<R extends TSchema>(route: R, onRoute: TSchema) {
       agent: Type.String({ minLength: 1, pattern: "\\S", description: "The orientation: what the step is for" }),
       ...agentKeys,
       by: Type.Optional(Type.String({ minLength: 1, description: "Name from config.agents; default config.agent" })),
-      outcomes: routes,
+      produces: Type.Optional(Type.Union([agentKeys.produces, ProducesList], { description: "What every outcome produces unless it lists its own, or the older map of files" })),
+      outcomes: openOutcomes(agentRoute),
       means: Type.Optional(Type.Record(OutcomeName, Type.String({ minLength: 1 }), { additionalProperties: false, description: "Outcome → what it means, shown to the agent in the brief" })),
       verdict: Type.Optional(Type.Record(OutcomeName, Verdict, { additionalProperties: false, description: "Outcome → the worst criteria verdict it may be reported with" })),
     },
@@ -264,7 +268,7 @@ function fileStepTypes<R extends TSchema>(route: R, onRoute: TSchema) {
     OpenPrStep: verb("open-pr", ["done", "conflict"]),
     IntegrateStep: verb("integrate", ["done", "conflict"]),
     PushStep: verb("push", ["done", "conflict"]),
-    AwaitMergeStep: verb("await-merge", ["stale"], true),
+    AwaitMergeStep: verb("await-merge", ["merged", "unpushed", "stale"], true),
     SlicesStep: verb("slices", ["done", "stuck"]),
   };
 }
@@ -359,14 +363,41 @@ export const ExitEdge = Type.Object(
 export type ExitEdge = Static<typeof ExitEdge>;
 
 /**
- * A route as a file writes it: a bare target or `{ to, counter, max }`; its meaning and verdict sit in the step's sibling maps.
- * `max` bounds the counter derived from the edge; the loader turns it into a counter, so the loaded workflow never holds it.
+ * A route as a file writes it: a bare target or `{ to, counter, max }`. `max` bounds the counter
+ * derived from the edge; the loader turns it into a counter, so the loaded workflow never holds it.
  */
 const RouteEdge = Type.Object(
   { to: Target, counter: Type.Optional(CounterName), max: Type.Optional(PosInt) },
   { additionalProperties: false },
 );
 const FileRoute = Type.Union([Target, RouteEdge]);
+
+/**
+ * What an agent's report of an outcome comes with: a report norn takes with it (`criteria`,
+ * `findings`, `evidence`), bare, or a file of the spec folder, given once in the step as
+ * `{ name, file }` and named bare elsewhere in it. Which names are reports is the loader's check.
+ */
+export const ProducesEntry = Type.Union([
+  OutcomeName,
+  Type.Object(
+    { name: OutcomeName, file: Type.String({ minLength: 1, pattern: "\\S", description: "The file, relative to the story's spec folder (`pr.md`)" }) },
+    { additionalProperties: false },
+  ),
+]);
+export type ProducesEntry = Static<typeof ProducesEntry>;
+export const ProducesList = Type.Array(ProducesEntry, { uniqueItems: true });
+export type ProducesList = Static<typeof ProducesList>;
+
+/** What an agent step's outcome object says of the outcome beside its route. */
+const outcomeFields = {
+  means: Type.Optional(Type.String({ minLength: 1, description: "Shown to the agent in the brief" })),
+  verdict: Type.Optional(Verdict),
+  produces: Type.Optional(ProducesList),
+};
+/** An agent step's outcome as a file writes it: a bare target, or the route with everything about the outcome. */
+const AgentRoute = Type.Union([Target, Type.Object({ ...RouteEdge.properties, ...outcomeFields }, { additionalProperties: false })]);
+/** An outcome of a shared file's agent step may leave the file instead; its bound sits on the `use` step's route. */
+const SharedExitOutcome = Type.Object({ exit: OutcomeName, ...outcomeFields }, { additionalProperties: false });
 /**
  * A route under `on:`: a route as under `outcomes:`, whose edge may also carry the signal's parameters.
  * Open, since a plugin's signal declares its own parameters, which only the loader knows to check.
@@ -374,10 +405,14 @@ const FileRoute = Type.Union([Target, RouteEdge]);
 const signalParams = { after: Type.Optional(Duration) };
 const OnEdge = Type.Object({ ...RouteEdge.properties, ...signalParams }, { additionalProperties: true });
 const OnExit = Type.Object({ exit: OutcomeName, ...signalParams }, { additionalProperties: true });
-const fileSteps = (route: TSchema, onRoute: TSchema) => Object.values(fileStepTypes(route, onRoute)) as TObject[];
-const FileSteps = fileSteps(FileRoute, Type.Union([Target, OnEdge]));
+const fileSteps = (route: TSchema, agentRoute: TSchema, onRoute: TSchema) => Object.values(fileStepTypes(route, agentRoute, onRoute)) as TObject[];
+const FileSteps = fileSteps(FileRoute, AgentRoute, Type.Union([Target, OnEdge]));
 // A shared file's route may also leave it through an exit, which its `use` step routes by name
-const SharedSteps = fileSteps(Type.Union([FileRoute, Type.Object({ exit: OutcomeName }, { additionalProperties: false })]), Type.Union([Target, OnEdge, OnExit]));
+const SharedSteps = fileSteps(
+  Type.Union([FileRoute, Type.Object({ exit: OutcomeName }, { additionalProperties: false })]),
+  Type.Union([AgentRoute, SharedExitOutcome]),
+  Type.Union([Target, OnEdge, OnExit]),
+);
 
 // As written in a shared file: a declared (dotless) counter, and a `max` the loader turns into a derived counter
 const SharedModelEdge = Type.Object(

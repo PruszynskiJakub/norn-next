@@ -173,37 +173,74 @@
                   }
                 },
                 "produces": {
-                  "minProperties": 1,
-                  "additionalProperties": false,
-                  "description": "Name → the file the step writes for later steps, which list the name under inputs:",
-                  "type": "object",
-                  "patternProperties": {
-                    "^[a-z][a-z0-9_-]*$": {
+                  "description": "What every outcome produces unless it lists its own, or the older map of files",
+                  "anyOf": [
+                    {
+                      "minProperties": 1,
                       "additionalProperties": false,
+                      "description": "Name → the file the step writes for later steps, which list the name under inputs:",
                       "type": "object",
-                      "required": [
-                        "file"
-                      ],
-                      "properties": {
-                        "file": {
-                          "minLength": 1,
-                          "pattern": "\\S",
-                          "description": "The file, relative to the story's spec folder (`pr.md`)",
-                          "type": "string"
-                        },
-                        "on": {
-                          "minItems": 1,
-                          "uniqueItems": true,
-                          "description": "The outcomes whose report needs the file",
-                          "type": "array",
-                          "items": {
-                            "pattern": "^[a-z][a-z0-9_-]*$",
-                            "type": "string"
+                      "patternProperties": {
+                        "^[a-z][a-z0-9_-]*$": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "file"
+                          ],
+                          "properties": {
+                            "file": {
+                              "minLength": 1,
+                              "pattern": "\\S",
+                              "description": "The file, relative to the story's spec folder (`pr.md`)",
+                              "type": "string"
+                            },
+                            "on": {
+                              "minItems": 1,
+                              "uniqueItems": true,
+                              "description": "The outcomes whose report needs the file",
+                              "type": "array",
+                              "items": {
+                                "pattern": "^[a-z][a-z0-9_-]*$",
+                                "type": "string"
+                              }
+                            }
                           }
                         }
                       }
+                    },
+                    {
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "pattern": "^[a-z][a-z0-9_-]*$",
+                            "type": "string"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "name",
+                              "file"
+                            ],
+                            "properties": {
+                              "name": {
+                                "pattern": "^[a-z][a-z0-9_-]*$",
+                                "type": "string"
+                              },
+                              "file": {
+                                "minLength": 1,
+                                "pattern": "\\S",
+                                "description": "The file, relative to the story's spec folder (`pr.md`)",
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
                     }
-                  }
+                  ]
                 },
                 "writes": {
                   "description": "worktree (default): the unit's worktree; docs: only the story's documents in its spec folder",
@@ -254,6 +291,63 @@
                                 "max": {
                                   "minimum": 1,
                                   "type": "integer"
+                                },
+                                "means": {
+                                  "minLength": 1,
+                                  "description": "Shown to the agent in the brief",
+                                  "type": "string"
+                                },
+                                "verdict": {
+                                  "anyOf": [
+                                    {
+                                      "const": "fail",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "unverified",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "person",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "pass",
+                                      "type": "string"
+                                    }
+                                  ]
+                                },
+                                "produces": {
+                                  "uniqueItems": true,
+                                  "type": "array",
+                                  "items": {
+                                    "anyOf": [
+                                      {
+                                        "pattern": "^[a-z][a-z0-9_-]*$",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "name",
+                                          "file"
+                                        ],
+                                        "properties": {
+                                          "name": {
+                                            "pattern": "^[a-z][a-z0-9_-]*$",
+                                            "type": "string"
+                                          },
+                                          "file": {
+                                            "minLength": 1,
+                                            "pattern": "\\S",
+                                            "description": "The file, relative to the story's spec folder (`pr.md`)",
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
                                 }
                               }
                             }
@@ -269,6 +363,63 @@
                             "exit": {
                               "pattern": "^[a-z][a-z0-9_-]*$",
                               "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "produces": {
+                              "uniqueItems": true,
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "pattern": "^[a-z][a-z0-9_-]*$",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "type": "object",
+                                    "required": [
+                                      "name",
+                                      "file"
+                                    ],
+                                    "properties": {
+                                      "name": {
+                                        "pattern": "^[a-z][a-z0-9_-]*$",
+                                        "type": "string"
+                                      },
+                                      "file": {
+                                        "minLength": 1,
+                                        "pattern": "\\S",
+                                        "description": "The file, relative to the story's spec folder (`pr.md`)",
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
                             }
                           }
                         }
@@ -1204,6 +1355,98 @@
                   "additionalProperties": false,
                   "type": "object",
                   "properties": {
+                    "merged": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "to"
+                              ],
+                              "properties": {
+                                "to": {
+                                  "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                                  "type": "string"
+                                },
+                                "counter": {
+                                  "pattern": "^[a-z][a-z0-9_-]*$",
+                                  "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "exit"
+                          ],
+                          "properties": {
+                            "exit": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "unpushed": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "to"
+                              ],
+                              "properties": {
+                                "to": {
+                                  "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                                  "type": "string"
+                                },
+                                "counter": {
+                                  "pattern": "^[a-z][a-z0-9_-]*$",
+                                  "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "exit"
+                          ],
+                          "properties": {
+                            "exit": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    },
                     "stale": {
                       "anyOf": [
                         {
