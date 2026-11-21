@@ -148,7 +148,23 @@ describe("the run folder", () => {
     await h.files.write(`${WORKTREE}/.agents/run/out/evidence/shot.txt`, "old");
     await tickUntil(h, has("agent.start"));
     const left = Object.keys(h.files.snapshot()).filter((p) => p.startsWith(`${WORKTREE}/.agents/run/out/`));
-    expect(left).toEqual([]);
+    expect(left).toEqual([`${WORKTREE}/.agents/run/out/.gitignore`]);
+  });
+
+  test("a launch on a fresh worktree makes .agents/run/out/, so a shell redirect into $NORN_OUT finds its folder", async () => {
+    const h = harness({ workflow: "handed" });
+    h.items.push(trackerItem(1, ITEM));
+    await tickUntil(h, has("agent.start"));
+    // the host has no folders of their own: a folder exists once a file is in it
+    expect(await h.files.list(`${WORKTREE}/.agents/run/out`)).toEqual([".gitignore"]);
+    expect(await h.files.read(`${WORKTREE}/.agents/run/out/.gitignore`)).toBe("*\n");
+  });
+
+  test("norn brief makes .agents/run/out/ too, for a step briefed before its launch", async () => {
+    const { h } = await started();
+    await h.files.remove(`${WORKTREE}/.agents/run/out/.gitignore`);
+    await brief(h);
+    expect(await h.files.list(`${WORKTREE}/.agents/run/out`)).toEqual([".gitignore"]);
   });
 
   test("a launch removes a link left in .agents/run/out/ and never empties the folder it points at", async () => {

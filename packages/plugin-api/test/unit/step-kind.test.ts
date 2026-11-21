@@ -87,6 +87,14 @@ describe("step kind produces (plugin API 1.22)", () => {
     expect(stepKindProblems("open-pr", kind({ produces: [{ name: "Preview URL", file: "p.md" }] }))).toEqual(['produces "Preview URL" is not an input name']);
     expect(stepKindProblems("open-pr", kind({ produces: [{ name: "url", file: "a.md" }, { name: "url", file: "b.md" }] }))).toEqual(["produces repeat"]);
   });
+
+  test("a product's file stays in the story's spec folder, by the path rule an agent step's file follows", () => {
+    for (const file of ["../../package.json", "a/../../x.md", "/etc/x.md", "out\\x.md", "C:x.md", "c:/x.md"])
+      expect(stepKindProblems("open-pr", kind({ produces: [{ name: "url", file }] }))).toEqual([
+        `produces url names ${JSON.stringify(file)}, which leaves the story's spec folder: name a path inside it, without \`..\`, with \`/\` between folders and no drive letter`,
+      ]);
+    expect(stepKindProblems("open-pr", kind({ produces: [{ name: "url", file: "out/url.md" }] }))).toEqual([]);
+  });
 });
 
 describe("stepKindAnswerProblem", () => {

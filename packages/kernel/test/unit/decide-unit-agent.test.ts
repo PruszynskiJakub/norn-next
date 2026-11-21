@@ -60,6 +60,20 @@ describe("a ready agent step", () => {
     expect(decideCase({ state: stateAt("build", {}, optional), workflows: [optional] })?.rule).toBe("agent.start");
   });
 
+  test("a park on an unbound source lifts once the config binds it or the workflow gives it a path, and the step starts next", () => {
+    const parked = { reason: "source.unbound", since: minutesAgo(30) };
+    const step = graph({ build: { agent: agentSpec({ inputs: ["brand"], sources: ["brand"] }) } });
+    const unbound = loaded({ ...step, sources: { brand: { type: "folder" } } });
+    expect(decideCase({ state: stateAt("build", { parked }, unbound), workflows: [unbound] })?.rule).toBe("unit.parked");
+    const bound = { sources: { brand: "/assets/brand" } };
+    const lifted = kindOf(decideCase({ state: stateAt("build", { parked }, unbound), workflows: [unbound], config: bound }), "apply_receipts");
+    expect(lifted.rule).toBe("unit.unpark");
+    expect(lifted.state.parked).toBeUndefined();
+    expect(decideCase({ state: lifted.state, workflows: [unbound], config: bound })?.rule).toBe("agent.start");
+    const pathed = loaded({ ...step, sources: { brand: { type: "folder", path: "assets/brand" } } });
+    expect(decideCase({ state: stateAt("build", { parked }, pathed), workflows: [pathed] })?.rule).toBe("unit.unpark");
+  });
+
   test("a docs-only step starts where the harness denies a tool, and a step that writes its worktree starts either way", () => {
     const docs = loaded(graph({ build: { agent: agentSpec({ writes: "docs" }) } }));
     expect(decideCase({ state: stateAt("build", {}, docs), workflows: [docs] })?.rule).toBe("agent.start");

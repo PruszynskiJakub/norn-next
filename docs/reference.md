@@ -162,7 +162,7 @@ An entry of a `produces:` list is a report norn takes with the outcome, written 
 
 ### Reports
 
-A report is a registered type with one place in the run folder's `out/`, which the launch names in the agent's env as `$NORN_OUT` (`.agents/run/out/` in the worktree, ignored by git) and empties before every run, so it holds only what this run wrote. `norn done <outcome>` collects each report there, validates it and keeps it on the run's receipt; a report that does not validate is refused with its path and its shape, at any outcome, and a missing one is refused where its outcome needs it.
+A report is a registered type with one place in the run folder's `out/`, which the launch names in the agent's env as `$NORN_OUT` (`.agents/run/out/` in the worktree, ignored by git) and empties before every run, leaving the folder in place for a shell redirect into it, so it holds only what this run wrote. `norn done <outcome>` collects each report there, validates it and keeps it on the run's receipt; a report that does not validate is refused with its path and its shape, at any outcome, and a missing one is refused where its outcome needs it.
 
 | Type | Where | What it holds |
 |---|---|---|

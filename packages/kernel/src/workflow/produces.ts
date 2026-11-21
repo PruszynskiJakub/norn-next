@@ -4,7 +4,7 @@
  * file in the story's spec folder, written by the agent and checked by the host when it reports; the
  * kernel only checks the declarations and the graph, and never opens the file.
  */
-import { readName, type StepKindRead } from "@norn/plugin-api";
+import { LEAVES_SPEC_FOLDER, readName, type StepKindProduct, type StepKindRead, staysInside } from "@norn/plugin-api";
 import type { WorkflowStepDoc } from "./document.ts";
 import { type CompiledRoute, OVERRIDABLE_OUTCOMES, type WorkflowError } from "./graph.ts";
 
@@ -42,11 +42,7 @@ export function producedFiles(steps: Readonly<Record<string, WorkflowStepDoc>>):
   return [...new Set(Object.values(steps).flatMap((s) => Object.values(s.produces ?? {}).map((p) => p.file)))];
 }
 
-/**
- * A path that stays inside the folder it is relative to on every host: not absolute, no `..` segment,
- * no backslash (a separator on Windows, a plain character elsewhere) and no drive letter.
- */
-export const inside = (file: string): boolean => !file.startsWith("/") && !file.includes("\\") && !/^[A-Za-z]:/.test(file) && !file.split("/").includes("..");
+export const inside = staysInside;
 
 /** The path as segments, `.` and empty ones dropped, lower-cased: a case-insensitive file system makes `Spec.md` the spec. */
 const segments = (file: string): string[] => file.split("/").filter((s) => s !== "" && s !== ".").map((s) => s.toLowerCase());
@@ -67,7 +63,7 @@ export function produceErrors(step: WorkflowStepDoc, at: string, outcomes: reado
     const where = `${at}/produces/${name}`;
     if (host?.includes(name)) errors.push({ path: where, message: `\`${name}\` is an input norn provides: a step produces a name of its own` });
     if (!inside(p.file))
-      errors.push({ path: `${where}/file`, message: `\`${p.file}\` leaves the story's spec folder: name a path inside it, without \`..\`, with \`/\` between folders and no drive letter` });
+      errors.push({ path: `${where}/file`, message: `\`${p.file}\` ${LEAVES_SPEC_FOLDER}` });
     else if (norns(p.file, specFiles))
       errors.push({ path: `${where}/file`, message: `\`${p.file}\` is a file norn writes in the spec folder itself: name another (norn keeps ${specFiles.join(", ")})` });
     (p.on ?? []).forEach((o, i) => {
@@ -77,6 +73,22 @@ export function produceErrors(step: WorkflowStepDoc, at: string, outcomes: reado
         message: OVERRIDABLE.includes(o) ? `produces names '${o}', a route the kernel takes, never one an agent reports` : `produces names outcome '${o}', but the step declares no route for it in outcomes`,
       });
     });
+  }
+  return errors;
+}
+
+/**
+ * A step kind's products against the same rule an agent step's `produces:` follows: the plugin's own
+ * definition already keeps each file inside the spec folder, and only the host knows which files it
+ * writes there and which names it provides, so a kind cannot overwrite the spec or be shadowed by an input.
+ */
+export function kindProductErrors(kind: string, products: readonly StepKindProduct[], at: string, host: readonly string[] | undefined, specFiles: readonly string[] = []): WorkflowError[] {
+  const errors: WorkflowError[] = [];
+  for (const p of products) {
+    if (!inside(p.file)) errors.push({ path: at, message: `step kind ${kind} produces \`${p.name}\` as \`${p.file}\`, which ${LEAVES_SPEC_FOLDER}` });
+    else if (norns(p.file, specFiles))
+      errors.push({ path: at, message: `step kind ${kind} produces \`${p.name}\` as \`${p.file}\`, a file norn writes in the spec folder itself: the kind must name another (norn keeps ${specFiles.join(", ")})` });
+    if (host?.includes(p.name)) errors.push({ path: at, message: `step kind ${kind} produces \`${p.name}\`, an input norn provides: the kind must produce a name of its own` });
   }
   return errors;
 }

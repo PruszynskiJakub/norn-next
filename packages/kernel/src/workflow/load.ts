@@ -11,7 +11,7 @@ import { type CountedStep, deriveCounters } from "./counters.ts";
 import { type CounterDoc, type OnRoute, type Route, type WorkflowDocument, WorkflowFile, type WorkflowStepDoc } from "./document.ts";
 import { type Flat, flatten } from "./flatten.ts";
 import type { AgentStepSpec, CompiledCounter, CompiledRoute, CompiledStep, PinnedWorkflow, WorkflowError, WorkflowGraph, WorkflowLoad } from "./graph.ts";
-import { flowErrors, inside, producesOn, readersOf } from "./produces.ts";
+import { flowErrors, inside, kindProductErrors, producesOn, readersOf } from "./produces.ts";
 import { checkGraph } from "./shape.ts";
 import { type ReadStep, readStep } from "./steps.ts";
 
@@ -63,7 +63,7 @@ const fail = (errors: WorkflowError[]): Fail => ({ ok: false, errors });
  * step, `$done` or `$stuck`; a step no route reaches; a route back that no counter bounds; and an
  * `on:` block on a step that does not wait, naming a signal no source reports, giving parameters the
  * signal does not take, or naming what `outcomes:` already routes; a `produces:` file outside the
- * spec folder or one the host writes there (`opts.specFiles`), due on an outcome the step does not report, or named twice with two files; and, when
+ * spec folder or one the host writes there (`opts.specFiles`), due on an outcome the step does not report, or named twice with two files; a step kind's product file that norn writes there or named like an input norn provides; and, when
  * `opts.inputs` is given, an agent step's input name neither the host provides nor a step produces, a
  * produced name the host already provides, and a produced name an input or a step kind's `reads`
  * names that some path from `start` reaches with no producer on it.
@@ -104,6 +104,8 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
     else errors.push(...r.errors.map(inShared));
     // the host hands a reader the file by its name, so every producer of a name writes the same file
     const kind = productsOf(step, opts.stepKinds);
+    // a pinned revision (no `inputs`) loads to its hash, as an agent step's produces does
+    if (kind && opts.inputs) errors.push(...kindProductErrors(kind.head, kind.kind.produces ?? [], `/steps/${name}/${kind.head}`, opts.inputs, opts.specFiles).map(inShared));
     const products: [string, string, string][] = [
       ...Object.entries(step.produces ?? {}).map(([p, { file }]): [string, string, string] => [p, file, `/steps/${name}/produces/${p}/file`]),
       ...(kind?.kind.produces ?? []).map((p): [string, string, string] => [p.name, p.file, `/steps/${name}/${kind?.head}`]),

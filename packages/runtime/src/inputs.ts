@@ -56,6 +56,15 @@ export function runDirsEnv(worktree: string): Record<string, string> {
  */
 export async function clearOut(files: HostFiles, worktree: string): Promise<void> {
   await emptyFolder(files, `${worktree}/${OUT_DIR}`);
+  await makeOut(files, worktree);
+}
+
+/**
+ * Make sure `out/` exists: the host makes a folder only for a file in it, and an agent writing a
+ * report through the shell (`> $NORN_OUT/criteria.json`) gets no folder made for it.
+ */
+async function makeOut(files: HostFiles, worktree: string): Promise<void> {
+  await files.write(`${worktree}/${OUT_DIR}/${IGNORE_FILE}`, IGNORE_ALL);
 }
 
 async function emptyFolder(files: HostFiles, dir: string): Promise<void> {
@@ -366,6 +375,7 @@ export async function materializeInputs(env: RuntimeEnv, record: UnitJournal, br
   try {
     await env.ctx.files.write(`${worktree}/${RUN_DIR}/${IGNORE_FILE}`, IGNORE_ALL);
     await env.ctx.files.write(`${worktree}/${specFolder(unit)}/${IGNORE_FILE}`, IGNORE_ALL);
+    await makeOut(env.ctx.files, worktree);
     await readBackDocs(env, unit, worktree, producedOf(env, record));
     const item = await storyItem(env, unit);
     const out: MaterializedInputs = { inputs: [] };

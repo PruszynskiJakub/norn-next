@@ -150,6 +150,16 @@ export const readName = (read: StepKindRead): string => (typeof read === "string
  * produced file follows: `name` is what a later step reads it by, and `file` is relative to the
  * story's spec folder. It is due on every outcome the kind answers.
  */
+/**
+ * Whether a path stays inside the folder it is relative to on every host: not absolute, no `..`
+ * segment, no backslash (a separator on Windows, a plain character elsewhere) and no drive letter.
+ * The one rule for a produced file, whether an agent step or a step kind declares it.
+ */
+export const staysInside = (file: string): boolean => !file.startsWith("/") && !file.includes("\\") && !/^[A-Za-z]:/.test(file) && !file.split("/").includes("..");
+
+/** Why a produced file breaks the path rule, worded for whoever declared it. */
+export const LEAVES_SPEC_FOLDER = "leaves the story's spec folder: name a path inside it, without `..`, with `/` between folders and no drive letter";
+
 export interface StepKindProduct {
   name: string;
   file: string;
@@ -233,6 +243,7 @@ function producesProblems(produces: unknown): string[] {
   const bad = names.filter((n) => !OUTCOME_RE.test(n));
   if (bad.length > 0) out.push(`produces ${bad.map((n) => JSON.stringify(n)).join(", ")} ${bad.length === 1 ? "is not an input name" : "are not input names"}`);
   if (new Set(names).size !== names.length) out.push("produces repeat");
+  for (const p of produces as StepKindProduct[]) if (!staysInside(p.file)) out.push(`produces ${p.name} names ${JSON.stringify(p.file)}, which ${LEAVES_SPEC_FOLDER}`);
   return out;
 }
 

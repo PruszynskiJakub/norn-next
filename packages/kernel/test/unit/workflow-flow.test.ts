@@ -83,6 +83,21 @@ describe("produces: what an agent step writes for the steps after it", () => {
     expect(loadWorkflow(doc, opts({ inputs: undefined })).ok).toBe(true);
   });
 
+  test("a step kind's product is held to the rule an agent step's is: never a file norn writes in the spec folder, never a name norn provides", () => {
+    const specFiles = [".gitignore", "spec.md", "handoffs/", "slices/"];
+    const kinds = {
+      ...KINDS,
+      respec: { ...kind("respec", ["done"]), produces: [{ name: "draft", file: "./Spec.md" }] },
+      rediff: { ...kind("rediff", ["done"]), produces: [{ name: "diff", file: "diff.md" }] },
+    };
+    const doc = wf({ a: { respec: null, outcomes: { done: "b" } }, b: { rediff: null, outcomes: { done: "$done" } } });
+    expect(errorsOf(loadWorkflow(doc, opts({ stepKinds: kinds, specFiles })))).toEqual([
+      { path: "/steps/a/respec", message: "step kind respec produces `draft` as `./Spec.md`, a file norn writes in the spec folder itself: the kind must name another (norn keeps .gitignore, spec.md, handoffs/, slices/)" },
+      { path: "/steps/b/rediff", message: "step kind rediff produces `diff`, an input norn provides: the kind must produce a name of its own" },
+    ]);
+    expect(loadWorkflow(doc, opts({ stepKinds: kinds, inputs: undefined })).ok).toBe(true);
+  });
+
   test("produces is a key of an agent step only", () => {
     const doc = wf({ t: { check: "x", timeout: "1m", produces: NOTES, outcomes: { pass: "$done", fail: "$stuck" } } });
     expect(errorsOf(loadWorkflow(doc, opts()))).toEqual([{ path: "/steps/t/produces", message: "`produces` is not a key of a check step" }]);
