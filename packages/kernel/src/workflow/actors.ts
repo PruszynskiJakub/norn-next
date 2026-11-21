@@ -6,7 +6,9 @@
  * `reset_on` keep one dot, and a pin's hash never depends on which form a file used.
  */
 import { BUILTIN_STEP_KINDS, type SignalDeclaration, STEP_KEYS, STEP_KEYWORDS } from "@norn/plugin-api";
-import { AGENT_ROLES } from "@norn/schema";
+import { AGENT_ROLES, check } from "@norn/schema";
+import type { TSchema } from "@sinclair/typebox";
+import { ExitsDoc, SkillsDoc } from "./document.ts";
 import type { WorkflowError } from "./graph.ts";
 import type { StepKindInfo } from "./load.ts";
 
@@ -101,7 +103,7 @@ function agent(name: string, step: Obj): Lowered {
   if (step.do === undefined) errors.push({ path: at, message: `step '${name}' says what to do with do:` });
   else out.agent = step.do;
   for (const [k, v] of Object.entries(isObj(step.with) ? step.with : {})) {
-    if (k === "skills") out.skills = v;
+    if (k === "skills") out.skills = setting(`${at}/with/skills`, SkillsDoc, v, errors);
     else if (k === "executor" || k === "model") errors.push({ path: `${at}/with/${k}`, message: `\`${k}\` is not written: ${NO_EXECUTOR}` });
     else errors.push({ path: `${at}/with/${k}`, message: `\`${k}\` is not a setting of an agent step: with: holds skills` });
   }
@@ -135,7 +137,7 @@ function shell(name: string, step: Obj): Lowered {
   if (step.do === undefined) errors.push({ path: at, message: `step '${name}' says what to run with do:` });
   else out.check = step.do;
   for (const [k, v] of Object.entries(isObj(step.with) ? step.with : {})) {
-    if (k === "exits") out.exits = v;
+    if (k === "exits") out.exits = setting(`${at}/with/exits`, ExitsDoc, v, errors);
     else errors.push({ path: `${at}/with/${k}`, message: `\`${k}\` is not a setting of a shell step: with: holds exits` });
   }
   const limits = isObj(step.limits) ? step.limits : {};
@@ -230,6 +232,13 @@ function lowerOn(name: string, step: Obj, names: SurfaceNames, errors: WorkflowE
 }
 
 const surfaceOf = (d: SignalDeclaration | undefined): string | undefined => (d?.namespace ? `${d.namespace}.${d.name}` : undefined);
+
+/** A `with:` value checked by the schema of the pinned key it lowers to, since the pin is read back by that schema on every tick. */
+function setting(path: string, schema: TSchema, value: unknown, errors: WorkflowError[]): unknown {
+  const r = check(schema, value);
+  if (!r.ok) errors.push(...r.errors.map((e) => ({ path: `${path}${e.path}`, message: e.message })));
+  return value;
+}
 
 function pick(step: Obj, keys: readonly string[]): Obj {
   return Object.fromEntries(keys.filter((k) => step[k] !== undefined).map((k) => [k, step[k]]));

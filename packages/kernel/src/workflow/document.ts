@@ -118,6 +118,11 @@ const ProducesMap = Type.Record(Type.String({ pattern: OUTCOME_NAME_PATTERN }), 
 const FileProduces = Type.Union([ProducesMap, ProducesList]);
 
 const EXIT_CODE_PATTERN = "^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
+
+/** An agent step's skills, and a check step's exit codes each named as an outcome; `with:` lowers to these, so it is checked by them. */
+export const SkillsDoc = Type.Array(NonEmpty, { uniqueItems: true });
+export const ExitsDoc = Type.Record(Type.String({ pattern: EXIT_CODE_PATTERN }), OutcomeName, { ...closed, minProperties: 1 });
+
 const SharedName = Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "A shared file's name, without `.yaml`" });
 
 /**
@@ -157,7 +162,7 @@ function stepProps<R extends TSchema, O extends TSchema, P extends TSchema>(rout
     on: Type.Optional(Type.Record(OutcomeName, onRoute, { ...closed, minProperties: 1 })),
     means: Type.Optional(Type.Record(OutcomeName, Type.String({ minLength: 1 }), closed)),
     verdict: Type.Optional(Type.Record(OutcomeName, Verdict, closed)),
-    skills: Type.Optional(Type.Array(NonEmpty, { uniqueItems: true })),
+    skills: Type.Optional(SkillsDoc),
     inputs: Type.Optional(Type.Array(StepInputDoc, { uniqueItems: true })),
     /** what an agent step writes for later steps, by the name their `inputs:` (or a step kind's `reads`) use */
     produces: Type.Optional(produces),
@@ -171,7 +176,7 @@ function stepProps<R extends TSchema, O extends TSchema, P extends TSchema>(rout
     nudges: Type.Optional(Type.Integer({ minimum: 0 })),
     retries: Type.Optional(Type.Integer({ minimum: 0 })),
     timeout: Type.Optional(Duration),
-    exits: Type.Optional(Type.Record(Type.String({ pattern: EXIT_CODE_PATTERN }), OutcomeName, { ...closed, minProperties: 1 })),
+    exits: Type.Optional(ExitsDoc),
   };
 }
 

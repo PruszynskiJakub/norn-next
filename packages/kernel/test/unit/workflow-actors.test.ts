@@ -104,6 +104,25 @@ describe("a step names its actor with by:", () => {
     );
   });
 
+  test("allow: without docs:write alone leaves the agent its worktree write", () => {
+    const older = wf({ a: { agent: "Do it.", outcomes: { done: "$done" } } });
+    pinsAlike(wf({ a: { by: "builder", do: "Do it.", allow: ["code:write"], outcomes: { done: "$done" } } }), older);
+    pinsAlike(wf({ a: { by: "builder", do: "Do it.", allow: ["code:write", "docs:write"], outcomes: { done: "$done" } } }), older);
+  });
+
+  test("a pinned document lowered from with: loads again with the same hash", () => {
+    const first = loaded(
+      loadWorkflow(
+        wf({
+          a: { by: "builder", do: "Do it.", with: { skills: ["norn-implement"] }, outcomes: { done: "t" } },
+          t: { by: "shell", do: "bun test", with: { exits: { 3: "flaky" } }, limits: { timeout: "1m" }, outcomes: { pass: "$done", fail: "$stuck", flaky: "$stuck" } },
+        }),
+        opts(),
+      ),
+    ).pinned;
+    expect(loaded(loadWorkflow(first.doc, opts())).pinned.hash).toBe(first.hash);
+  });
+
   test("norn.each runs the slices it reads", () => {
     pinsAlike(wf({ slices: { by: "norn.each", reads: ["slices"], outcomes: { done: "$done", stuck: "$stuck" } } }), wf({ slices: { slices: null, outcomes: { done: "$done", stuck: "$stuck" } } }));
   });
@@ -244,6 +263,16 @@ describe("refusals of the step form", () => {
     ]);
   });
 
+  test("with: holds an agent's skills as a list of names and a shell step's exits as exit code to outcome", () => {
+    const shell = (exits: unknown) => wf({ t: { by: "shell", do: "bun test", with: { exits }, limits: { timeout: "1m" }, outcomes: { pass: "$done", fail: "$stuck" } } });
+    expect(refusals(wf({ a: { by: "builder", do: "Do it.", with: { skills: "norn" }, outcomes: { done: "$done" } } }))).toEqual([
+      { path: "/steps/a/with/skills", message: "must be array" },
+    ]);
+    expect(refusals(wf({ a: { by: "builder", do: "Do it.", with: { skills: ["norn", ""] }, outcomes: { done: "$done" } } })).map((e) => e.path)).toEqual(["/steps/a/with/skills/1"]);
+    expect(refusals(shell(3))).toEqual([{ path: "/steps/t/with/exits", message: "must be object" }]);
+    expect(refusals(shell({ abc: "x" })).map((e) => e.path)).toEqual(["/steps/t/with/exits"]);
+  });
+
   test("do: is required of an agent, a person and a shell step, and a shell step's timeout", () => {
     expect(refusals(wf({ a: { by: "builder", outcomes: { done: "$done" } } }))).toEqual([{ path: "/steps/a", message: "step 'a' says what to do with do:" }]);
     expect(refusals(wf({ a: { by: "person", outcomes: { approve: "$done" } } }))).toEqual([{ path: "/steps/a", message: "step 'a' says what the person decides with do:" }]);
@@ -258,6 +287,9 @@ describe("refusals of the step form", () => {
     ]);
     expect(refusals(wf({ a: { by: "shell", do: "bun test", limits: { timeout: "1m", retries: 2 }, outcomes: { pass: "$done", fail: "$stuck" } } }))).toEqual([
       { path: "/steps/a/limits/retries", message: "`retries` bounds an agent step: a shell step is bounded by timeout" },
+    ]);
+    expect(refusals(wf({ a: { by: "builder", do: "Do it.", attended: true, outcomes: { done: "$done" } } }))).toEqual([
+      { path: "/steps/a/attended", message: "attended: names who stays beside the agent: person" },
     ]);
     expect(refusals(wf({ a: { agent: "Do it.", attended: "person", outcomes: { done: "$done" } } }))).toEqual([
       { path: "/steps/a/attended", message: "`attended: person` belongs to a step written with by:; an agent: step takes attended: true" },
