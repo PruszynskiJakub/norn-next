@@ -102,6 +102,21 @@ describe("step kind produces (plugin API 1.22)", () => {
   });
 });
 
+describe("step kind effects (plugin API 1.24)", () => {
+  test("a kind may declare the effects a person must stand before: outward, cost, forge-write", () => {
+    expect(stepKindProblems("deploy", kind({ name: "deploy", effects: ["outward", "cost"] }))).toEqual([]);
+    expect(stepKindProblems("merge", kind({ name: "merge", effects: ["forge-write"] }))).toEqual([]);
+    const plugin = defineNornPlugin({ name: "p", api: "^1.24", provides: { stepKinds: { deploy: kind({ name: "deploy", effects: ["outward"] }) } } });
+    expect(plugin.provides.stepKinds?.deploy?.effects).toEqual(["outward"]);
+  });
+
+  test("an effect is one of those, named once, in a list", () => {
+    expect(stepKindProblems("deploy", kind({ name: "deploy", effects: "outward" as never }))).toEqual(['effects must be a list of "outward", "cost" or "forge-write"']);
+    expect(stepKindProblems("deploy", kind({ name: "deploy", effects: ["publish" as never] }))).toEqual(['effects must be a list of "outward", "cost" or "forge-write"']);
+    expect(stepKindProblems("deploy", kind({ name: "deploy", effects: ["cost", "cost"] }))).toEqual(["effects repeat"]);
+  });
+});
+
 describe("stepKindAnswerProblem", () => {
   const effect = kind();
   const wait = kind({ name: "await-merge", mode: "wait", outcomes: ["merged", "stale"] });

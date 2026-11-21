@@ -11,6 +11,7 @@ import { type CountedStep, deriveCounters } from "./counters.ts";
 import { type CounterDoc, type OnRoute, type Route, type WorkflowDocument, WorkflowFile, type WorkflowStepDoc } from "./document.ts";
 import { type Flat, flatten } from "./flatten.ts";
 import type { AgentStepSpec, CompiledCounter, CompiledRoute, CompiledStep, PinnedWorkflow, WorkflowError, WorkflowGraph, WorkflowLoad } from "./graph.ts";
+import { type FloorStep, floorErrors } from "./floor.ts";
 import { flowErrors, inside, kindProductErrors, producesOn, readersOf } from "./produces.ts";
 import { checkGraph } from "./shape.ts";
 import { type ReadStep, readStep } from "./steps.ts";
@@ -20,7 +21,7 @@ import { type ReadStep, readStep } from "./steps.ts";
  * its name in a workflow file (`forge` in `forge.open-pr`), which the host knows from the plugin;
  * without it the kind's `slot` does, and a kind with neither is named only in the older form.
  */
-export type StepKindInfo = Pick<StepKindDefinition, "name" | "configSchema" | "outcomes" | "mode" | "reads" | "produces" | "slot"> & { namespace?: string };
+export type StepKindInfo = Pick<StepKindDefinition, "name" | "configSchema" | "outcomes" | "mode" | "reads" | "produces" | "slot" | "effects"> & { namespace?: string };
 
 /** The step kind a flat step runs, when it is one that declares products. */
 function productsOf(step: WorkflowStepDoc, stepKinds: Readonly<Record<string, StepKindInfo>>): { kind: StepKindInfo; head: string } | null {
@@ -53,6 +54,12 @@ export interface LoadWorkflowOptions {
    * the shipped pack's. A pinned revision already holds its role, so loading it needs none.
    */
   roles?: readonly string[];
+  /**
+   * Check the floor (`floorErrors`): `delegated` names the gates of this workflow a policy grant lets a
+   * stand-in decide. Left out for a pinned revision, which must load to its hash whatever the policy
+   * granted since, or a grant would take a round's workflow away mid-round.
+   */
+  floor?: { delegated: readonly string[] };
 }
 
 type Fail = { ok: false; errors: WorkflowError[] };
@@ -163,6 +170,18 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
     );
     const flow = flowErrors(flat.flat.start, routes, flatSteps, readers, kindOn);
     if (flow.length) return fail(flow.map(inShared));
+  }
+  if (opts.floor !== undefined) {
+    const steps: Record<string, FloorStep> = {};
+    for (const name of order) {
+      const head = read[name]?.kind as string;
+      const kind = Object.hasOwn(opts.stepKinds, head) ? opts.stepKinds[head] : undefined;
+      const namespace = kind?.namespace ?? kind?.slot;
+      steps[name] = { kind: head, actor: namespace ? `${namespace}.${head}` : head, effects: kind?.effects ?? [], routes: routes[name] ?? {} };
+    }
+    const origins = [{ step: flat.flat.start, named: "start" }, ...(flat.flat.base?.step !== undefined ? [{ step: flat.flat.base.step, named: "the entry update-branch" }] : [])];
+    const floor = floorErrors(steps, origins, new Set(opts.floor.delegated));
+    if (floor.length) return fail(floor.map(inShared));
   }
 
   const pinned = pin(written, flat.flat, read, routes, derived.counters);

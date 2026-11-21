@@ -162,6 +162,16 @@ export const staysInside = (file: string): boolean => !file.startsWith("/") && !
 /** Why a produced file breaks the path rule, worded for whoever declared it. */
 export const LEAVES_SPEC_FOLDER = "leaves the story's spec folder: name a path inside it, without `..`, with `/` between folders and no drive letter";
 
+/**
+ * What a step kind does that a person must stand before (plugin API 1.24), since no one can take it
+ * back once others act on it: `outward` reaches past the repo and its story branch (a deploy, a
+ * release, a post others act on), `cost` spends money, `forge-write` changes what a forge lets others
+ * merge or act on (marking a pull request ready, merging). A workflow loads only when a person's step
+ * no policy grant delegates stands on every path to a step of such a kind.
+ */
+export const KIND_EFFECTS = ["outward", "cost", "forge-write"] as const;
+export type KindEffect = (typeof KIND_EFFECTS)[number];
+
 export interface StepKindProduct {
   name: string;
   file: string;
@@ -184,6 +194,8 @@ export interface StepKindDefinition<S extends TSchema = TSchema> {
    * (`vcs.update-branch`). Absent, it is named after the plugin that provides it (`vercel.preview`).
    */
   slot?: KindSlot;
+  /** the effects a person must stand before (`KIND_EFFECTS`); absent: none */
+  effects?: readonly KindEffect[];
   run(input: StepKindInput<Static<S>>, ctx: HostContext): Promise<PluginResult<StepKindOutcome>>;
 }
 
@@ -221,7 +233,13 @@ export function stepKindProblems(key: string, value: unknown): string[] {
   if (v.produces !== undefined) out.push(...producesProblems(v.produces));
   const slot = slotProblem(v.slot);
   if (slot) out.push(slot);
+  if (v.effects !== undefined) out.push(...effectsProblems(v.effects));
   return out;
+}
+
+function effectsProblems(effects: unknown): string[] {
+  if (!Array.isArray(effects) || !effects.every((e) => (KIND_EFFECTS as readonly unknown[]).includes(e))) return [`effects must be a list of ${KIND_EFFECTS.map((e) => `"${e}"`).join(", ").replace(/, ([^,]*)$/, " or $1")}`];
+  return new Set(effects).size === effects.length ? [] : ["effects repeat"];
 }
 
 function readsProblems(reads: unknown): string[] {

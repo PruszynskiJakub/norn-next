@@ -28,7 +28,7 @@ export const STEP_KINDS: Record<string, StepKindInfo> = {
   integrate: kind("integrate", ["done", "conflict"], "effect", NONE, "vcs"),
   "open-pr": { ...kind("open-pr", ["done"], "effect", NONE, "forge"), reads: [{ name: "pr_body", fallback: "the body file an earlier pass left, else norn's footer alone" }] },
   push: kind("push", ["done"], "effect", NONE, "vcs"),
-  "await-merge": kind("await-merge", ["merged", "unpushed"], "wait", NONE, "forge"),
+  "await-merge": { ...kind("await-merge", ["merged", "unpushed"], "wait", NONE, "forge"), effects: ["forge-write"] },
 };
 
 export const readShipped = (file: string): Record<string, unknown> => parse(readFileSync(join(SHIPPED, file), "utf8"));

@@ -48,7 +48,7 @@ export function createRuntimeEnv(deps: Omit<RuntimeDeps, "tickId">): PluginResul
   const slots = resolveSlots(deps.ctx, deps.plugins, deps.config);
   if (!slots.ok) return slots;
   const repoWorkflows = deps.repoWorkflows ?? NO_REPO_WORKFLOWS;
-  const workflows = loadPackWorkflows(overlayRepoWorkflows(slots.value.pack, repoWorkflows), slots.value.stepKinds, deps.config.kernel, signalDeclarations(slots.value.signals));
+  const workflows = loadPackWorkflows(overlayRepoWorkflows(slots.value.pack, repoWorkflows), slots.value.stepKinds, deps.config.kernel, signalDeclarations(slots.value.signals), deps.config.standIn);
   if (!workflows.ok) return workflows;
   let env: RuntimeEnv | undefined;
   const launcher = launcherOf(deps, slots.value, () => env);

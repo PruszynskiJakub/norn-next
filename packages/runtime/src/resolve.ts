@@ -27,7 +27,7 @@ import {
 } from "@norn/plugin-api";
 import { parse } from "yaml";
 import { HOST_INPUTS, SPEC_FOLDER_FILES } from "./inputs.ts";
-import type { RuntimeConfig } from "./types.ts";
+import type { RuntimeConfig, StandIn } from "./types.ts";
 
 export interface ResolvedSlots {
   tracker: Tracker;
@@ -145,11 +145,24 @@ function parseYaml(text: string): { ok: true; value: unknown } | { ok: false; me
  * command over one file. A shared file that does not parse is named in the failure of every workflow
  * that does not load without it.
  */
+const NO_STAND_IN: StandIn = { gates: [], attended: [] };
+
+/**
+ * The gates of one workflow a policy grant lets a stand-in decide: a grant names a step as
+ * `<workflow>.<step>` by the workflow's name, the one `bind:` names it by, else by its file's.
+ */
+function delegatedGates(standIn: StandIn, doc: unknown, file: string): string[] {
+  const named = (doc as { name?: unknown } | null)?.name;
+  const prefix = `${typeof named === "string" ? named : file}.`;
+  return standIn.gates.filter((ref) => ref.startsWith(prefix)).map((ref) => ref.slice(prefix.length));
+}
+
 export function loadPackWorkflows(
   pack: Pack,
   stepKinds: Readonly<Record<string, ProvidedStepKind>>,
   config: Pick<RuntimeConfig["kernel"], "counterDefaults" | "maxNudges" | "maxRetries" | "deadlineMs"> = DEFAULT_KERNEL_CONFIG,
   signals: Readonly<Record<string, SignalDeclaration>> = {},
+  standIn: StandIn = NO_STAND_IN,
 ): PluginResult<KernelWorkflows["byName"]> {
   const sharedFiles: Record<string, unknown> = {};
   const sharedBroken: WorkflowError[] = [];
@@ -167,7 +180,8 @@ export function loadPackWorkflows(
       byName[name] = { ok: false, errors: [{ path: "", message: `${file} does not parse: ${doc.message}` }] };
       continue;
     }
-    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config, signals, inputs: HOST_INPUTS, specFiles: SPEC_FOLDER_FILES, ...(roles && { roles }) });
+    const floor = { delegated: delegatedGates(standIn, doc.value, name) };
+    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config, signals, inputs: HOST_INPUTS, specFiles: SPEC_FOLDER_FILES, floor, ...(roles && { roles }) });
     byName[name] = load.ok || sharedBroken.length === 0 ? load : { ok: false, errors: [...sharedBroken, ...load.errors] };
   }
   return ok(byName);

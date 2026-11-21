@@ -70,5 +70,7 @@ export const awaitMerge: StepKindDefinition<typeof AwaitMergeConfig> = {
   outcomes: ["merged", "unpushed"],
   mode: "wait",
   slot: "forge",
+  // it marks a draft ready for review, which asks people to merge it, so a person approves before it
+  effects: ["forge-write"],
   run,
 };

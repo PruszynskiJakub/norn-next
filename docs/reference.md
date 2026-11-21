@@ -34,7 +34,7 @@ policy:
     gates: [story.human-qa]          # only the user file grants this
 ```
 
-No stand-in acts on a grant yet: until a runner gives the agent an OS sandbox, every gate waits for the person and every attended step for its person ([Limitations](limitations.md)).
+No stand-in acts on a grant yet: until a runner gives the agent an OS sandbox, every gate waits for the person and every attended step for its person ([Limitations](limitations.md)). A granted gate already counts against the floor a workflow is checked against when it loads ([Workflow floor and confirmation](#workflow-floor-and-confirmation)).
 
 ### Executors and runners
 
@@ -96,6 +96,16 @@ A workflow sets the stale signal's settings once, and names the step `norn story
 signals: { vcs.stale: { when: conflict, verify: test } }   # when: conflict (default) or behind
 entries: { update-branch: update }
 ```
+
+### Workflow floor and confirmation
+
+**The floor.** A workflow loads only when a person stands before every effect they cannot take back. A step kind declares such effects: `outward` (it reaches past the repo and its story branch: a deploy, a release), `cost` (it spends money) and `forge-write` (it changes what a forge lets others merge: `forge.await-merge` marks the draft ready). Every path to such a step, from `start` and from the entry `norn story update-branch` re-enters, must pass a `by: person` step that no policy grant delegates ([Policy](#policy)). A file that breaks it is refused at that step, with the path that reaches it, as a refusal in `norn doctor` and when a round would start on it:
+
+```text
+step merge (forge.await-merge) writes to the forge, and start reaches it through build → merge with no `by: person` step on the way: put a person's step no policy grant delegates on every path to it
+```
+
+Opening the draft pull request (`forge.open-pr`) pushes only the story's branch and asks no one to merge, so the shipped workflows open it before the person's `ready` gate. A round already under way keeps the revision it pinned, whatever the policy grants since; a person who starts a round at a step (`norn story round --at`) stands there themselves.
 
 **The older form.** One head key per step, `agent: <instruction>`, `check: <command>`, `gate: <decision>`, `slices:`, or a step kind's bare name with no value (`open-pr:`), with `skills:`, `inputs:`, `writes:`, `attended: true`, `timeout:`, `exits:` and the step kind's settings beside it, and `base: { stale, step, verify }` for the workflow. It still loads, and pins the same document: a unit pins every workflow in that form, so a pin's hash never depends on which form its file used.
 
