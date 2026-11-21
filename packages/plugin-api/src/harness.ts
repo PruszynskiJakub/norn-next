@@ -153,4 +153,11 @@ export interface Harness {
    * agent's pane by a person, never by norn.
    */
   dialogKeys?(answer: string, dialog?: string): readonly RunnerKey[] | null;
+  /**
+   * What decides the agent's hooks in `worktree`, as text that changes when anyone changes them and
+   * only then: norn's hooks and any setting that turns hooks off (plugin API 1.25). A host pins it when
+   * a run starts and refuses `norn done` once it differs, as an agent that changed its own hooks ran
+   * unguarded. Null when nothing is installed. Absent: a host cannot tell a run's hooks changed.
+   */
+  hookConfig?(worktree: string): Promise<string | null>;
 }

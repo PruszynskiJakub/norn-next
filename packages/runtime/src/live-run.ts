@@ -42,7 +42,7 @@ function launchedRun(state: RunState, unapplied: readonly KernelReceipt[]): RunI
     if (d.kind !== "run.started" || d.run_kind !== "agent" || d.step !== state.step || d.attempt !== state.attempt || run?.id === d.run_id) continue;
     // as the kernel applies it: a fresh run only where none is, a retry only of the current one
     if ((d.retry_of ?? null) !== (run?.id ?? null)) continue;
-    run = { id: d.run_id, step: state.step, attempt: state.attempt, started_at: r.at, executor: d.executor, attended: d.attended, nudges: 0, ...(d.session !== undefined && { session: d.session }), ...(d.code !== undefined && { code: d.code }) };
+    run = { id: d.run_id, step: state.step, attempt: state.attempt, started_at: r.at, executor: d.executor, attended: d.attended, nudges: 0, ...(d.session !== undefined && { session: d.session }), ...(d.code !== undefined && { code: d.code }), ...(d.hooks !== undefined && { hooks: d.hooks }) };
   }
   return run;
 }

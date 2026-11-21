@@ -44,6 +44,8 @@ export const RunInfo = Type.Object(
     limited_until: Type.Optional(IsoTime),
     /** the agent run may not keep code: what it changed is checked against the visit's snapshot once it reports; absent, it keeps its commits */
     code: Type.Optional(GuardedCode),
+    /** a digest of the agent's hook config as its launch left it; `norn done` is refused once it differs */
+    hooks: Type.Optional(Type.String({ pattern: "^[0-9a-f]{64}$" })),
   },
   { ...closed, title: "RunInfo" },
 );

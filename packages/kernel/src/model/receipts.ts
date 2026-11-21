@@ -72,6 +72,8 @@ const KINDS = [
     session: Type.Optional(NonEmpty),
     /** the agent may not keep code, so the host notes what it could change before it starts (`run.snapshot`) */
     code: Type.Optional(GuardedCode),
+    /** a digest of the agent's hook config as the launch left it, which `norn done` holds the run to */
+    hooks: Type.Optional(Type.String({ pattern: "^[0-9a-f]{64}$" })),
   }),
   /**
    * what the agent of a run that may not keep code could change, noted after its intent and before it

@@ -11,7 +11,7 @@ import { ensureWorktree } from "./branches.ts";
 import { stopDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
 import { appendEvents } from "./events/log.ts";
-import { noteSnapshot } from "./detect.ts";
+import { hookDigest, noteSnapshot } from "./detect.ts";
 import { clearOut } from "./inputs.ts";
 import { nudgePromptId } from "./launcher.ts";
 import { unitInFacts } from "./record.ts";
@@ -39,10 +39,10 @@ function runOnRecord(t: TickContext, unit: string, runId: string): RunInfo | nul
   return run?.id === runId ? run : null;
 }
 
-/** The launch's own receipt: the intent again, now naming the session, so a replay finds the launch done. */
-function launched(intent: ReceiptIntent, handle: string): ReceiptData {
+/** The launch's own receipt: the intent again, now naming the session and pinning its hook config, so a replay finds the launch done. */
+function launched(intent: ReceiptIntent, handle: string, hooks: string | null): ReceiptData {
   if (intent.data.kind !== "run.started") throw new Error(`a launch goes under run.started, not ${intent.data.kind}`);
-  return { ...intent.data, session: handle };
+  return { ...intent.data, session: handle, ...(hooks !== null && { hooks }) };
 }
 
 /**
@@ -86,10 +86,13 @@ async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"r
       }
       await clearOut(t.env.ctx.files, worktree.value);
       const started = await t.env.launcher.start(request);
-      if (!started.ok) await endUnlaunched(t, unit, d.run_id, started.failure.message);
-      return started;
+      if (!started.ok) {
+        await endUnlaunched(t, unit, d.run_id, started.failure.message);
+        return started;
+      }
+      return ok({ handle: started.value.handle, hooks: await hookDigest(t.env, d.executor, worktree.value) });
     },
-    outcome: (v) => launched(d.intent, v.handle),
+    outcome: (v) => launched(d.intent, v.handle, v.hooks),
     next: () => null,
   });
   if (!acted.ok) return acted;

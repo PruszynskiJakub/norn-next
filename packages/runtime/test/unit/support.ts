@@ -509,6 +509,8 @@ export interface Harnessed {
   untracked: Record<string, string[]>;
   /** what each checkout's snapshot answers */
   checkouts: FakeCheckouts;
+  /** the fake harness's hook config, by worktree; absent: nothing installed */
+  hookConfigs: Record<string, string>;
   stepCalls: StepCall[];
   stepAnswers: Record<string, StepAnswer[]>;
   launcher: FakeLauncher;
@@ -583,6 +585,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
   const dirty: Record<string, string[]> = {};
   const untracked: Record<string, string[]> = {};
   const checkouts: FakeCheckouts = { snapshot: {}, changed: {}, none: opts.noSnapshot === true };
+  const hookConfigs: Record<string, string> = {};
   const stepCalls: StepCall[] = [];
   const stepAnswers: Record<string, StepAnswer[]> = {};
   const launcher = new FakeLauncher();
@@ -594,7 +597,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
       tracker: { fake: { configSchema: Type.Object({}), create: () => fakeTracker(items) } },
       forge: { fake: { configSchema: Type.Object({}), create: () => fakeForge(changes) } },
       vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped, dirty, untracked, checkouts) } },
-      harness: { fake: HARNESS },
+      harness: { fake: { ...HARNESS, hookConfig: async (wt: string) => hookConfigs[wt] ?? null } },
       stepKinds: fakeStepKinds(stepAnswers, stepCalls),
       packs: { test: { workflows: WORKFLOWS, shared: {}, skills: {}, ...(opts.roles && { roles: opts.roles }) } },
     },
@@ -624,7 +627,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     return id;
   };
   const runtime: Runtime = { tick: () => tick(env, nextId()) };
-  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stopped, dirty, untracked, checkouts, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
+  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stopped, dirty, untracked, checkouts, hookConfigs, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
 }
 
 export type Report = Awaited<ReturnType<Runtime["tick"]>>;

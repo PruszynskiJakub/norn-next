@@ -151,3 +151,18 @@ function headerOf(intent: ReceiptIntent): { step?: string; attempt?: number } {
   const { step, attempt } = intent.data;
   return { ...(step !== undefined && { step }), ...(attempt !== undefined && { attempt }) };
 }
+
+/**
+ * A digest of the agent's hook config in `worktree`, as the executor's harness reads it; null when it
+ * reads none or cannot say, which leaves the run unpinned rather than refusing every report.
+ */
+export async function hookDigest(env: RuntimeEnv, executor: string, worktree: string): Promise<string | null> {
+  const harness = env.slots.executors[executor];
+  if (!harness?.hookConfig) return null;
+  try {
+    const text = await harness.hookConfig(worktree);
+    return text === null ? null : new Bun.CryptoHasher("sha256").update(text).digest("hex");
+  } catch {
+    return null;
+  }
+}

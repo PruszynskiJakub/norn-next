@@ -112,7 +112,7 @@ function runStarted(state: RunState, d: ReceiptDataOf<"run.started">, step: Comp
   if (want === "step" && d.executor !== step.kind) return { reject: `${step.name} runs step kind ${step.kind}, not ${d.executor}` };
   if (state.run?.id === d.run_id) {
     // the same run again: the host learned its session after recording the launch
-    return { state: { ...state, run: { ...state.run, ...(d.session !== undefined ? { session: d.session } : {}) } } };
+    return { state: { ...state, run: { ...state.run, ...(d.session !== undefined ? { session: d.session } : {}), ...(d.hooks !== undefined && { hooks: d.hooks }) } } };
   }
   if (d.retry_of !== undefined && want !== "agent") return { reject: `only an agent run is retried in a fresh session, not a ${want} run` };
   if (d.retry_of !== undefined && d.retry_of !== state.run?.id) return { reject: `retry of ${d.retry_of}, but the current run is ${state.run?.id ?? "none"}` };
@@ -128,6 +128,7 @@ function runStarted(state: RunState, d: ReceiptDataOf<"run.started">, step: Comp
   };
   if (d.session !== undefined) run.session = d.session;
   if (d.code !== undefined) run.code = d.code;
+  if (d.hooks !== undefined) run.hooks = d.hooks;
   // a retry is counted even past the step's bound: refusing it would leave a launch that already
   // happened uncounted, and decide reads the count to stop retrying
   const retries_used = state.retries_used + (d.retry_of !== undefined ? 1 : 0);

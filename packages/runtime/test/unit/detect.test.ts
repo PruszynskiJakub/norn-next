@@ -174,3 +174,30 @@ describe("the write guard of a run that may not change code", () => {
     expect(r.reply.stdout).toContain("deny");
   });
 });
+
+describe("the run's hook config, pinned at its launch", () => {
+  async function pinned(workflow = "agented") {
+    const h = harness({ workflow, roles: SCRATCH });
+    h.hookConfigs[WT] = "norn's hooks";
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    return { h, runId: (await record(h, UNIT)).state?.run?.id as string };
+  }
+
+  test("is recorded with the launch as a digest, and norn done goes through while it holds", async () => {
+    const { h, runId } = await pinned();
+    const launched = (await record(h, UNIT)).receipts.findLast((r) => r.data.kind === "run.started");
+    expect(launched?.data).toMatchObject({ kind: "run.started", session: `h-${runId}`, hooks: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    expect((await done(h, runId, "done")).ok).toBe(true);
+  });
+
+  test("a hook config changed under the run refuses norn done, at any code level", async () => {
+    const { h, runId } = await pinned();
+    h.hookConfigs[WT] = "norn's hooks, and one of the agent's";
+    const r = await done(h, runId, "done");
+    expect(r.ok ? null : r.refusal).toMatchObject({ code: "hooks_changed", error: `the agent's hook config in ${WT} changed since run ${runId} started` });
+    delete h.hookConfigs[WT];
+    expect((await done(h, runId, "done", "r2")).ok).toBe(false);
+  });
+});

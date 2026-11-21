@@ -25,7 +25,7 @@ import {
 import type { Capability, HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
 import { parseUnitId, STORE_ID_PATTERN } from "@norn/plugin-api";
 import { type CriterionVerdict, type Finding, type Note, OUT_ENV, REPORT_TYPES, reportPath, type Verdict } from "@norn/schema";
-import { changesSince, ownedBy, snapshotOf } from "./detect.ts";
+import { changesSince, hookDigest, ownedBy, snapshotOf } from "./detect.ts";
 import { branchOf, baseRefOf, cutFrom } from "./branches.ts";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
@@ -177,6 +177,8 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     if (long) return long;
     const stopped = await unfinishedRefusal(env, unit);
     if (stopped) return stopped;
+    const hooked = await hooksRefusal(env, record.unit, live);
+    if (hooked) return hooked;
     const detected = await detectedRefusal(env, record, live, req.outcome);
     if (detected) return detected;
     const dirty = await uncommittedRefusal(env, unit, live.run.executor, live.run.code);
@@ -443,6 +445,23 @@ async function uncommittedRefusal(env: RuntimeEnv, unit: string, executor: strin
     `${worktree} holds uncommitted work: ${named}`,
     "run `git status` in the worktree, commit the work this step made, then report again; ask a person about a change you cannot tell whether to commit",
     "dirty_worktree",
+  );
+}
+
+/**
+ * Why a `done` cannot be recorded once the agent's hook config differs from the one its launch pinned,
+ * or null when it holds: hooks the agent changed, removed or turned off guarded nothing since, so what
+ * it reports cannot be taken as a guarded run's. Only a person can tell what happened.
+ */
+async function hooksRefusal(env: RuntimeEnv, unit: string, live: LiveStep): Promise<Refusable<never> | null> {
+  const pinned = live.run.hooks;
+  if (pinned === undefined) return null;
+  const worktree = worktreeOf(env, unit);
+  if ((await hookDigest(env, live.run.executor, worktree)) === pinned) return null;
+  return refuse(
+    `the agent's hook config in ${worktree} changed since run ${live.run.id} started`,
+    "put back the hooks norn installed (and any setting that turns hooks off) as the run found them, then report again; if you cannot, report stuck saying what changed",
+    "hooks_changed",
   );
 }
 

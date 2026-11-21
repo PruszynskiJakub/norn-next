@@ -97,3 +97,13 @@ describe("pi uninstall", () => {
     expect(readFileSync(ext(), "utf8")).toBe("export default function (pi) {}\n");
   });
 });
+
+describe("pi hook config", () => {
+  test("is norn's extension as installed, null without it, and changes with any edit to it", async () => {
+    expect(await piHarness.hookConfig?.(wt)).toBeNull();
+    await piHarness.install({ worktree: wt, hookCommand: HOOK_COMMAND });
+    expect(await piHarness.hookConfig?.(wt)).toBe(extensionSource(HOOK_COMMAND));
+    write(ext(), `${extensionSource(HOOK_COMMAND)}\n// off\n`);
+    expect(await piHarness.hookConfig?.(wt)).not.toBe(extensionSource(HOOK_COMMAND));
+  });
+});
