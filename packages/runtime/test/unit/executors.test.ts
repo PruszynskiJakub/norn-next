@@ -83,6 +83,17 @@ describe("executors as a harness in a runner", () => {
     expect(gathered.value.facts.capabilities.executors.claude?.resume).toBeUndefined();
   });
 
+  test("executors that name one runner with one config share its instance, so a runner that groups a story's runs sees them all", () => {
+    const { env } = build((c) => ({
+      ...c,
+      executors: { "deep@person": { name: "fake", runner: { name: "pane" } }, "other@person": { name: "fake", runner: { name: "pane" } }, "deep@none": { name: "fake", runner: { name: "pane", config: { size: 2 } } } },
+    }));
+    if (!env.ok) throw new Error(env.failure.message);
+    const executors = (env.value.launcher as HarnessLauncher).opts.executors;
+    expect(executors["deep@person"]?.runner).toBe(executors["other@person"]?.runner as Runner);
+    expect(executors["deep@none"]?.runner).not.toBe(executors["deep@person"]?.runner as Runner);
+  });
+
   test("an executor with no runner and no default runner is a refusal naming it", () => {
     const { env } = build((c) => ({ ...c, executors: { claude: { name: "fake" } } }));
     expect(env.ok ? null : env.failure.message).toBe('executor "claude" names no runner and the config has no default runner');
