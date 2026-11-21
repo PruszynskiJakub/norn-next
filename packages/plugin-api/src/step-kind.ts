@@ -29,7 +29,7 @@ export type BuiltinStepKind = (typeof BUILTIN_STEP_KINDS)[number];
 /**
  * Every other key a workflow step may hold. A step kind's name or config key may not be one of these,
  * or the loader could not tell which key of a step is its head. A keyword added here refuses a plugin
- * that used its name, so it takes a minor bump of the plugin API (`produces` and `writes`: 1.20).
+ * that used its name, so it takes a minor bump of the plugin API.
  */
 export const STEP_KEYWORDS = [
   "use",
