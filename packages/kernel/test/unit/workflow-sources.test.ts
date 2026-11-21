@@ -27,6 +27,25 @@ describe("an optional read", () => {
     expect(loaded(loadWorkflow(wf({ review: builder(["spec", "findings"]) }), opts())).pinned.hash).toBe(b.hash);
   });
 
+  test("a document pinned with a produced file named `findings` reloads to its hash, the reader keeping that file", () => {
+    // the older map form a unit may have pinned before `findings` meant the open findings
+    const doc = wf({
+      plan: { agent: "Plan.", produces: { findings: { file: "findings.md" } }, outcomes: { done: "review" } },
+      review: { agent: "Review.", inputs: ["spec", "findings"], outcomes: { done: "$done" } },
+    });
+    const pinned = loaded(loadWorkflow(doc, opts({ inputs: undefined }))).pinned;
+    expect(pinned.doc.steps.review?.inputs).toEqual(["spec", "findings"]);
+    expect(loaded(loadWorkflow(structuredClone(pinned.doc), opts({ inputs: undefined }))).pinned.hash).toBe(pinned.hash);
+  });
+
+  test("a new workflow producing a file named `findings` is refused: the name is the open findings", () => {
+    const doc = wf({
+      plan: { agent: "Plan.", produces: { findings: { file: "findings.md" } }, outcomes: { done: "review" } },
+      review: { agent: "Review.", inputs: ["spec", "findings"], outcomes: { done: "$done" } },
+    });
+    expect(refusals(doc)).toEqual([{ path: "/steps/plan/produces/findings", message: "`findings` is the open findings norn provides: a produced file takes a name of its own" }]);
+  });
+
   test("on an input norn provides it pins the bare name, as norn notes such an input when it holds nothing", () => {
     const a = loaded(loadWorkflow(wf({ build: builder(["spec", "diff?"]) }), opts())).pinned;
     const b = loaded(loadWorkflow(wf({ build: builder(["spec", "diff"]) }), opts())).pinned;

@@ -20,6 +20,17 @@ export interface MemoryFiles extends HostFiles {
 
 const trim = (p: string): string => (p.length > 1 ? p.replace(/\/+$/, "") : p);
 
+/** `path` with `.`, `..` and repeated slashes folded away; absolute paths only. */
+function normal(path: string): string {
+  const out: string[] = [];
+  for (const part of path.split("/")) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") out.pop();
+    else out.push(part);
+  }
+  return `/${out.join("/")}`;
+}
+
 export function memoryFiles(seed: Record<string, string> = {}): MemoryFiles {
   const files = new Map<string, string>(Object.entries(seed).map(([p, d]) => [trim(p), d]));
   let failing = false;
@@ -28,45 +39,71 @@ export function memoryFiles(seed: Record<string, string> = {}): MemoryFiles {
   const guard = (op: string, path: string): void => {
     if (failing) throw new Error(`memoryFiles: ${op} ${path} failed (injected)`);
   };
+  /**
+   * The stored path `path` names, following every link on the way as a disk does; the last part only
+   * when `last`, as removing or reading a link acts on the link itself. A relative path (only tests
+   * use one) is kept as it is.
+   */
+  const real = (path: string, last = true): string => {
+    const p = trim(path);
+    if (!p.startsWith("/") || links.size === 0) return p;
+    let pending = normal(p).split("/").slice(1);
+    let at = "";
+    let hops = 0;
+    while (pending.length > 0) {
+      const next = `${at}/${pending.shift()}`;
+      const target = links.get(next);
+      if (target === undefined || (pending.length === 0 && !last)) {
+        at = next;
+        continue;
+      }
+      if (++hops > 40) throw new Error(`memoryFiles: ${p} loops through its links`);
+      // the target is relative to the link's folder; walked again from the root, a link in it is followed too
+      pending = [...normal(target.startsWith("/") ? target : `${at}/${target}`).split("/").slice(1), ...pending];
+      at = "";
+    }
+    return at || "/";
+  };
   return {
-    read: async (path) => files.get(trim(path)) ?? null,
+    read: async (path) => files.get(real(path)) ?? null,
     write: async (path, data) => {
       guard("write", path);
-      files.set(trim(path), data);
-      executables.delete(trim(path));
+      files.set(real(path), data);
+      executables.delete(real(path));
     },
     writeExecutable: async (path, data) => {
       guard("write", path);
-      files.set(trim(path), data);
-      executables.add(trim(path));
+      files.set(real(path), data);
+      executables.add(real(path));
     },
-    executable: (path) => executables.has(trim(path)),
+    executable: (path) => executables.has(real(path)),
     create: async (path, data) => {
       guard("create", path);
-      const p = trim(path);
+      const p = real(path);
       if (files.has(p)) return false;
       files.set(p, data);
       return true;
     },
     list: async (dir) => {
-      const prefix = `${trim(dir)}/`;
+      const prefix = `${real(dir)}/`;
       const names = new Set<string>();
       for (const p of [...files.keys(), ...links.keys()]) if (p.startsWith(prefix)) names.add(p.slice(prefix.length).split("/")[0] as string);
       return [...names].sort();
     },
     symlink: async (target, path) => {
       guard("symlink", path);
-      const p = trim(path);
+      const p = real(path, false);
       if (files.has(p) || [...files.keys()].some((f) => f.startsWith(`${p}/`))) throw new Error(`memoryFiles: ${p} is not a link; it is left as it is`);
       links.set(p, target);
     },
-    readLink: async (path) => links.get(trim(path)) ?? null,
+    readLink: async (path) => links.get(real(path, false)) ?? null,
     links: () => Object.fromEntries([...links.entries()].sort(([a], [b]) => a.localeCompare(b))),
     remove: async (path) => {
       guard("remove", path);
-      files.delete(trim(path));
-      executables.delete(trim(path));
-      links.delete(trim(path));
+      const p = real(path, false);
+      files.delete(p);
+      executables.delete(p);
+      links.delete(p);
     },
     snapshot: () => Object.fromEntries([...files.entries()].sort(([a], [b]) => a.localeCompare(b))),
     failWrites: (on) => {

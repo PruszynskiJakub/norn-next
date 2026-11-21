@@ -121,6 +121,22 @@ describe("readable inputs", () => {
     await brief(h);
     expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`)).toContain("newer, from elsewhere");
   });
+
+  test("an untouched copy in a worktree made before the run folder, its base under .agents/inputs/.base/, never overwrites a newer document", async () => {
+    const { h } = await started();
+    await brief(h);
+    // the worktree as an older norn left it: norn's copy of the handoff only in the old base folder
+    const handoff = `.agents/specs/lt-1/handoffs/lt-1.md`;
+    const copy = await h.files.read(`${WORKTREE}/.agents/run/.base/specs/lt-1/handoffs/lt-1.md`);
+    expect(copy).toBe(await h.files.read(`${WORKTREE}/${handoff}`));
+    await h.files.write(`${WORKTREE}/.agents/inputs/.base/specs/lt-1/handoffs/lt-1.md`, copy ?? "");
+    await h.files.remove(`${WORKTREE}/.agents/run/.base/specs/lt-1/handoffs/lt-1.md`);
+    const write = await h.env.slots.store.artifacts?.write(UNIT, handoffArtifact(UNIT), "# Handoff\n\nnewer, from elsewhere\n");
+    expect(write?.ok).toBe(true);
+    await brief(h);
+    expect(await doc(h, handoffArtifact(UNIT))).toContain("newer, from elsewhere");
+    expect(await h.files.read(`${WORKTREE}/${handoff}`)).toContain("newer, from elsewhere");
+  });
 });
 
 describe("the run folder", () => {
@@ -133,6 +149,19 @@ describe("the run folder", () => {
     await tickUntil(h, has("agent.start"));
     const left = Object.keys(h.files.snapshot()).filter((p) => p.startsWith(`${WORKTREE}/.agents/run/out/`));
     expect(left).toEqual([]);
+  });
+
+  test("a launch removes a link left in .agents/run/out/ and never empties the folder it points at", async () => {
+    const h = harness({ workflow: "handed" });
+    h.items.push(trackerItem(1, ITEM));
+    await h.files.write("/machine/repo/test-output/report.txt", "the agent's test output");
+    await h.files.write("/machine/repo/test-output/shots/a.png", "png");
+    // an earlier run linked its evidence folder to the test output
+    await h.files.symlink("../../../../../test-output", `${WORKTREE}/.agents/run/out/evidence`);
+    await tickUntil(h, has("agent.start"));
+    expect(await h.files.read("/machine/repo/test-output/report.txt")).toBe("the agent's test output");
+    expect(await h.files.read("/machine/repo/test-output/shots/a.png")).toBe("png");
+    expect(await h.files.readLink(`${WORKTREE}/.agents/run/out/evidence`)).toBeNull();
   });
 });
 

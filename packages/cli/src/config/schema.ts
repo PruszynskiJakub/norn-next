@@ -3,7 +3,7 @@
  * setting silently ignored; a slot's own keys (beside `use`) belong to the plugin that fills it, and
  * that plugin's factory validates them.
  */
-import { Mode, NonEmpty, PosInt } from "@norn/schema";
+import { Mode, NonEmpty, OUTCOME_NAME_PATTERN, PosInt } from "@norn/schema";
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
 
 const closed = { additionalProperties: false } as const;
@@ -69,8 +69,12 @@ export const KernelKnobs = Type.Object(
 /** A check's command by the name a workflow's check step spells as `{checks.<name>}`. */
 export const Checks = Type.Record(Name, NonEmpty, closed);
 
-/** Where this machine keeps each workflow source, by the name the workflow gives it: an absolute path, or one relative to the repo's root. */
-export const Sources = Type.Record(Type.String({ pattern: "^[a-z][a-z0-9_]*$" }), NonEmpty, closed);
+/**
+ * Where this machine keeps each workflow source, by the name the workflow gives it: an absolute path,
+ * or one relative to the repo's root. The key takes the workflow's own pattern for a source name, so
+ * every source a workflow may name can be bound.
+ */
+export const Sources = Type.Record(Type.String({ pattern: OUTCOME_NAME_PATTERN }), NonEmpty, closed);
 
 export const CONFIG_FORMAT = 1;
 

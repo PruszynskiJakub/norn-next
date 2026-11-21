@@ -32,6 +32,21 @@ describe("memoryFiles", () => {
     expect(f.snapshot()).toEqual({});
   });
 
+  test("a path through a link to a folder reaches the link's target, as on a disk; removing the link itself removes only the link", async () => {
+    const f = memoryFiles({ "/keep/a.txt": "kept", "/keep/sub/b.txt": "too" });
+    await f.symlink("../../keep", "/w/out/evidence");
+    expect(await f.list("/w/out")).toEqual(["evidence"]);
+    expect(await f.list("/w/out/evidence")).toEqual(["a.txt", "sub"]);
+    expect(await f.read("/w/out/evidence/sub/b.txt")).toBe("too");
+    await f.write("/w/out/evidence/c.txt", "new");
+    expect(await f.read("/keep/c.txt")).toBe("new");
+    await f.remove("/w/out/evidence/c.txt");
+    expect(await f.read("/keep/c.txt")).toBeNull();
+    await f.remove("/w/out/evidence");
+    expect(f.links()).toEqual({});
+    expect(f.snapshot()).toEqual({ "/keep/a.txt": "kept", "/keep/sub/b.txt": "too" });
+  });
+
   test("while writes fail, write, create and remove reject and change nothing; reads still work", async () => {
     const f = memoryFiles({ "/d/a": "1" });
     f.failWrites(true);

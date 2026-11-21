@@ -123,7 +123,7 @@ steps:
 
 - `type` is `folder` or `file`; the brief names the path, read-only, and norn copies nothing.
 - A step that reads a source without `?` that nothing binds parks `stuck` (`source.unbound`) before an agent starts, with the command that binds it, and `norn doctor` names it beforehand. Binding it lifts the park on the next tick.
-- A source takes a name of its own: not one of norn's inputs, not a name a step produces. A `path:` that leaves the repo is refused; bind a place outside it in the config.
+- A source takes a name of its own: not one of norn's inputs, not a name a step produces. It is spelt as a step's name is (lowercase letters, digits, `_` and `-`), and the config binds every name a workflow may give. A `path:` that leaves the repo is refused; bind a place outside it in the config.
 - A workflow with `sources:` pins them, so its pin's hash covers them; a workflow without pins as it did before sources existed.
 
 ## Outcomes
@@ -185,7 +185,7 @@ describe:
 ```
 
 - `file` is relative to the story's spec folder, `.agents/specs/<story>/`; a path that may leave it (absolute, with `..`, a backslash or a drive letter) is refused, and so is a file norn writes there itself: `.gitignore`, `spec.md`, or one under `handoffs/` or `slices/`.
-- The step's list is due on every outcome the step reports; an outcome that lists its own, such as `changes_requested: { to: implement, produces: [findings] }`, needs only what it lists. A name with no file in the step, or one name given two files, is refused. The older form, a map `pr_body: { file: pr.md, on: [done] }`, still loads: there `on:` names the outcomes, and without it every outcome but one that hands findings back.
+- The step's list is due on every outcome the step reports; an outcome that lists its own, such as `changes_requested: { to: implement, produces: [findings] }`, needs only what it lists. A name with no file in the step, or one name given two files, is refused. The older form, a map `pr_body: { file: pr.md, on: [done] }`, still loads: there `on:` names the outcomes, and without it every outcome but one that hands findings back. A file is never named `findings`, the open findings' name; a unit that pinned a workflow producing one before keeps reading that file.
 - A produced name may not be an input norn provides, and every step producing one name writes the same file.
 - `norn done <outcome>` is refused (`produced_missing`) while a file due on that outcome is missing or empty in the worktree; a file left by an earlier pass counts, as norn does not check that this run wrote it. The brief says which file each outcome needs.
 - A later step lists the name under `reads:`, and its brief names the file. norn keeps the file with the story's documents, so a step in another worktree gets it too.

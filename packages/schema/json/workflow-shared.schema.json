@@ -139,7 +139,7 @@
                         ]
                       },
                       {
-                        "pattern": "^[a-z][a-z0-9_]*\\??$",
+                        "pattern": "^[a-z][a-z0-9_-]*\\??$",
                         "description": "a name an earlier step produces, a source the workflow names, or findings, the open findings; a trailing ? makes it optional",
                         "type": "string"
                       },
@@ -1046,7 +1046,7 @@
                         ]
                       },
                       {
-                        "pattern": "^[a-z][a-z0-9_]*\\??$",
+                        "pattern": "^[a-z][a-z0-9_-]*\\??$",
                         "description": "a name an earlier step produces, a source the workflow names, or findings, the open findings; a trailing ? makes it optional",
                         "type": "string"
                       },

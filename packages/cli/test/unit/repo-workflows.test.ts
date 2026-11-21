@@ -130,4 +130,13 @@ describe("a repo workflow's sources", () => {
     const again = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; warning?: string }>).find((c) => c.name === "workflows");
     expect(again).not.toHaveProperty("warning");
   });
+
+  test("a hyphenated source name a workflow may give is one the config binds, so doctor's fix applies", async () => {
+    const m = repoWith({ "sourced.yaml": SOURCED.replaceAll("brand", "brand-assets") });
+    const check = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; do_instead?: string }>).find((c) => c.name === "workflows");
+    expect(check?.do_instead).toBe("norn config set sources.brand-assets <path>");
+    expect((await runCli(["config", "set", "sources.brand-assets", "/assets/brand", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    const again = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; warning?: string }>).find((c) => c.name === "workflows");
+    expect(again).not.toHaveProperty("warning");
+  });
 });

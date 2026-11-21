@@ -61,6 +61,12 @@ export async function clearOut(files: HostFiles, worktree: string): Promise<void
 async function emptyFolder(files: HostFiles, dir: string): Promise<void> {
   for (const name of await files.list(dir)) {
     const path = `${dir}/${name}`;
+    // a link is removed as itself: listing it would walk into its target, and empty a folder outside out/
+    const link = files.readLink ? await files.readLink(path) : null;
+    if (link !== null) {
+      await files.remove(path);
+      continue;
+    }
     let inner: string[];
     try {
       inner = await files.list(path);

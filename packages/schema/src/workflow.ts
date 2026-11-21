@@ -4,6 +4,7 @@ import {
   Duration,
   Mode,
   NonEmpty,
+  OUTCOME_NAME_PATTERN,
   OutcomeName,
   PosInt,
   StepName,
@@ -88,7 +89,7 @@ export type InputKind = Static<typeof InputKind>;
 export const StepInput = Type.Union([
   InputKind,
   Type.String({
-    pattern: "^[a-z][a-z0-9_]*\\??$",
+    pattern: `${OUTCOME_NAME_PATTERN.slice(0, -1)}\\??$`,
     description: "a name an earlier step produces, a source the workflow names, or findings, the open findings; a trailing ? makes it optional",
   }),
   Type.Object({ file: NonEmpty, label: Type.Optional(NonEmpty) }, { additionalProperties: false }),

@@ -90,8 +90,13 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
   const errors: WorkflowError[] = [];
   const produced = [...new Set(Object.values(flatSteps).flatMap((s) => [...Object.keys(s.produces ?? {}), ...(productsOf(s, opts.stepKinds)?.kind.produces ?? []).map((p) => p.name)]))];
   const sources = Object.keys(written.sources ?? {});
-  for (const step of Object.values(flatSteps)) if (step.inputs) step.inputs = lowerReads(step.inputs, [...produced, ...sources]);
+  for (const step of Object.values(flatSteps)) if (step.inputs) step.inputs = lowerReads(step.inputs, [...produced, ...sources], produced.includes(OPEN_FINDINGS));
   errors.push(...sourceErrors(written.sources ?? {}, opts.inputs, produced));
+  // a pinned revision (no `inputs`) producing a file named findings predates the open findings, and must still load to its hash
+  if (opts.inputs)
+    for (const [name, step] of Object.entries(flatSteps))
+      if (step.produces && Object.hasOwn(step.produces, OPEN_FINDINGS))
+        errors.push(inShared({ path: `/steps/${name}/produces/${OPEN_FINDINGS}`, message: `\`${OPEN_FINDINGS}\` is the open findings norn provides: a produced file takes a name of its own` }));
   const fileOf = new Map<string, { step: string; file: string }>();
   for (const [name, step] of Object.entries(flatSteps)) {
     const r = readStep(name, step, opts.stepKinds, signals, opts.inputs, produced, opts.specFiles, sources);
@@ -274,13 +279,14 @@ const readOf = (input: string): string => (input.endsWith("?") ? input.slice(0, 
  * A step's reads as the pinned document keeps them: `findings` is the open findings, which norn
  * provides as `last_findings`, and the optional mark stays only on a produced name or a source, where
  * it means something; norn notes any input of its own it holds nothing for. So a read spelt either way
- * pins one document.
+ * pins one document. In a document that produces a file named `findings` (one pinned before the name
+ * meant the open findings) the read is that file, left as written so the pin keeps its hash.
  */
-function lowerReads(inputs: WorkflowStepDoc["inputs"] & {}, optional: readonly string[]): NonNullable<WorkflowStepDoc["inputs"]> {
+function lowerReads(inputs: WorkflowStepDoc["inputs"] & {}, optional: readonly string[], findingsProduced: boolean): NonNullable<WorkflowStepDoc["inputs"]> {
   return inputs.map((input) => {
     if (typeof input !== "string") return input;
     const name = readOf(input);
-    if (name === OPEN_FINDINGS) return "last_findings";
+    if (name === OPEN_FINDINGS && !findingsProduced) return "last_findings";
     return input.endsWith("?") && optional.includes(name) ? input : name;
   });
 }

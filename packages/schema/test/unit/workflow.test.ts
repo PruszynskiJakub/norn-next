@@ -112,6 +112,12 @@ describe("workflow schema", () => {
     expect(modelErrorsOf(wf)).toEqual([]);
   });
 
+  test("a step reads a produced name or a source by the name the workflow may give it, hyphens included, optional or not", () => {
+    const wf = (inputs: unknown[]) => ({ name: "x", start: "a", steps: { a: { type: "agent", instructions: "do it", inputs, outcomes: { done: "$done" } } } });
+    expect(modelErrorsOf(wf(["brand-assets", "pr_body?", "brand-kit?"]))).toEqual([]);
+    expect(modelErrorsOf(wf(["Brand"])).length).toBeGreaterThan(0);
+  });
+
   test("a loaded agent step holds a list of skills, maybe none; a single `skill` is the file's wording, not the model's", () => {
     const wf = (step: Record<string, unknown>) => ({ name: "x", start: "a", steps: { a: { type: "agent", instructions: "do it", ...step, outcomes: { done: "$done" } } } });
     expect(modelErrorsOf(wf({}))).toEqual([]);
