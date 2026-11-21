@@ -64,6 +64,8 @@ export function applyOne(state: RunState, r: KernelReceipt, graph: WorkflowGraph
       return runBound(state, d.run_id) ?? onRun(state, (run) => ({ ...run, resumes: (run.resumes ?? 0) + 1 }));
     case "stop.sent":
       return runBound(state, d.run_id) ?? onRun(state, (run) => ({ ...run, stopped_at: r.at }));
+    case "run.snapshot":
+      return runBound(state, d.run_id) ?? snapshotted(state, d, r.at);
     case "run.limited":
       return runBound(state, d.run_id) ?? onRun(state, (run) => ({ ...run, limited_until: d.resets_at }));
     case "run.requested":
@@ -121,10 +123,19 @@ function runStarted(state: RunState, d: ReceiptDataOf<"run.started">, step: Comp
     nudges: 0,
   };
   if (d.session !== undefined) run.session = d.session;
+  if (d.code !== undefined) run.code = d.code;
   // a retry is counted even past the step's bound: refusing it would leave a launch that already
   // happened uncounted, and decide reads the count to stop retrying
   const retries_used = state.retries_used + (d.retry_of !== undefined ? 1 : 0);
   return { state: { ...unparked(state), run, retries_used } };
+}
+
+/** The park of a unit whose run's snapshot could not be taken: nothing would check what its agent changed. */
+export const SNAPSHOT_FAILED_PARK = "run.snapshot.failed";
+
+function snapshotted(state: RunState, d: ReceiptDataOf<"run.snapshot">, at: string): OneApplied {
+  if (d.failed === undefined) return d.snapshot === undefined ? { reject: "a snapshot names what it noted, or why it failed" } : { state };
+  return { state: { ...state, parked: { reason: SNAPSHOT_FAILED_PARK, since: at, text: `the snapshot run ${d.run_id} is checked against could not be taken: ${d.failed}` } } };
 }
 
 function onRun(state: RunState, change: (run: NonNullable<RunState["run"]>) => NonNullable<RunState["run"]>): OneApplied {

@@ -22,6 +22,7 @@ import {
   type Tracker,
   type TrackerItem,
   type Vcs,
+  type VcsSnapshot,
   type VcsUnfinished,
 } from "@norn/plugin-api";
 import { deriveUlid } from "@norn/schema";
@@ -88,6 +89,19 @@ export interface VcsCall {
  * A vcs with worktrees under the data dir, heads from a map, and every call recorded but `unfinished`
  * `uncommitted` and `untracked`, which answer from `stopped`, `dirty` and `untracked` by checkout path.
  */
+/**
+ * What a checkout's snapshot answers, by checkout path: `snapshot` what it notes now (a string is the
+ * failure it answers), `changed` the tracked paths changed since; `none` drops the three methods, as a
+ * vcs that cannot snapshot. `restore` records its call and puts the checkout back as it was noted.
+ */
+export interface FakeCheckouts {
+  snapshot: Record<string, VcsSnapshot | string>;
+  changed: Record<string, string[]>;
+  none: boolean;
+}
+
+export const BASE_SNAPSHOT: VcsSnapshot = { head: "head-0", tree: "tree-0", refs: "refs-0", config: "config-0", hooks: "hooks-0" };
+
 export function fakeVcs(
   ctx: HostContext,
   heads: Record<string, string>,
@@ -95,7 +109,29 @@ export function fakeVcs(
   stopped: Record<string, VcsUnfinished> = {},
   dirty: Record<string, string[]> = {},
   untracked: Record<string, string[]> = {},
+  checkouts: FakeCheckouts = { snapshot: {}, changed: {}, none: false },
 ): Vcs {
+  const snapshotting: Partial<Vcs> = checkouts.none
+    ? {}
+    : {
+        snapshot: (p) => {
+          calls.push({ op: "snapshot", args: [p] });
+          const s = checkouts.snapshot[p] ?? BASE_SNAPSHOT;
+          return Promise.resolve(typeof s === "string" ? fail("unknown", s) : ok({ ...s }));
+        },
+        changedSince: (p, tree) => {
+          calls.push({ op: "changedSince", args: [p, tree] });
+          return Promise.resolve(ok([...(checkouts.changed[p] ?? [])]));
+        },
+        restore: (p, to, paths) => {
+          calls.push({ op: "restore", args: [p, to, [...paths]] });
+          const left = (checkouts.changed[p] ?? []).filter((c) => !paths.includes(c));
+          checkouts.changed[p] = left;
+          const now = checkouts.snapshot[p];
+          if (typeof now === "object") checkouts.snapshot[p] = { ...now, head: to.head, ...(left.length === 0 && { tree: to.tree }) };
+          return Promise.resolve(ok(undefined));
+        },
+      };
   const path = (unit: string) => `${ctx.repo.dataDir}/worktrees/${unit.replace("/", "-")}`;
   const call = <T>(op: string, args: unknown[], value: T): Promise<PluginResult<T>> => {
     calls.push({ op, args });
@@ -119,6 +155,7 @@ export function fakeVcs(
     deleteBranch: (branch) => call("deleteBranch", [branch], undefined),
     push: (branch) => call("push", [branch], undefined),
     fetch: () => call("fetch", [], undefined),
+    ...snapshotting,
   };
 }
 
@@ -469,6 +506,8 @@ export interface Harnessed {
   dirty: Record<string, string[]>;
   /** untracked files, by checkout path, as the fake vcs reports them */
   untracked: Record<string, string[]>;
+  /** what each checkout's snapshot answers */
+  checkouts: FakeCheckouts;
   stepCalls: StepCall[];
   stepAnswers: Record<string, StepAnswer[]>;
   launcher: FakeLauncher;
@@ -525,6 +564,8 @@ export interface HarnessOptions {
   plugins?: NornPlugin[];
   /** the roles the test pack registers; absent, it registers none and no step is narrowed */
   roles?: Record<string, RoleDefinition>;
+  /** the vcs cannot snapshot a checkout */
+  noSnapshot?: boolean;
 }
 
 export function harness(opts: HarnessOptions = {}): Harnessed {
@@ -540,6 +581,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
   const stopped: Record<string, VcsUnfinished> = {};
   const dirty: Record<string, string[]> = {};
   const untracked: Record<string, string[]> = {};
+  const checkouts: FakeCheckouts = { snapshot: {}, changed: {}, none: opts.noSnapshot === true };
   const stepCalls: StepCall[] = [];
   const stepAnswers: Record<string, StepAnswer[]> = {};
   const launcher = new FakeLauncher();
@@ -550,7 +592,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     provides: {
       tracker: { fake: { configSchema: Type.Object({}), create: () => fakeTracker(items) } },
       forge: { fake: { configSchema: Type.Object({}), create: () => fakeForge(changes) } },
-      vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped, dirty, untracked) } },
+      vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped, dirty, untracked, checkouts) } },
       harness: { fake: HARNESS },
       stepKinds: fakeStepKinds(stepAnswers, stepCalls),
       packs: { test: { workflows: WORKFLOWS, shared: {}, skills: {}, ...(opts.roles && { roles: opts.roles }) } },
@@ -581,7 +623,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     return id;
   };
   const runtime: Runtime = { tick: () => tick(env, nextId()) };
-  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stopped, dirty, untracked, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
+  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stopped, dirty, untracked, checkouts, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
 }
 
 export type Report = Awaited<ReturnType<Runtime["tick"]>>;

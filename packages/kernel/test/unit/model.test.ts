@@ -144,6 +144,7 @@ describe("kernel schemas", () => {
       { kind: "run.resumed", run_id: "r" },
       { kind: "stop.sent", run_id: "r", reason: "timeout" },
       { kind: "run.limited", run_id: "r", resets_at: "2026-11-17T10:00:00.000Z" },
+      { kind: "run.snapshot", run_id: "r", failed: "no vcs snapshot" },
       { kind: "round.started", workflow: pinned },
       { kind: "step.moved", to: "work", by: "a-person" },
       { kind: "claim.taken", from: "machine-a", from_expires_at: "2026-11-17T10:00:00.000Z", to: "machine-b", version: 4, by: "machine-b", reason: "a is off" },

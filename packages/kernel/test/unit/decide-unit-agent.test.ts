@@ -611,3 +611,27 @@ describe("the effective grant", () => {
     expect(decideCase({ state: stateAt("build", {}, scratch), workflows: [scratch], executors: { claude: caps({ denyTool: false }) }, config: { roles } })?.rule).toBe("agent.start");
   });
 });
+
+describe("the code level a run starts under", () => {
+  const roles: Record<string, Capability[]> = { builder: ["code:write"], reviewer: ["code:read", "docs:write"], qa: ["code:scratch"] };
+  const at = (role: string) => {
+    const wf = loaded(graph({ build: { agent: agentSpec({ role }) } }));
+    return { wf, state: stateAt("build", {}, wf) };
+  };
+
+  test("is recorded on run.started when the grant may not keep code, so the host notes what the agent could change before it starts", () => {
+    for (const [role, code] of [["reviewer", "read"], ["qa", "scratch"]] as const) {
+      const { wf, state } = at(role);
+      const d = kindOf(decideCase({ state, workflows: [wf], config: { roles } }), "start_run");
+      expect(d.intent.data).toMatchObject({ kind: "run.started", code });
+    }
+    const { wf, state } = at("builder");
+    expect(kindOf(decideCase({ state, workflows: [wf], config: { roles } }), "start_run").intent.data).not.toHaveProperty("code");
+  });
+
+  test("a retry runs under the level its run started with", () => {
+    const { wf } = at("reviewer");
+    const d = kindOf(decideCase({ state: stateAt("build", { run: run({ code: "read" }) }, wf), workflows: [wf], session: session("ended"), config: { roles } }), "retry_run");
+    expect(d.intent.data).toMatchObject({ kind: "run.started", code: "read", retry_of: "run-1" });
+  });
+});

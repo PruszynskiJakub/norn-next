@@ -16,6 +16,10 @@ export const RUN_STATE_FORMAT = 1;
 /** The formats a reader of this build accepts. */
 export const READABLE_RUN_STATE_FORMATS: readonly number[] = [RUN_STATE_FORMAT];
 
+/** The code level of an agent run that may not keep code: it only reads, or changes it for the run alone. */
+export const GuardedCode = Type.Union([Type.Literal("read"), Type.Literal("scratch")]);
+export type GuardedCode = Static<typeof GuardedCode>;
+
 /** The run in progress for the current step and attempt: an agent's session, a check, or a plugin step. */
 export const RunInfo = Type.Object(
   {
@@ -38,6 +42,8 @@ export const RunInfo = Type.Object(
     stopped_at: Type.Optional(IsoTime),
     /** the reset of the last usage limit the session hit; the run's deadline counts from it, never through the wait */
     limited_until: Type.Optional(IsoTime),
+    /** the agent run may not keep code: what it changed is checked against the visit's snapshot once it reports; absent, it keeps its commits */
+    code: Type.Optional(GuardedCode),
   },
   { ...closed, title: "RunInfo" },
 );

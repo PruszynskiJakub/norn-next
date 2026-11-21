@@ -8,7 +8,7 @@ import { EndReason, ReportVerb } from "@norn/plugin-api";
 import { CriterionVerdict, Finding, IsoTime, Mode, NonEmpty, Note, OutcomeName, PosInt, SignalRef, StepName, TaggedUnion } from "@norn/schema";
 import { type Static, type TProperties, Type } from "@sinclair/typebox";
 import { GraphCounterName, PinnedWorkflow } from "../workflow/graph.ts";
-import { Ended } from "./run-state.ts";
+import { Ended, GuardedCode } from "./run-state.ts";
 
 const closed = { additionalProperties: false } as const;
 const Id = Type.String({ minLength: 1 });
@@ -19,6 +19,23 @@ const HEADER = { step: Type.Optional(StepName), attempt: Type.Optional(PosInt) }
 function kind<K extends string, P extends TProperties>(name: K, props: P) {
   return Type.Object({ kind: Type.Literal(name), ...HEADER, ...props }, closed);
 }
+
+/**
+ * What an agent could change, as the vcs noted it (`VcsSnapshot`) with the remote's copy of the unit's
+ * branch: HEAD and the remote head are commits, the tree a tree object, the rest opaque digests.
+ */
+export const RunSnapshot = Type.Object(
+  {
+    head: Type.Union([NonEmpty, Type.Null()]),
+    tree: NonEmpty,
+    refs: NonEmpty,
+    config: NonEmpty,
+    hooks: NonEmpty,
+    remote: Type.Union([NonEmpty, Type.Null()]),
+  },
+  { ...closed, title: "RunSnapshot" },
+);
+export type RunSnapshot = Static<typeof RunSnapshot>;
 
 /** How a run is carried out: an agent session, a check command, or a plugin step kind. */
 export const RunKind = Type.Union([Type.Literal("agent"), Type.Literal("check"), Type.Literal("step")]);
@@ -53,7 +70,15 @@ const KINDS = [
     retry_of: Type.Optional(Id),
     /** the harness session, once the host knows it */
     session: Type.Optional(NonEmpty),
+    /** the agent may not keep code, so the host notes what it could change before it starts (`run.snapshot`) */
+    code: Type.Optional(GuardedCode),
   }),
+  /**
+   * what the agent of a run that may not keep code could change, noted after its intent and before it
+   * starts: the visit's first snapshot, which a retry is checked against too; or why it could not be
+   * taken, which parks the unit stuck and never lets the run start
+   */
+  kind("run.snapshot", { run_id: Id, snapshot: Type.Optional(RunSnapshot), failed: Type.Optional(NonEmpty) }),
   kind("run.reported", {
     run_id: Id,
     verb: ReportVerb,

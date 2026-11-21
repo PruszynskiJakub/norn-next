@@ -574,3 +574,24 @@ describe("readRunState: formats", () => {
     expect(readRunState("{}")).toEqual({ ok: false, reason: "the run state is not an object" });
   });
 });
+
+describe("applyReceipts: detection of a run that may not keep code", () => {
+  const SNAP = { head: "a".repeat(40), tree: "b".repeat(40), refs: "r", config: "c", hooks: "h", remote: null };
+
+  test("a run started under a code level keeps it, and its snapshot changes nothing", () => {
+    const res = apply(fresh(), journal(1, started("a1", { code: "read" }), { kind: "run.snapshot", run_id: "a1", snapshot: SNAP }));
+    expect(res.rejected).toEqual([]);
+    expect(res.state.run?.code).toBe("read");
+    expect(res.state.parked).toBeUndefined();
+  });
+
+  test("a snapshot that could not be taken parks the unit stuck, saying why; it never passes", () => {
+    const res = apply(fresh(), journal(1, started("a1", { code: "scratch" }), { kind: "run.snapshot", run_id: "a1", failed: "git stash: fatal: index file corrupt" }));
+    expect(res.state.parked).toEqual({ reason: "run.snapshot.failed", since: iso(2), text: "the snapshot run a1 is checked against could not be taken: git stash: fatal: index file corrupt" });
+  });
+
+  test("a snapshot of another run is refused", () => {
+    const res = apply(fresh(), journal(1, started("a1", { code: "read" }), { kind: "run.snapshot", run_id: "zz", snapshot: SNAP }));
+    expect(res.rejected.map((r) => r.seq)).toEqual([2]);
+  });
+});

@@ -11,6 +11,7 @@ import { ensureWorktree } from "./branches.ts";
 import { stopDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
 import { appendEvents } from "./events/log.ts";
+import { noteSnapshot } from "./detect.ts";
 import { clearOut } from "./inputs.ts";
 import { nudgePromptId } from "./launcher.ts";
 import { unitInFacts } from "./record.ts";
@@ -78,6 +79,11 @@ async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"r
   const acted = await t.env.journal.act(unit, {
     intent: d.intent,
     perform: async () => {
+      // noted before the agent starts, so nothing it does can land before what it is checked against
+      if (d.intent.data.kind === "run.started" && d.intent.data.code !== undefined) {
+        const noted = await noteSnapshot(t.env, unit, worktree.value, d.intent);
+        if (!noted.ok) return noted;
+      }
       await clearOut(t.env.ctx.files, worktree.value);
       const started = await t.env.launcher.start(request);
       if (!started.ok) await endUnlaunched(t, unit, d.run_id, started.failure.message);

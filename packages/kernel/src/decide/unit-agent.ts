@@ -163,6 +163,7 @@ function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
   const run_id = v.ctx.nextId();
   // the match gave a person beside the step a runner with presence, and their start is on the record
   const attended = spec.attended === "person";
+  const code = codeLevelOf(grantOf(spec, v.ctx.config));
   return {
     kind: "start_run",
     unit: v.unit.id,
@@ -171,7 +172,7 @@ function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
     executor,
     attended,
     brief: briefOf(v, spec),
-    intent: intentFor(v, { kind: "run.started", run_id, run_kind: "agent", executor, attended }),
+    intent: intentFor(v, { kind: "run.started", run_id, run_kind: "agent", executor, attended, ...(code !== "write" && { code }) }),
   };
 }
 
@@ -350,6 +351,6 @@ function retry(v: UnitView, spec: AgentStepSpec, run: RunInfo, rule: string): De
     executor: run.executor,
     attended: false,
     brief: briefOf(v, spec),
-    intent: intentFor(v, { kind: "run.started", run_id, run_kind: "agent", executor: run.executor, attended: false, retry_of: run.id }),
+    intent: intentFor(v, { kind: "run.started", run_id, run_kind: "agent", executor: run.executor, attended: false, retry_of: run.id, ...(run.code !== undefined && { code: run.code }) }),
   };
 }
