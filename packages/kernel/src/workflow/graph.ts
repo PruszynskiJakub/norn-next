@@ -53,6 +53,10 @@ export const StepRunner = Type.Union([
 ]);
 export type StepRunner = Static<typeof StepRunner>;
 
+/** A file an agent step produces, and the outcomes it is due on, resolved from the step's `produces:`. */
+export const ProducedFile = Type.Object({ file: NonEmpty, on: Type.Array(OutcomeName) }, closed);
+export type ProducedFile = Static<typeof ProducedFile>;
+
 /** What an agent step's report must come with and may say, read by the brief builder and applyReceipts. */
 export const AgentStepSpec = Type.Object(
   {
@@ -65,6 +69,8 @@ export const AgentStepSpec = Type.Object(
     attended: Type.Boolean(),
     criteria: Type.Boolean(),
     hand_back: Type.Record(OutcomeName, HandBack),
+    /** produced name → its file and outcomes; absent when the step produces nothing */
+    produces: Type.Optional(Type.Record(Type.String(), ProducedFile)),
     means: Type.Record(OutcomeName, Type.String()),
     verdict: Type.Record(OutcomeName, Verdict),
     /** limits resolved from the step, then the workflow's `defaults`, then the kernel config */

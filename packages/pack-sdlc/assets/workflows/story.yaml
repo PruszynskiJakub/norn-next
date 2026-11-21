@@ -103,6 +103,9 @@ steps:
     agent: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
     skills: [norn-pr]
     inputs: [spec, diff, record]
+    # open-pr reads it; norn done refuses the report while pr.md is missing or empty
+    produces:
+      pr_body: { file: pr.md }
     outcomes:
       done: ship
     means:

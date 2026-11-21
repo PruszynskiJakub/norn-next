@@ -52,7 +52,28 @@ An agent step's `inputs:` lists what its brief gives it. norn writes each one un
 | `resolution` | the resolution to review: each merge's remerge-diff and the conflicts this round recorded |
 | `base_side` | the base side of a conflict: the base commit to merge and what it changed in each conflicting path |
 
-An entry may also be a file in the repo, `{file: <path>, label: <text>}`, which the brief names as it is. A workflow file naming any other input is refused when it loads, at the step and the entry (`/steps/review/inputs/2`), with the names above. A unit that pinned a workflow naming one before norn refused such names keeps running it, and its brief notes that norn provides no input of that name.
+An entry may also be a file in the repo, `{file: <path>, label: <text>}`, which the brief names as it is, or a name an earlier step produces (below). A workflow file naming any other input is refused when it loads, at the step and the entry (`/steps/review/inputs/2`), with the names above. A unit that pinned a workflow naming one before norn refused such names keeps running it, and its brief notes that norn provides no input of that name.
+
+### Produced files
+
+An agent step declares the files it writes for later steps under `produces:`, each by a name of its own:
+
+```yaml
+describe:
+  agent: "Write the PR body to pr.md in the spec folder."
+  produces:
+    pr_body: { file: pr.md }            # on: [done] would name the outcomes it is due on
+  outcomes: { done: ship }
+```
+
+- `file` is relative to the story's spec folder, `.agents/specs/<story>/`; a path that leaves it (absolute, or with `..`) is refused.
+- `on:` lists the outcomes whose report needs the file. Without it, every outcome the step reports needs it but one that hands findings back (`hand_back: findings`), which sends the work back rather than forward. An outcome the step does not report is refused.
+- A produced name may not be an input norn provides, and every step producing one name writes the same file.
+- `norn done <outcome>` is refused (`produced_missing`) while a file due on that outcome is missing or empty in the worktree. The brief says which file each outcome needs.
+- A later step lists the name under `inputs:`, and its brief names the file. norn keeps the file with the story's documents, so a step in another worktree gets it too.
+- A step that lists a produced name, or a step kind that reads one, must have a producer before it on every path from `start`, the producer reporting an outcome the file is due on. A file where some path lacks one is refused when it loads, naming the step and that path (`plan.skip → review`). A route back is fine.
+
+The bundled `describe` steps produce `pr_body`, which `open-pr` reads. `open-pr` reads it with a fallback: a base update's light path reaches `open-pr` again without `describe`, and then it reads the `pr.md` an earlier pass left, else opens the change with norn's footer alone. A unit that pinned its workflow before `produces:` existed loads it to the same graph and hash.
 
 ## Generated reference
 

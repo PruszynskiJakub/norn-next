@@ -13,7 +13,7 @@ import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import type { RuntimeEnv } from "./env.ts";
 import { readEvents } from "./events/log.ts";
 import { historyOf, rulingsOf } from "./input-history.ts";
-import { findingsList, INPUTS_NOTE, materializeInputs, unsettledCriteria, worktreeOf } from "./inputs.ts";
+import { findingsList, INPUTS_NOTE, materializeInputs, specFolder, unsettledCriteria, worktreeOf } from "./inputs.ts";
 import { reportableOutcomes } from "./live-run.ts";
 import { readStepRun } from "./step-runs.ts";
 import { loadPinned } from "./workflows.ts";
@@ -139,6 +139,7 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
   const history = historyOf(record);
   const made = await materializeInputs(env, record, brief, worktree ?? worktreeOf(env, record.unit));
   const inputs = made.ok ? made.value : null;
+  const produced = Object.entries(spec.produces ?? {}).map(([name, p]) => ({ name, path: `${specFolder(record.unit)}/${p.file}`, outcomes: [...p.on] }));
   return ok({
     brief,
     unit: record.unit,
@@ -149,6 +150,7 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
     ...(wantsCriteria(spec) && { criteria: { required: spec.criteria, verdict: { ...spec.verdict } } }),
     ...(attendedRun(record, runId, spec.attended) && { attended: true }),
     ...(Object.keys(spec.hand_back).length > 0 && { handBack: { ...spec.hand_back } }),
+    ...(produced.length > 0 && { produced }),
     ...(rework !== undefined && { rework }),
     ...(answered.length > 0 && { answered }),
     ...(retry !== undefined && { retry }),

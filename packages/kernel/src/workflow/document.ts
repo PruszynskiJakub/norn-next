@@ -61,6 +61,20 @@ export const StepInputDoc = Type.Union([
 ]);
 export type StepInputDoc = Static<typeof StepInputDoc>;
 
+/**
+ * A file an agent step writes for the steps after it, relative to the story's spec folder, and the
+ * outcomes whose report needs it (default: every outcome the step reports but one that hands findings
+ * back). The loader keeps the path inside the folder; the host refuses a report without the file.
+ */
+export const ProducesDoc = Type.Object(
+  {
+    file: Type.String({ minLength: 1, pattern: "\\S", description: "The file, relative to the story's spec folder (`pr.md`)" }),
+    on: Type.Optional(Type.Array(OutcomeName, { minItems: 1, uniqueItems: true })),
+  },
+  closed,
+);
+export type ProducesDoc = Static<typeof ProducesDoc>;
+
 const EXIT_CODE_PATTERN = "^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
 const SharedName = Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "A shared file's name, without `.yaml`" });
 
@@ -82,6 +96,8 @@ function stepDoc<R extends TSchema, O extends TSchema>(route: R, onRoute: O) {
       verdict: Type.Optional(Type.Record(OutcomeName, Verdict, closed)),
       skills: Type.Optional(Type.Array(NonEmpty, { uniqueItems: true })),
       inputs: Type.Optional(Type.Array(StepInputDoc, { uniqueItems: true })),
+      /** what an agent step writes for later steps, by the name their `inputs:` (or a step kind's `reads`) use */
+      produces: Type.Optional(Type.Record(Type.String({ pattern: OUTCOME_NAME_PATTERN }), ProducesDoc, { ...closed, minProperties: 1 })),
       attended: Type.Optional(Type.Boolean({ description: "Worked with a person; always started by a person" })),
       by: Type.Optional(Type.String({ minLength: 1, description: "The executor that runs the agent; default the config's" })),
       model: Type.Optional(NonEmpty),

@@ -503,3 +503,21 @@ describe("an attended step's brief follows how its run was started", () => {
     expect(md).toContain("never through `norn ask`");
   });
 });
+
+describe("done at a step that produces a file", () => {
+  test("describe's done is refused while pr.md is missing, naming the file, and recorded once it is written; the brief asks for it", async () => {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { step: "describe" });
+    expect((await runCli(["brief"], m.io)).stdout).toContain("- Before `norn done done`, write `pr_body` to `.agents/specs/lt-1/pr.md`: a report without it, or with it empty, is refused.");
+    const missing = await runCli(["done", "done", "--json"], m.io);
+    expect(missing.exit).toBe(ExitCode.refused);
+    expect(json(missing.stdout)).toEqual({
+      error: "step describe produces `pr_body` with outcome done, and .agents/specs/lt-1/pr.md is missing",
+      do_instead: "write .agents/specs/lt-1/pr.md (`pr_body`, which later steps read) in the worktree, then report again",
+      code: "produced_missing",
+    });
+    expect(await receiptsOf(m)).toEqual([]);
+    await m.files.write(`${worktreeOf(await envOf(m), UNIT)}/.agents/specs/lt-1/pr.md`, "# Fix the help\n\nWhat changed.\n");
+    expect((await runCli(["done", "done", "--json"], m.io)).exit).toBe(0);
+  });
+});

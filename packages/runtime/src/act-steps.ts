@@ -8,12 +8,13 @@
  * while the retries last.
  */
 import type { DecisionOf, ReceiptIntent } from "@norn/kernel";
-import { fail, ok, type PluginResult, stepKindAnswerProblem, type StepKindOutcome } from "@norn/plugin-api";
+import { fail, ok, type PluginResult, readName, type StepKindDefinition, stepKindAnswerProblem, type StepKindOutcome } from "@norn/plugin-api";
 import { baseRefOf, branchOf, ensureWorktree } from "./branches.ts";
 import { checkCommandOf } from "./check-command.ts";
 import { removeLeftovers, untrackedFiles } from "./check-leftovers.ts";
 import { canDetach, checkOutcome, OUTPUT_TAIL, startDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
+import { specFolder } from "./inputs.ts";
 import { unitInFacts } from "./record.ts";
 import { readStepRun, type StepRunRecord, writeStepRun } from "./step-runs.ts";
 
@@ -90,6 +91,20 @@ function answered(record: StepRunRecord, kind: string, got: PluginResult<StepKin
   return { ...record, outcome: got.value.outcome, ...(got.value.detail !== undefined ? { detail: got.value.detail } : {}) };
 }
 
+/**
+ * Each name the kind reads → the file the unit's pinned workflow produces it as, relative to the
+ * worktree; undefined when the kind reads none the workflow produces.
+ */
+function readsOf(t: TickContext, unit: string, reads: StepKindDefinition["reads"]): Record<string, string> | undefined {
+  const steps = unitInFacts(t.facts, unit)?.state?.workflow.doc.steps ?? {};
+  const out: Record<string, string> = {};
+  for (const name of (reads ?? []).map(readName)) {
+    const file = Object.values(steps).find((s) => s.produces?.[name] !== undefined)?.produces?.[name]?.file;
+    if (file !== undefined) out[name] = `${specFolder(unit)}/${file}`;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export async function runStep(t: TickContext, d: DecisionOf<"run_step">): Promise<PluginResult<unknown>> {
   const unit = unitOf(d);
   const def = t.env.slots.stepKinds[d.step_kind];
@@ -97,6 +112,7 @@ export async function runStep(t: TickContext, d: DecisionOf<"run_step">): Promis
   const worktree = await ensureWorktree(t.env, unit);
   if (!worktree.ok) return worktree;
   const { vcs, forge, tracker } = t.env.slots;
+  const reads = readsOf(t, unit, def.reads);
   // a kind over the provider-neutral slots cannot learn the branch, the base or the receipt any other way
   const input = {
     unit,
@@ -108,6 +124,7 @@ export async function runStep(t: TickContext, d: DecisionOf<"run_step">): Promis
     branch: branchOf(unit),
     base: { branch: t.env.config.base, ref: await baseRefOf(t.env) },
     ...(d.intent ? { receipt_id: d.intent.id } : {}),
+    ...(reads && { reads }),
   };
   return underIntent(t, unit, d.intent, async () => {
     const record = base(t, unit, d, d.step_kind, d.intent);

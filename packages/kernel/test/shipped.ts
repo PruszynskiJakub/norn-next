@@ -23,7 +23,7 @@ export const kind = (name: string, outcomes: string[], mode: "effect" | "wait" =
 export const STEP_KINDS: Record<string, StepKindInfo> = {
   "update-branch": kind("update-branch", ["done", "conflict", "clean", "resolved"]),
   integrate: kind("integrate", ["done", "conflict"]),
-  "open-pr": kind("open-pr", ["done"]),
+  "open-pr": { ...kind("open-pr", ["done"]), reads: [{ name: "pr_body", fallback: "the body file an earlier pass left, else norn's footer alone" }] },
   push: kind("push", ["done"]),
   "await-merge": kind("await-merge", ["merged", "unpushed"], "wait"),
 };

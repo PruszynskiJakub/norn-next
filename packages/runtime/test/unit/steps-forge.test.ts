@@ -112,6 +112,22 @@ describe("open-pr", () => {
     expect(effects.map((e) => (e.kind === "open" || e.kind === "update" ? e.body?.split("\n\n---")[0] : null))).toEqual(["# First", "# Second\n\nMerge danger changed."]);
   });
 
+  test("reads the PR body where the workflow's producer of pr_body writes it; with none, pr.md in the spec folder, and with no file norn's footer alone", async () => {
+    expect(openPr.reads).toEqual([{ name: "pr_body", fallback: expect.stringContaining("pr.md") }]);
+    const body = async (files: Record<string, string>, over: Partial<StepKindInput<object>>, config: { body_file?: string } = {}) => {
+      const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
+      const effects = recorded(world);
+      const { vcs } = fakeVcs({ "gh-12-login": HEAD }, {});
+      value(await openPr.run(input(config, { slots: { forge: world.forge, vcs }, ...over }), memoryHost({ files: memoryFiles(files) })));
+      return effects.map((e) => (e.kind === "open" ? e.body?.split("\n\n---")[0] : null));
+    };
+    const both = { [`${WT}/.agents/specs/gh-12/pr.md`]: "# Default\n", [`${WT}/.agents/specs/gh-12/body/pr.md`]: "# Produced\n", [`${WT}/docs/pr.md`]: "# Configured\n" };
+    expect(await body(both, { reads: { pr_body: ".agents/specs/gh-12/body/pr.md" } })).toEqual(["# Produced"]);
+    expect(await body(both, { reads: { pr_body: ".agents/specs/gh-12/body/pr.md" } }, { body_file: "docs/pr.md" })).toEqual(["# Configured"]);
+    expect(await body(both, {})).toEqual(["# Default"]);
+    expect(await body({}, {})).toEqual(["Delivered by norn (story gh-12)."]);
+  });
+
   test("open is idempotent by receipt id: the same run again opens no second change", async () => {
     const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
     const { vcs } = fakeVcs({ "gh-12-login": HEAD }, {});

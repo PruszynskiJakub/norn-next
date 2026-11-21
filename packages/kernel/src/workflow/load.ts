@@ -10,11 +10,12 @@ import { type CountedStep, deriveCounters } from "./counters.ts";
 import { type CounterDoc, type OnRoute, type Route, WorkflowDocument, type WorkflowStepDoc } from "./document.ts";
 import { type Flat, flatten } from "./flatten.ts";
 import type { AgentStepSpec, CompiledCounter, CompiledRoute, CompiledStep, PinnedWorkflow, WorkflowError, WorkflowGraph, WorkflowLoad } from "./graph.ts";
+import { flowErrors, producesOn, readersOf } from "./produces.ts";
 import { checkGraph } from "./shape.ts";
 import { type ReadStep, readStep } from "./steps.ts";
 
 /** What the loader needs of a registered step kind; `run` stays with the host. */
-export type StepKindInfo = Pick<StepKindDefinition, "name" | "configSchema" | "outcomes" | "mode">;
+export type StepKindInfo = Pick<StepKindDefinition, "name" | "configSchema" | "outcomes" | "mode" | "reads">;
 
 export interface LoadWorkflowOptions {
   /** every step kind the configured plugins provide, by head key */
@@ -43,8 +44,11 @@ const fail = (errors: WorkflowError[]): Fail => ({ ok: false, errors });
  * step can end with left unrouted (the overridable built-in outcomes excepted); a target that is not a
  * step, `$done` or `$stuck`; a step no route reaches; a route back that no counter bounds; and an
  * `on:` block on a step that does not wait, naming a signal no source reports, giving parameters the
- * signal does not take, or naming what `outcomes:` already routes; and, when `opts.inputs` is given, an
- * agent step's input name the host does not provide.
+ * signal does not take, or naming what `outcomes:` already routes; a `produces:` file outside the
+ * spec folder, due on an outcome the step does not report, or named twice with two files; and, when
+ * `opts.inputs` is given, an agent step's input name neither the host provides nor a step produces, a
+ * produced name the host already provides, and a produced name an input or a step kind's `reads`
+ * names that some path from `start` reaches with no producer on it.
  * Counters are derived by edge kind (see `deriveCounters`) and written into the pinned document, so
  * its hash covers them, and loading a pinned document again gives the same hash.
  */
@@ -63,10 +67,19 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
 
   const read: Record<string, ReadStep> = {};
   const errors: WorkflowError[] = [];
+  const produced = [...new Set(Object.values(flatSteps).flatMap((s) => Object.keys(s.produces ?? {})))];
+  const fileOf = new Map<string, { step: string; file: string }>();
   for (const [name, step] of Object.entries(flatSteps)) {
-    const r = readStep(name, step, opts.stepKinds, signals, opts.inputs);
+    const r = readStep(name, step, opts.stepKinds, signals, opts.inputs, produced);
     if (r.ok) read[name] = r.step;
     else errors.push(...r.errors.map(inShared));
+    // the host hands a reader the file by its name, so every producer of a name writes the same file
+    for (const [p, { file }] of Object.entries(step.produces ?? {})) {
+      const first = fileOf.get(p);
+      if (!first) fileOf.set(p, { step: name, file });
+      else if (first.file !== file)
+        errors.push(inShared({ path: `/steps/${name}/produces/${p}/file`, message: `\`${p}\` is produced as ${first.file} by step ${first.step} and as ${file} here: a produced name names one file` }));
+    }
   }
   if (errors.length) return fail(errors);
 
@@ -98,6 +111,13 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
   }
   const shape = checkGraph(flat.flat.start, order, routes);
   if (shape.length) return fail(shape.map(inShared));
+  if (opts.inputs !== undefined) {
+    const host = opts.inputs;
+    const names = new Set(produced);
+    const readers = order.flatMap((name) => readersOf(name, flatSteps[name] as WorkflowStepDoc, read[name]?.kind as string, opts.stepKinds[read[name]?.kind ?? ""]?.reads, names, host));
+    const flow = flowErrors(flat.flat.start, routes, flatSteps, readers);
+    if (flow.length) return fail(flow.map(inShared));
+  }
 
   const pinned = pin(written, flat.flat, read, routes, derived.counters);
   const graph = compile(pinned, read, routes, derived.counters, opts.config);
@@ -223,6 +243,7 @@ function agentSpec(s: WorkflowStepDoc, d: NonNullable<WorkflowDocument["defaults
     attended: s.attended ?? false,
     criteria: s.criteria === "required",
     hand_back: { ...(s.hand_back ?? {}) },
+    ...(s.produces !== undefined && { produces: Object.fromEntries(Object.entries(producesOn(s)).map(([name, on]) => [name, { file: s.produces?.[name]?.file as string, on }])) }),
     means: { ...(s.means ?? {}) },
     verdict: { ...(s.verdict ?? {}) },
     deadline_ms: deadline === undefined ? config.deadlineMs : parseDuration(deadline),
