@@ -72,6 +72,25 @@ describe("a question from a supervised step", () => {
   });
 });
 
+describe("what a supervisor stood in for belongs to one visit", () => {
+  const visited = loaded(graph({ build: { agent: agentSpec({ attended: "agent", asks: 2 }), routes: { done: { to: "approve" } } } }));
+
+  test("leaving the step drops the answers counted and the subjects handed back, and a question on the next visit starts a fresh supervisor", () => {
+    const spent = { answered: 2, escalated: [{ input: "q-1", reason: "needs the person's taste" }] };
+    const atBuild = stateAt("build", { run: run(), supervised: spent, visits: { build: 1 } }, visited);
+    const left = kindOf(decideCase({ state: atBuild, workflows: [visited], config: grant, receipts: [receipt(1, { kind: "run.reported", run_id: "run-1", verb: "done", outcome: "done" })] }), "apply_receipts");
+    expect(left.state.step).toBe("approve");
+    expect(left.state.supervised).toBeUndefined();
+
+    const back = kindOf(decideCase({ state: left.state, workflows: [visited], config: grant, receipts: [receipt(2, { kind: "gate.decided", outcome: "reject", by: "a-person", step: "approve", attempt: 1 })] }), "apply_receipts");
+    expect(back.state).toMatchObject({ step: "build", attempt: 2 });
+    expect(back.state.supervised).toBeUndefined();
+
+    const askedAgain: RunState = { ...back.state, run: run({ id: "run-2", attempt: 2 }), parked: { reason: ASKED_PARK, since: minutesAgo(1), text: "Which database?", input_id: "q-1" } };
+    expect(decideCase({ state: askedAgain, workflows: [visited], config: grant })?.rule).toBe("supervisor.ask");
+  });
+});
+
 describe("the supervisor's answer", () => {
   const answer = (over: Record<string, unknown> = {}): KernelReceipt =>
     receipt(1, { kind: "answer.sent", input_id: "q-1", text: "Postgres.", by: "supervisor", supervisor_run: "sup-1", step: "build", attempt: 1, ...over } as KernelReceipt["data"]);
