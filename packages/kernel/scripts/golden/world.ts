@@ -39,6 +39,10 @@ export interface SimUnit {
   /** the run's process still runs, as the host probes it while the session has sent no event */
   run_alive?: boolean;
   step_run?: StepRunFacts;
+  /** the capabilities only a person grants that the open question names, as the host reads them */
+  question_reserved?: string[];
+  /** whether the unit's supervisor still runs, as the host probes it */
+  supervisor_alive?: boolean;
   corrupt?: string;
   /** the corrupt record holds decide's mark, as the journal reads it back */
   corrupt_marked?: boolean;
@@ -191,6 +195,8 @@ export class World {
         const f: UnitFacts = { id: u.id, state: structuredClone(u.state), version: u.version, receipts: structuredClone(u.receipts.filter((r) => r.seq > through)), session: structuredClone(u.session) };
         if (u.step_run) f.step_run = { ...u.step_run };
         if (u.run_alive !== undefined && u.session === null) f.run_alive = u.run_alive;
+        if (u.question_reserved !== undefined) f.question_reserved = [...u.question_reserved];
+        if (u.supervisor_alive !== undefined) f.supervisor_alive = u.supervisor_alive;
         reportAsRecorded(u, f);
         if (u.corrupt !== undefined) {
           f.corrupt = u.corrupt;
@@ -314,6 +320,7 @@ export class World {
         this.commit(u, d.state, d.expect_version);
         return;
       }
+      case "start_supervisor":
       case "start_run":
       case "retry_run":
       case "nudge":

@@ -55,10 +55,72 @@ const STALLED_DOC = {
   },
 };
 
+/** A build step a supervisor stays beside, answering at most one question a visit, then a person's gate. */
+const SUPERVISED_DOC = {
+  name: "supervised",
+  description: "A build step a supervisor stays beside, then a person's gate.",
+  start: "build",
+  steps: {
+    build: { by: "builder", do: "Build it.", attended: "agent", limits: { asks: 1 }, outcomes: { done: "ready" } },
+    ready: { by: "person", do: "Ship it?", outcomes: { approve: "$done", reject: "build" } },
+  },
+};
+
+/** A unit of the supervised workflow parked on its agent's question `q-<key>`. */
+function asking(w: World, key: string, state: Partial<RunState> = {}): void {
+  seed(w, key, { workflow: "supervised", step: "build", run: {}, state: { parked: { reason: "agent.asked", since: earlier(w, 1), text: "Which database should the cache use?", input_id: `q-${key}` }, ...state } });
+}
+
+const supervising = (w: World, key: string, minutesAgo: number) => ({ id: `sup-${key}`, subject: "ask" as const, input_id: `q-${key}`, executor: "claude", started_at: earlier(w, minutesAgo), session: `h-sup-${key}` });
+
 const later = (w: World, minutes: number) => new Date(w.now + minutes * 60_000).toISOString();
 const earlier = (w: World, minutes: number) => new Date(w.now - minutes * 60_000).toISOString();
 
 export const MATRIX: Scenario[] = [
+  scenario(
+    "supervisor-ask",
+    "Questions from an attended: agent step the person's policy grants a stand-in: a fresh one starts the supervisor; one naming a merge, or past the step's limits.asks, waits for the person; a supervisor at work is waited on, and one gone quiet or dead hands the question back.",
+    { files: { supervised: SUPERVISED_DOC }, config: config({ workflow: "supervised", standIn: { attended: ["supervised.build"], gates: [] } }) },
+    (w) => {
+      asking(w, "gh-160");
+      asking(w, "gh-161");
+      w.unit("gh-161").question_reserved = ["merge"];
+      asking(w, "gh-162", { supervised: { answered: 1 } });
+      asking(w, "gh-163", { supervisor: supervising(w, "gh-163", 2) });
+      asking(w, "gh-164", { supervisor: supervising(w, "gh-164", 20) });
+      asking(w, "gh-165", { supervisor: supervising(w, "gh-165", 2) });
+      w.unit("gh-165").supervisor_alive = false;
+    },
+    ["supervisor.ask", "supervisor.reserved", "supervisor.asks_spent", "supervisor.working", "supervisor.silent", "supervisor.died"],
+  ),
+  scenario(
+    "supervisor-unavailable",
+    "A supervised step's question with no executor that can run a supervisor guarded: it waits for the person.",
+    { files: { supervised: SUPERVISED_DOC }, config: config({ workflow: "supervised", standIn: { attended: ["supervised.build"], gates: [] } }), capabilities: capabilities({ executors: { claude: executor({ denyTool: false }) } }) },
+    (w) => asking(w, "gh-166"),
+    ["supervisor.no_executor"],
+  ),
+  scenario(
+    "supervisor-revoked",
+    "A supervisor at work on a question after the person's policy stopped granting the step: it hands the question back.",
+    { files: { supervised: SUPERVISED_DOC }, config: config({ workflow: "supervised" }) },
+    (w) => asking(w, "gh-167", { supervisor: supervising(w, "gh-167", 2) }),
+    ["supervisor.revoked"],
+  ),
+  scenario(
+    "supervisor-gate",
+    "A gate the person's policy grants to a stand-in: with every executor sandboxed the supervisor starts for the gate's visit; without a sandbox anywhere the gate waits for the person, saying why.",
+    { files: { supervised: SUPERVISED_DOC }, config: config({ workflow: "supervised", standIn: { attended: [], gates: ["supervised.ready"] } }), capabilities: capabilities({ executors: { claude: executor({ sandbox: true }) } }) },
+    (w) => seed(w, "gh-168", { workflow: "supervised", step: "ready" }),
+    ["supervisor.gate"],
+  ),
+  scenario(
+    "supervisor-gate-unsandboxed",
+    "A gate the person's policy grants to a stand-in while no executor runs in an OS sandbox: it waits for the person, since an agent's shell could forge the decision.",
+    { files: { supervised: SUPERVISED_DOC }, config: config({ workflow: "supervised", standIn: { attended: [], gates: ["supervised.ready"] } }) },
+    (w) => seed(w, "gh-169", { workflow: "supervised", step: "ready" }),
+    ["gate.park"],
+  ),
   scenario(
     "claims",
     "Claims as a host finds them: a story another machine holds, one whose other holder let its claim expire (left to a person), one in progress with no claim at all, and one whose claim this machine let expire.",

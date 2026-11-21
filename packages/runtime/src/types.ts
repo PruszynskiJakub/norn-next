@@ -3,7 +3,7 @@
  * sessions through, and what one tick reports. The ports are interfaces here so the tick host is
  * tested with fakes; the runners and the hook ingestion that fill them live outside this package.
  */
-import type { BriefInputs, Decision, KernelConfig, SessionFacts } from "@norn/kernel";
+import type { BriefInputs, Decision, KernelConfig, SessionFacts, SupervisorSubject } from "@norn/kernel";
 import type { HostContext, IntakeQuery, NornPlugin, PluginResult, RunnerSplitRequest } from "@norn/plugin-api";
 import type { StepWrites } from "@norn/schema";
 import type { RepoWorkflows } from "./repo-workflows.ts";
@@ -83,6 +83,8 @@ export interface AgentRunRequest {
   resume?: string;
   /** what the step lets the agent write; `docs` is held by the write guard alone, so it needs a harness that can deny a tool */
   writes?: StepWrites;
+  /** a supervisor's launch, beside the step's own run: briefed with what it stands in for, not with the step's brief */
+  supervisor?: { subject: SupervisorSubject; input_id?: string };
 }
 
 /** How this launcher can run an agent: with nobody watching (auto mode needs it), or where a person works beside it. */

@@ -87,6 +87,8 @@ export const AgentStepSpec = Type.Object(
     deadline_ms: Type.Union([PosInt, Type.Null()]),
     nudges: NonNegInt,
     retries: NonNegInt,
+    /** the questions its supervisor answers in one visit (`limits.asks`); absent: `DEFAULT_SUPERVISOR_ASKS` */
+    asks: Type.Optional(NonNegInt),
   },
   closed,
 );

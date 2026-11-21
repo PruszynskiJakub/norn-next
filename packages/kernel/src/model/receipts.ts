@@ -8,7 +8,7 @@ import { EndReason, ReportVerb } from "@norn/plugin-api";
 import { CriterionVerdict, Finding, IsoTime, Mode, NonEmpty, Note, OutcomeName, PosInt, SignalRef, StepName, TaggedUnion } from "@norn/schema";
 import { type Static, type TProperties, Type } from "@sinclair/typebox";
 import { GraphCounterName, PinnedWorkflow } from "../workflow/graph.ts";
-import { Ended, GuardedCode } from "./run-state.ts";
+import { Ended, GuardedCode, SupervisorSubject } from "./run-state.ts";
 
 const closed = { additionalProperties: false } as const;
 const Id = Type.String({ minLength: 1 });
@@ -130,10 +130,13 @@ const KINDS = [
     outcome: GateOutcome,
     by: NonEmpty,
     /**
-     * Decided by someone acting for a person (a supervising agent). No command sets it now; kept so
-     * a receipt written with it still validates, and its history still says so.
+     * Decided by the supervisor on the person's behalf, under their policy's grant of this gate. It
+     * stands only with `supervisor_run` naming the supervisor norn launched for this gate's visit, and
+     * with the visit (`step`, `attempt`) on the receipt; any other is refused.
      */
     delegated: Type.Optional(Type.Boolean()),
+    /** the supervisor run a delegated decision comes from */
+    supervisor_run: Type.Optional(Id),
     reason: Type.Optional(Type.String()),
     /** set when the decision came through a run: a unit's own step agent may never decide its gate */
     run_id: Type.Optional(Id),
@@ -142,7 +145,18 @@ const KINDS = [
    * `to: dialog`: the answer chooses an option in a dialog the agent's pane shows (a permission or
    * trust prompt), so it goes in as keys, never as a prompt typed to the agent
    */
-  kind("answer.sent", { input_id: Id, text: Type.String(), by: NonEmpty, to: Type.Optional(Type.Literal("dialog")) }),
+  /**
+   * `supervisor_run`: the answer is the supervisor's, standing only from the supervisor norn launched
+   * for this question; absent, a person's
+   */
+  kind("answer.sent", { input_id: Id, text: Type.String(), by: NonEmpty, to: Type.Optional(Type.Literal("dialog")), supervisor_run: Type.Optional(Id) }),
+  /**
+   * norn starts a supervisor for this visit's question (`input_id`) or gate, beside the step's own run:
+   * written before the launch, then again naming the session the launcher answered
+   */
+  kind("supervisor.started", { run_id: Id, executor: NonEmpty, subject: SupervisorSubject, input_id: Type.Optional(Id), session: Type.Optional(NonEmpty) }),
+  /** the supervisor handed what it stood in for back to the person, or went quiet or died, which hands it back too */
+  kind("supervisor.escalated", { run_id: Id, reason: NonEmpty }),
   kind("nudge.sent", { run_id: Id, reason: NonEmpty }),
   /** a check or effect step run again under its run, after it was cut short or its plugin failed; counted against the retries */
   kind("run.resumed", { run_id: Id, reason: Type.Optional(Type.String()) }),

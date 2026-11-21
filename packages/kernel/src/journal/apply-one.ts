@@ -38,7 +38,7 @@ export function applyOne(state: RunState, r: KernelReceipt, graph: WorkflowGraph
     case "run.started":
       return runStarted(state, d, step, r.at);
     case "run.reported":
-      return runBound(state, d.run_id) ?? reported(state, d, step, graph, r.at);
+      return runBound(state, d.run_id) ?? reported(state, d, step, graph, r);
     case "run.ended":
       // the run stays on the record: a run cleared here would read as a step nobody started, which
       // decide would start again uncounted; only an outcome or a counted retry replaces it
@@ -53,10 +53,14 @@ export function applyOne(state: RunState, r: KernelReceipt, graph: WorkflowGraph
     case "gate.decided":
       if (step.kind !== "gate") return { reject: `${state.step} is a ${step.kind} step, not a gate` };
       if (d.run_id !== undefined) return { reject: `a step agent may not ${d.outcome} a gate (run ${d.run_id}); a person or their delegate decides it` };
-      if (d.delegated === true) return { reject: "a delegated decision stands only when the supervisor norn launched for this gate's visit made it" };
+      if (d.delegated === true && !fromVisitSupervisor(state, d)) return { reject: "a delegated decision stands only when the supervisor norn launched for this gate's visit made it, naming the visit" };
       return route(state, graph, d.outcome);
     case "answer.sent":
-      return { state: unparked(state) };
+      return answered(state, d);
+    case "supervisor.started":
+      return supervisorStarted(state, d, step, r.at);
+    case "supervisor.escalated":
+      return escalated(state, d);
     case "unit.parked":
       return { state: { ...state, parked: { reason: d.reason, since: r.at } } };
     case "nudge.sent":
@@ -151,6 +155,53 @@ function checkedRun(state: RunState, d: ReceiptDataOf<"run.checked">, at: string
   return { state: { ...state, parked: { reason: `run.check.${d.verdict}`, since: at, text } } };
 }
 
+/** Whether a delegated decision comes from the supervisor at work for this gate's visit, and names the visit. */
+function fromVisitSupervisor(state: RunState, d: ReceiptDataOf<"gate.decided">): boolean {
+  const sup = state.supervisor;
+  return sup?.subject === "gate" && d.supervisor_run === sup.id && d.step !== undefined && d.attempt !== undefined;
+}
+
+/**
+ * A person's answer settles the question, and with it any supervisor still at work on it, whose later
+ * answer is then refused. A supervisor's answer stands only from the run norn launched for this very
+ * question; it counts against the step's `limits.asks`.
+ */
+function answered(state: RunState, d: ReceiptDataOf<"answer.sent">): OneApplied {
+  const sup = state.supervisor;
+  const onIt = sup?.subject === "ask" && sup.input_id === d.input_id;
+  if (d.supervisor_run !== undefined && !(onIt && sup?.id === d.supervisor_run))
+    return { reject: `an answer from supervisor run ${d.supervisor_run} stands only from the supervisor norn launched for question ${d.input_id}; the one at work is ${sup?.id ?? "none"}` };
+  const next = unparked(state);
+  if (onIt) delete next.supervisor;
+  if (d.supervisor_run !== undefined) next.supervised = { ...state.supervised, answered: (state.supervised?.answered ?? 0) + 1 };
+  return { state: next };
+}
+
+function supervisorStarted(state: RunState, d: ReceiptDataOf<"supervisor.started">, step: CompiledStep, at: string): OneApplied {
+  const sup = state.supervisor;
+  // the same supervisor again: the host learned its session after recording the launch
+  if (sup?.id === d.run_id) return { state: { ...state, supervisor: { ...sup, ...(d.session !== undefined && { session: d.session }) } } };
+  if (sup) return { reject: `supervisor ${sup.id} is already at work for ${state.step} attempt ${state.attempt}` };
+  if (d.subject === "gate" && step.kind !== "gate") return { reject: `${state.step} is a ${step.kind} step; a supervisor decides only a gate` };
+  if (d.subject === "ask" && (state.parked?.reason !== ASKED_PARK || state.parked.input_id === undefined || state.parked.input_id !== d.input_id))
+    return { reject: `a supervisor for question ${d.input_id ?? "(none)"}, but the open question is ${state.parked?.input_id ?? "none"}` };
+  const run: NonNullable<RunState["supervisor"]> = { id: d.run_id, subject: d.subject, executor: d.executor, started_at: at };
+  if (d.input_id !== undefined) run.input_id = d.input_id;
+  if (d.session !== undefined) run.session = d.session;
+  return { state: { ...state, supervisor: run } };
+}
+
+/** What the supervisor hands back stays the person's for the rest of the visit: no supervisor takes it again. */
+function escalated(state: RunState, d: ReceiptDataOf<"supervisor.escalated">): OneApplied {
+  const sup = state.supervisor;
+  if (sup?.id !== d.run_id) return { reject: `stale supervisor ${d.run_id}; the one at work is ${sup?.id ?? "none"}` };
+  const next = { ...state };
+  delete next.supervisor;
+  const input = sup.subject === "gate" ? "gate" : (sup.input_id ?? "ask");
+  next.supervised = { answered: state.supervised?.answered ?? 0, escalated: [...(state.supervised?.escalated ?? []), { input, reason: d.reason }] };
+  return { state: next };
+}
+
 function onRun(state: RunState, change: (run: NonNullable<RunState["run"]>) => NonNullable<RunState["run"]>): OneApplied {
   return state.run ? { state: { ...state, run: change(state.run) } } : { reject: "no run on the record" };
 }
@@ -162,7 +213,8 @@ function nudged(state: RunState, at: string): OneApplied {
   return { state: { ...state, run: { ...run, nudges: run.nudges + 1, last_nudge_at: at } } };
 }
 
-function reported(state: RunState, d: ReceiptDataOf<"run.reported">, step: CompiledStep, graph: WorkflowGraph, at: string): OneApplied {
+function reported(state: RunState, d: ReceiptDataOf<"run.reported">, step: CompiledStep, graph: WorkflowGraph, r: KernelReceipt): OneApplied {
+  const at = r.at;
   if (step.kind !== "agent") return { reject: `${step.name} is a ${step.kind} step; only an agent step takes a report` };
   const text = d.text?.trim() ? d.text.trim() : undefined;
   if (d.verb === "done") {
@@ -172,7 +224,8 @@ function reported(state: RunState, d: ReceiptDataOf<"run.reported">, step: Compi
   }
   if (d.verb === "ask") {
     if (step.routes.ask) return route(state, graph, "ask");
-    return { state: { ...state, parked: { reason: ASKED_PARK, since: at, ...(text !== undefined && { text }) } } };
+    // the ask's own id names the question, so an answer, a person's or a supervisor's, is for this one
+    return { state: { ...state, parked: { reason: ASKED_PARK, since: at, ...(text !== undefined && { text }), input_id: r.id } } };
   }
   if (step.routes.stuck) return route(state, graph, "stuck", text);
   return { state: endStuck(state, text ?? `${step.name}: the agent reported stuck`) };
@@ -230,6 +283,7 @@ function stepFinished(state: RunState, d: ReceiptDataOf<"step.finished">, step: 
 function marked(state: RunState, d: ReceiptDataOf<"unit.marked">): RunState {
   const next: RunState = { ...state, run: null, ended: d.ended };
   delete next.parked;
+  delete next.supervisor;
   delete next.exhausted;
   if (d.reason !== undefined) next.ended_reason = d.reason;
   else if (d.ended === "done") delete next.ended_reason;

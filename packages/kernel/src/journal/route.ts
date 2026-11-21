@@ -31,6 +31,8 @@ export function enterStep(state: RunState, to: string): RunState {
   const next: RunState = { ...state, step: to, attempt, visits, retries_used: 0, run: null };
   delete next.parked;
   delete next.requested;
+  delete next.supervisor;
+  delete next.supervised;
   // the rework belongs to the visit it sent back to; the caller that knows the receipt sets it again
   delete next.rework_from;
   return next;

@@ -184,6 +184,8 @@ function stepProps<R extends TSchema, O extends TSchema, P extends TSchema>(rout
     deadline: Type.Optional(Duration),
     nudges: Type.Optional(Type.Integer({ minimum: 0 })),
     retries: Type.Optional(Type.Integer({ minimum: 0 })),
+    /** the questions a supervisor answers for an `attended: agent` step in one visit (`limits.asks`) */
+    asks: Type.Optional(Type.Integer({ minimum: 0 })),
     timeout: Type.Optional(Duration),
     exits: Type.Optional(ExitsDoc),
   };

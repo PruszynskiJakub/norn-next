@@ -135,6 +135,10 @@ export interface Case {
   run_dialog?: string;
   /** why the kernel refused the run's report the session shows */
   report_rejected?: string;
+  /** the capabilities only a person grants that the open question names, as the host read them */
+  question_reserved?: string[];
+  /** whether the unit's supervisor still runs */
+  supervisor_alive?: boolean;
   unitId?: string;
   story?: Partial<StoryFacts>;
   executors?: Record<string, ExecutorCapabilities>;
@@ -152,6 +156,8 @@ export function factsOf(c: Case): KernelFacts {
   if (c.run_alive !== undefined) unit.run_alive = c.run_alive;
   if (c.run_dialog !== undefined) unit.run_dialog = c.run_dialog;
   if (c.report_rejected !== undefined) unit.report_rejected = c.report_rejected;
+  if (c.question_reserved !== undefined) unit.question_reserved = c.question_reserved;
+  if (c.supervisor_alive !== undefined) unit.supervisor_alive = c.supervisor_alive;
   const story: StoryFacts = { key: "gh-1", item: null, change: null, claim: null, units: [unit], mailbox: [], ...c.story };
   const others: StoryFacts[] = (c.others ?? []).map((u, i) => ({ key: `gh-${i + 10}`, item: null, change: null, claim: null, units: [u], mailbox: [] }));
   return {

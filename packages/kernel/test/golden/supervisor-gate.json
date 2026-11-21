@@ -1,0 +1,269 @@
+{
+  "name": "supervisor-gate",
+  "description": "A gate the person's policy grants to a stand-in: with every executor sandboxed the supervisor starts for the gate's visit; without a sandbox anywhere the gate waits for the person, saying why.",
+  "step_kinds": {
+    "update-branch": {
+      "outcomes": [
+        "done",
+        "conflict",
+        "clean",
+        "resolved"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "integrate": {
+      "outcomes": [
+        "done",
+        "conflict"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "open-pr": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "push": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "await-merge": {
+      "outcomes": [
+        "merged",
+        "unpushed"
+      ],
+      "mode": "wait",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "supervised": {
+        "name": "supervised",
+        "description": "A build step a supervisor stays beside, then a person's gate.",
+        "start": "build",
+        "steps": {
+          "build": {
+            "by": "builder",
+            "do": "Build it.",
+            "attended": "agent",
+            "limits": {
+              "asks": 1
+            },
+            "outcomes": {
+              "done": "ready"
+            }
+          },
+          "ready": {
+            "by": "person",
+            "do": "Ship it?",
+            "outcomes": {
+              "approve": "$done",
+              "reject": "build"
+            }
+          }
+        }
+      }
+    },
+    "pinned": []
+  },
+  "config": {
+    "counterDefaults": {
+      "checkFail": 5,
+      "gateReject": 2,
+      "conflict": 2,
+      "stale": 10,
+      "agentBack": 3
+    },
+    "silentAfterMs": 900000,
+    "maxNudges": 2,
+    "maxRetries": 1,
+    "deadlineMs": 3600000,
+    "mode": "auto",
+    "executor": "claude",
+    "workflow": "supervised",
+    "intakeWorkflowLabelPrefix": "norn:wf:",
+    "sliceWorkflow": "slice",
+    "base": "main",
+    "claimTtlMs": 600000,
+    "claimRenewBeforeMs": 400000,
+    "standIn": {
+      "attended": [],
+      "gates": [
+        "supervised.ready"
+      ]
+    }
+  },
+  "facts": {
+    "tick_id": "01JD5G00000MR9XA8KKK8P87K1",
+    "now": "2026-11-17T09:00:00.000Z",
+    "holder": "machine-a",
+    "capabilities": {
+      "tracker": {
+        "assign": true,
+        "labels": true,
+        "comment": true,
+        "create": true,
+        "close": true
+      },
+      "forge": {
+        "draft": true,
+        "checks": true,
+        "raw_urls": true
+      },
+      "store": {
+        "shared": false,
+        "claims": "local",
+        "mailbox": true,
+        "artifacts": true
+      },
+      "executors": {
+        "claude": {
+          "blockStop": true,
+          "denyTool": true,
+          "injectContext": true,
+          "subagents": true,
+          "limits": true,
+          "paneInput": false,
+          "headless": true,
+          "attended": true,
+          "sandbox": true
+        }
+      }
+    },
+    "stories": [
+      {
+        "key": "gh-168",
+        "item": {
+          "id": 168,
+          "key": "gh-168",
+          "title": "Story 168",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-168",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-168",
+            "state": {
+              "format": 1,
+              "unit": "gh-168",
+              "story": "gh-168",
+              "workflow": {
+                "name": "supervised",
+                "hash": "1a08ff22db16ad4c93fae04cb57ec20ae0c00cdbeef2120f22369d26d321a647",
+                "doc": {
+                  "name": "supervised",
+                  "description": "A build step a supervisor stays beside, then a person's gate.",
+                  "start": "build",
+                  "steps": {
+                    "build": {
+                      "outcomes": {
+                        "done": "ready"
+                      },
+                      "role": "builder",
+                      "agent": "Build it.",
+                      "attended": "agent",
+                      "asks": 1
+                    },
+                    "ready": {
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": {
+                          "to": "build",
+                          "counter": "ready.reject"
+                        }
+                      },
+                      "gate": "Ship it?"
+                    }
+                  },
+                  "counters": {
+                    "ready.reject": {
+                      "max": 2
+                    }
+                  }
+                }
+              },
+              "step": "ready",
+              "attempt": 1,
+              "counters": {
+                "ready.reject": 0
+              },
+              "retries_used": 0,
+              "run": null,
+              "applied_through": 0,
+              "visits": {
+                "ready": 1
+              }
+            },
+            "version": 1,
+            "receipts": [],
+            "session": null
+          }
+        ],
+        "mailbox": []
+      }
+    ],
+    "intake": []
+  },
+  "decisions": [
+    {
+      "kind": "start_supervisor",
+      "unit": "gh-168",
+      "rule": "supervisor.gate",
+      "run_id": "01JD5G0000C73G79TPA9EMCVD5",
+      "executor": "claude",
+      "subject": "gate",
+      "intent": {
+        "id": "01JD5G0000FWPMF8ZZQPVMTVA7",
+        "data": {
+          "kind": "supervisor.started",
+          "run_id": "01JD5G0000C73G79TPA9EMCVD5",
+          "executor": "claude",
+          "subject": "gate",
+          "step": "ready",
+          "attempt": 1
+        }
+      }
+    }
+  ]
+}

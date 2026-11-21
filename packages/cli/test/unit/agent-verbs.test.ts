@@ -566,3 +566,24 @@ describe("done at a step that produces a file", () => {
     expect((await runCli(["done", "done", "--json"], m.io)).exit).toBe(0);
   });
 });
+
+describe("a supervisor norn launched beside a step's run", () => {
+  const SUP = "01JCCCCCCCCCCCCCCCCCCCCCCC";
+  const supervised = (): Partial<RunState> => ({
+    parked: { reason: "agent.asked", since: "2026-11-17T10:00:00.000Z", text: "Which database?", input_id: "q-1" },
+    supervisor: { id: SUP, subject: "ask", input_id: "q-1", executor: "claude", started_at: "2026-11-17T10:01:00.000Z" },
+  });
+
+  test("brief prints its own brief, not the step's, and done records its answer as the supervisor's", async () => {
+    const m = configured({ env: runEnv(UNIT, SUP) });
+    await seedUnit(m, { step: AGENT_STEP, extra: supervised() });
+    const brief = await runCli(["brief", "--json"], m.io);
+    expect(brief.exit).toBe(ExitCode.ok);
+    expect(json(brief.stdout)).toMatchObject({ unit: UNIT, run_id: SUP, markdown: expect.stringContaining("# Supervisor of lt-1") });
+    const bare = await runCli(["done", "answer", "--json"], m.io);
+    expect({ exit: bare.exit, code: (json(bare.stdout) as { code: string }).code }).toEqual({ exit: ExitCode.refused, code: "reason_required" });
+    expect((await runCli(["done", "answer", "--note", "Postgres."], m.io)).exit).toBe(ExitCode.ok);
+    const answer = (await receiptsOf(m)).find((r) => r.data.kind === "answer.sent");
+    expect(answer?.data).toMatchObject({ kind: "answer.sent", input_id: "q-1", by: "supervisor", supervisor_run: SUP, text: expect.stringContaining("Postgres.") });
+  });
+});

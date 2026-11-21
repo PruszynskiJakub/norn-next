@@ -35,7 +35,7 @@ export const STEP_KEYS = ["by", "do", "with", "reads", "produces", "allow", "att
 
 /**
  * Every key a step may hold beside a head key: the step keys, the older form's keys, which a pinned
- * document holds for good, and the keys only a pinned document holds (`role`, plugin API 1.23). A step
+ * document holds for good, and the keys only a pinned document holds (`role`, plugin API 1.23; `asks`, 1.26). A step
  * kind's name or config key may not be one of these, or the loader could not tell which key of a
  * pinned step is its head. It grows only with the pinned document, never with what a file writes.
  */
@@ -67,6 +67,7 @@ export const STEP_KEYWORDS = [
   "allow",
   "limits",
   "role",
+  "asks",
 ] as const;
 
 /** The slots a step kind or signal source may work over; a workflow names it `<slot>.<name>`, so a workflow moves between providers unchanged. */

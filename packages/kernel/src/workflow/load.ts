@@ -357,6 +357,7 @@ function agentSpec(s: WorkflowStepDoc, d: NonNullable<WorkflowDocument["defaults
     deadline_ms: deadline === undefined ? config.deadlineMs : parseDuration(deadline),
     nudges: s.nudges ?? d.nudges ?? config.maxNudges,
     retries: s.retries ?? d.retries ?? config.maxRetries,
+    ...(s.asks !== undefined && { asks: s.asks }),
   };
 }
 

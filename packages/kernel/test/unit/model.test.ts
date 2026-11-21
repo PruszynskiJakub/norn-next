@@ -140,6 +140,8 @@ describe("kernel schemas", () => {
       { kind: "step.finished", step_kind: "open-pr", outcome: "done", detail: { id: 4 } },
       { kind: "gate.decided", outcome: "approve", by: "a-person" },
       { kind: "answer.sent", input_id: "q1", text: "yes", by: "a-person" },
+      { kind: "supervisor.started", run_id: "s", executor: "claude", subject: "gate", step: "ready", attempt: 1 },
+      { kind: "supervisor.escalated", run_id: "s", reason: "the question names a merge" },
       { kind: "nudge.sent", run_id: "r", reason: "silent" },
       { kind: "run.resumed", run_id: "r" },
       { kind: "stop.sent", run_id: "r", reason: "timeout" },

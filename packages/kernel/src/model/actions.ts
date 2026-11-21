@@ -10,7 +10,7 @@ import { type Static, type TProperties, Type } from "@sinclair/typebox";
 import { StepInputDoc } from "../workflow/document.ts";
 import { CapabilitySchema } from "./grant.ts";
 import { ReceiptIntent, RejectedReceipt } from "./receipts.ts";
-import { GuardedCode, RunState } from "./run-state.ts";
+import { GuardedCode, RunState, SupervisorSubject } from "./run-state.ts";
 
 const closed = { additionalProperties: false } as const;
 const Id = Type.String({ minLength: 1 });
@@ -106,6 +106,11 @@ const ACTIONS = [
     resume: Type.Optional(NonEmpty),
     intent: ReceiptIntent,
   }),
+  /**
+   * write `intent` (`supervisor.started`), then launch the supervisor on `executor` beside the step's
+   * own run, briefed with the question `input_id` names or the gate, and record it again with its session
+   */
+  action("start_supervisor", { run_id: Id, executor: NonEmpty, subject: SupervisorSubject, input_id: Type.Optional(Id), intent: ReceiptIntent }),
   action("nudge", { run_id: Id, reason: NonEmpty, intent: ReceiptIntent }),
   /**
    * check a reported run that may not keep code before its report applies: write `intent` (`run.checking`),

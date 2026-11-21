@@ -68,6 +68,14 @@ export const UnitFacts = Type.Object(
      */
     report_rejected: Type.Optional(NonEmpty),
     step_run: Type.Optional(StepRunFacts),
+    /**
+     * The capabilities only a person grants (a merge, a push, a remote write) that the unit's open
+     * question names, as the host read them off the question: such a question goes to the person,
+     * never to a supervisor, whose answer grants nothing. Absent or empty: none named.
+     */
+    question_reserved: Type.Optional(Type.Array(NonEmpty)),
+    /** Whether the unit's supervisor still runs. Absent: not probed, or the runner could not tell. */
+    supervisor_alive: Type.Optional(Type.Boolean()),
   },
   { ...closed, title: "UnitFacts" },
 );

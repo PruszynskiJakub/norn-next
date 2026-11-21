@@ -67,6 +67,9 @@ export const WRITES_ENV = "NORN_WRITES";
  * longer live is held to its own step's rule, not to the step the unit has moved on to.
  */
 export function runWrites(unit: UnitJournal, runId: string): { step: string; writes: StepWrites } | null {
+  // a supervisor writes nothing of the step's: it is held to the docs-only guard whatever the step lets its agent write
+  const supervised = unit.receipts.findLast((r) => r.data.kind === "supervisor.started" && r.data.run_id === runId);
+  if (supervised?.data.kind === "supervisor.started" && supervised.data.step !== undefined) return { step: supervised.data.step, writes: "docs" };
   const started = unit.receipts.findLast((r) => r.data.kind === "run.started" && r.data.run_id === runId);
   if (started?.data.kind !== "run.started") return null;
   const step = started.data.step ?? (unit.state?.run?.id === runId ? unit.state.run.step : undefined);

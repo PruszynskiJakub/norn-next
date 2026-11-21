@@ -1,5 +1,5 @@
 import type { KernelReceipt } from "./receipts.ts";
-import type { RunInfo, RunState } from "./run-state.ts";
+import type { RunInfo, RunState, SupervisorRun } from "./run-state.ts";
 
 /**
  * The agent run the newest launch on the record started at the unit's step, applied or not. The
@@ -33,4 +33,24 @@ export function launchedRun(state: RunState, unapplied: readonly KernelReceipt[]
     };
   }
   return run;
+}
+
+/**
+ * The supervisor at work for the unit's visit, applied or not: its launch is applied by the next tick,
+ * but the supervisor asks for its brief and may answer within seconds, and only the unapplied
+ * `supervisor.started` says it stands in. Null when none does.
+ */
+export function launchedSupervisor(state: RunState, unapplied: readonly KernelReceipt[]): SupervisorRun | null {
+  let sup = state.supervisor ?? null;
+  for (const r of unapplied) {
+    const d = r.data;
+    if (d.kind !== "supervisor.started" || d.step !== state.step || d.attempt !== state.attempt) continue;
+    if (sup?.id === d.run_id) {
+      if (d.session !== undefined) sup = { ...sup, session: d.session };
+      continue;
+    }
+    if (sup !== null) continue;
+    sup = { id: d.run_id, subject: d.subject, executor: d.executor, started_at: r.at, ...(d.input_id !== undefined && { input_id: d.input_id }), ...(d.session !== undefined && { session: d.session }) };
+  }
+  return sup;
 }

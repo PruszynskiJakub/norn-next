@@ -73,7 +73,9 @@ export function lowerActor(name: string, step: Obj, names: SurfaceNames): Lowere
     // a grant is read from a role, so allow: with none would pin a narrowing nothing enforces
     if (step.allow !== undefined && step.role === undefined)
       return refused(`${at}/allow`, `step '${name}' is written with the head key \`${heads[0]}\` and with \`allow\`, which narrows a role's capabilities: write it with by: <role> and do:`);
-    if (typeof step.attended === "string") return refused(`${at}/attended`, `\`attended: ${step.attended}\` belongs to a step written with by:; ${/^[aeiou]/.test(heads[0] as string) ? "an" : "a"} ${heads[0]}: step takes attended: true`);
+    // a pinned step written with by: holds its role and `attended: "agent"`, and must reload as pinned
+    const pinnedAgent = step.attended === "agent" && step.role !== undefined;
+    if (typeof step.attended === "string" && !pinnedAgent) return refused(`${at}/attended`, `\`attended: ${step.attended}\` belongs to a step written with by:; ${/^[aeiou]/.test(heads[0] as string) ? "an" : "a"} ${heads[0]}: step takes attended: true`);
     return { step };
   }
   if (step.by === undefined) return formOnly.length ? refused(at, `step '${name}' names no actor: give it by: (an agent role, person, shell, or a step kind as <namespace>.<kind>)`) : { step };
@@ -135,7 +137,8 @@ function agent(name: string, step: Obj, role: string, baseline: readonly string[
   for (const [k, v] of Object.entries(limits)) {
     if (k === "deadline" || k === "nudges" || k === "retries") out[k] = v;
     else if (k === "timeout") errors.push({ path: `${at}/limits/timeout`, message: "an agent step is bounded by deadline, never timeout" });
-    else if (k === "asks") errors.push({ path: `${at}/limits/asks`, message: "`asks` bounds a supervisor's answers, and no step has a supervisor yet" });
+    else if (k === "asks" && step.attended === "agent") out.asks = v;
+    else if (k === "asks") errors.push({ path: `${at}/limits/asks`, message: "`asks` bounds a supervisor's answers, and only an attended: agent step has a supervisor" });
   }
   return errors.length ? { errors } : { step: out };
 }

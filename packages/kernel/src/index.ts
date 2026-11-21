@@ -20,7 +20,7 @@ export * from "./model/actions.ts";
 export * from "./model/capabilities.ts";
 export * from "./model/config.ts";
 export * from "./model/grant.ts";
-export { launchedRun } from "./model/launched.ts";
+export { launchedRun, launchedSupervisor } from "./model/launched.ts";
 export * from "./model/detect.ts";
 export * from "./model/facts.ts";
 export * from "./model/receipts.ts";
@@ -39,6 +39,7 @@ export { readRunState, RUN_STATE_UPGRADES, type RunStateRead, type RunStateUpgra
 export { type DecideContext, decideContext, Decisions } from "./decide/context.ts";
 export { decide } from "./decide/index.ts";
 export { decideUnit } from "./decide/unit.ts";
+export { DEFAULT_SUPERVISOR_ASKS, SUPERVISOR_ROLE } from "./decide/supervisor.ts";
 export { changeClosedReason, decideIntake, decideStory, decideStoryTail, ITEM_CLOSED_REASON, isChangeClosedReason, unsyncedReason } from "./decide/story.ts";
 export { loadProblem } from "./decide/story-unit.ts";
 export { RULE_IDS } from "./decide/rules.ts";

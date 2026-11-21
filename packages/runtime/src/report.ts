@@ -32,6 +32,7 @@ import { declaredCriteria } from "./criteria.ts";
 import { baseConflictOf } from "./input-history.ts";
 import { producedOf, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
 import { collectReports } from "./reports.ts";
+import { renderSupervisorBrief, supervisorOfRun, supervisorReceipt } from "./supervisor.ts";
 import { handoffArtifact } from "./story-docs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
@@ -115,7 +116,13 @@ function briefInputsOf(record: UnitJournal, live: LiveStep, spec: { skills: stri
   };
 }
 
-export async function briefOf(env: RuntimeEnv, unit: string): Promise<Refusable<BriefShown>> {
+/** The brief of `runId` when it is the unit's supervisor, else of the unit's live run. */
+export async function briefOf(env: RuntimeEnv, unit: string, runId?: string): Promise<Refusable<BriefShown>> {
+  if (runId !== undefined) {
+    const read = await env.journal.readUnit(unit);
+    const sup = read.ok && read.value.corrupt === undefined ? supervisorOfRun(read.value, runId) : null;
+    if (read.ok && sup) return { ok: true, value: { unit, run_id: runId, markdown: await renderSupervisorBrief(env, read.value, sup) } };
+  }
   const found = await liveAgent(env, unit);
   if (!found.ok) return found;
   const { record, live } = found.value;
@@ -150,6 +157,8 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
       return { ok: true, value: { seq: earlier.seq, replayed: true, ...(summary !== undefined && { criteria: summary }) } };
     }
   }
+  const supervised = await supervisorReport(env, unit, runId, req, receiptId);
+  if (supervised) return supervised;
   const found = await liveAgent(env, unit);
   if (!found.ok) return found;
   const { record, live } = found.value;
@@ -222,6 +231,25 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     await appendEvents(env.ctx, unit, runId, [{ ...eventOf(runId, req), seq: next_seq, at: env.ctx.now() }]);
   }
   return { ok: true, value: { seq: wrote.value.seq, replayed: wrote.value.replayed, ...(criteria !== undefined && { criteria: criteria.summary }) } };
+}
+
+/**
+ * A report from the unit's supervisor, recorded as the receipt its subject takes, or null when `runId`
+ * is not the supervisor at work. Nothing of the step's own run is read back or checked: a supervisor
+ * changes nothing in the worktree, and what it reports stands only as its own.
+ */
+async function supervisorReport(env: RuntimeEnv, unit: string, runId: string, req: ReportRequest, receiptId: string): Promise<Refusable<ReportRecorded> | null> {
+  const read = await env.journal.readUnit(unit);
+  if (!read.ok || read.value.corrupt !== undefined) return null;
+  const sup = supervisorOfRun(read.value, runId);
+  if (!sup) return null;
+  const moved = await claimMovedRefusal(env, unit, runId);
+  if (moved) return moved;
+  const receipt = supervisorReceipt(read.value, sup, req);
+  if (!receipt.ok) return { ok: false, refusal: receipt.refusal };
+  const wrote = await env.journal.record(unit, { id: receiptId, data: receipt.value });
+  if (!wrote.ok) return refuse(`cannot record the report: ${wrote.failure.message}`, "report again with the same report id", wrote.failure.code);
+  return { ok: true, value: { seq: wrote.value.seq, replayed: wrote.value.replayed } };
 }
 
 /**

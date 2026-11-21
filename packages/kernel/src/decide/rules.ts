@@ -102,5 +102,15 @@ export const RULE_IDS: readonly string[] = [
   "agent.died.retry",
   "agent.died.exhausted",
   "agent.retry.no_headless",
+  // the supervisor: a question of an attended: agent step, or a gate the person's policy grants
+  "supervisor.ask",
+  "supervisor.gate",
+  "supervisor.reserved",
+  "supervisor.asks_spent",
+  "supervisor.no_executor",
+  "supervisor.working",
+  "supervisor.silent",
+  "supervisor.died",
+  "supervisor.revoked",
   ...QUIET_BASES.flatMap((base) => QUIET_SUFFIXES.map((suffix) => `${base}.${suffix}`)),
 ];

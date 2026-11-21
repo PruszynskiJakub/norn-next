@@ -326,7 +326,7 @@ describe("refusals of the step form", () => {
   test("limits and attended take what the pinned document can hold", () => {
     expect(refusals(wf({ a: { by: "builder", do: "Do it.", limits: { timeout: "1h", asks: 3 }, attended: "none", outcomes: { done: "$done" } } }))).toEqual([
       { path: "/steps/a/limits/timeout", message: "an agent step is bounded by deadline, never timeout" },
-      { path: "/steps/a/limits/asks", message: "`asks` bounds a supervisor's answers, and no step has a supervisor yet" },
+      { path: "/steps/a/limits/asks", message: "`asks` bounds a supervisor's answers, and only an attended: agent step has a supervisor" },
     ]);
     expect(refusals(wf({ a: { by: "shell", do: "bun test", limits: { timeout: "1m", retries: 2 }, outcomes: { pass: "$done", fail: "$stuck" } } }))).toEqual([
       { path: "/steps/a/limits/retries", message: "`retries` bounds an agent step: a shell step is bounded by timeout" },
@@ -337,6 +337,21 @@ describe("refusals of the step form", () => {
     expect(refusals(wf({ a: { agent: "Do it.", attended: "person", outcomes: { done: "$done" } } }))).toEqual([
       { path: "/steps/a/attended", message: "`attended: person` belongs to a step written with by:; an agent: step takes attended: true" },
     ]);
+  });
+
+  test("limits.asks on an attended: agent step pins how many questions its supervisor answers in a visit", () => {
+    const r = loadWorkflow(wf({ a: { by: "builder", do: "Do it.", attended: "agent", limits: { asks: 4 }, outcomes: { done: "$done" } } }), opts());
+    const w = loaded(r);
+    expect(w.pinned.doc.steps.a?.asks).toBe(4);
+    expect(w.graph.steps.a?.agent?.asks).toBe(4);
+    expect(loaded(loadWorkflow(wf({ a: { by: "builder", do: "Do it.", attended: "agent", outcomes: { done: "$done" } } }), opts())).graph.steps.a?.agent?.asks).toBeUndefined();
+  });
+
+  test("a pinned attended: agent step reloads to the hash it was pinned under", () => {
+    const w = loaded(loadWorkflow(wf({ a: { by: "builder", do: "Do it.", attended: "agent", limits: { asks: 2 }, outcomes: { done: "$done" } } }), opts()));
+    const again = loaded(loadWorkflow(structuredClone(w.pinned.doc), opts()));
+    expect(again.pinned.hash).toBe(w.pinned.hash);
+    expect(again.graph.steps.a?.agent).toMatchObject({ attended: "agent", asks: 2 });
   });
 
   test("allow: asks only for capabilities norn knows", () => {

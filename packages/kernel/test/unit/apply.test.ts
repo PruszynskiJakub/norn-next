@@ -382,7 +382,7 @@ describe("applyReceipts: runs, nudges and classified outcomes", () => {
 
   test("an ask with no ask route parks the unit under a reason code, the question beside it; an answer lifts the park and keeps the run", () => {
     const parked = apply(fresh(), journal(1, started("a1"), { kind: "run.reported", run_id: "a1", verb: "ask", text: "which base?" })).state;
-    expect(parked.parked).toEqual({ reason: ASKED_PARK, since: iso(2), text: "which base?" });
+    expect(parked.parked).toEqual({ reason: ASKED_PARK, since: iso(2), text: "which base?", input_id: "r2" });
     const res = apply(parked, journal(3, { kind: "answer.sent", input_id: "q1", text: "main", by: "a-person" }));
     expect(res.state.parked).toBeUndefined();
     expect(res.state.run?.id).toBe("a1");

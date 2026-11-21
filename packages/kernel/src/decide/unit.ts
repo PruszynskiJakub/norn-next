@@ -7,16 +7,15 @@
  */
 import type { Decision, DecisionOf } from "../model/actions.ts";
 import type { StoryFacts, UnitFacts } from "../model/facts.ts";
-import type { RunState } from "../model/run-state.ts";
+import { ASKED_PARK, type RunState } from "../model/run-state.ts";
 import type { DecideContext } from "./context.ts";
 import { checkDue } from "./check-due.ts";
 import { applyAction, markCorrupt } from "./record.ts";
+import { decideQuestion, GATE_PARK } from "./supervisor.ts";
 import { decideAgent } from "./unit-agent.ts";
 import { decideCheck, decideGate, decidePluginStep } from "./unit-steps.ts";
 import { applyDecision, noop, type UnitView } from "./unit-support.ts";
 
-/** The park of a gate waiting on its decision. */
-const GATE_PARK = "gate.park";
 
 /**
  * Parks the unit rules derive from facts each tick, by the rule that parks. A park with any other
@@ -77,6 +76,10 @@ export function decideUnit(story: StoryFacts, unit: UnitFacts, ctx: DecideContex
     return undelivered.length > 0 ? { ...d, rule: "receipts.apply.undelivered", undelivered } : d;
   }
   if (state.ended) return noop(view, `unit.ended.${state.ended}`, state.ended_reason ?? state.ended);
+  if (parked?.reason === ASKED_PARK) {
+    const question = decideQuestion(view);
+    if (question) return question;
+  }
   if (parked && !derived) return noop(view, "unit.parked", parked.reason);
 
   const d = decideStep(view);

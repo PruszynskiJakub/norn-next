@@ -3,7 +3,7 @@
  * session of its current run, and the step run the host remembers for it. A port that throws is read
  * as knowing nothing, never as a fact.
  */
-import { type UnitFacts, type UnitJournal, validateReceiptData } from "@norn/kernel";
+import { ASKED_PARK, type UnitFacts, type UnitJournal, validateReceiptData } from "@norn/kernel";
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import type { RuntimeEnv } from "./env.ts";
 import type { GatherOptions } from "./facts.ts";
@@ -11,6 +11,7 @@ import { removeLeftovers } from "./check-leftovers.ts";
 import { OUTPUT_TAIL, readDetachedCheck, stopDetachedCheck } from "./checks-detached.ts";
 import { worktreeOf } from "./inputs.ts";
 import { sessionReportOnRecord, sessionReportRejected } from "./live-run.ts";
+import { reservedNamed } from "./supervisor.ts";
 import { readStepRun, type StepRunRecord, stepRunFact, writeStepRun } from "./step-runs.ts";
 
 export interface UnitRead {
@@ -100,6 +101,15 @@ export async function readUnitFacts(env: RuntimeEnv, unit: string, problems: str
     facts.corrupt = j.corrupt;
     if (j.corrupt_marked === true || (await corruptMarked(env, unit))) facts.corrupt_marked = true;
     return ok({ facts, journal: j });
+  }
+  // the question's words are read here, so decide sends one naming what only a person grants to the person
+  const parked = j.state?.parked;
+  const reserved = parked?.reason === ASKED_PARK && parked.text !== undefined ? reservedNamed(parked.text) : [];
+  if (reserved.length > 0) facts.question_reserved = reserved;
+  const sup = j.state?.supervisor;
+  if (sup?.session !== undefined) {
+    const alive = await probeAlive(env, sup.session);
+    if (alive !== null) facts.supervisor_alive = alive;
   }
   const run = j.state?.run ?? null;
   if (run) {

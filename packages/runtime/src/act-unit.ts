@@ -57,9 +57,13 @@ async function deliverAnswers(t: TickContext, unit: string, through: number, bef
 
 /**
  * A headless run the commit replaced or ended is stopped, so no agent goes on working for a step the
- * unit has left. An attended run is the person's to close: they work beside it.
+ * unit has left, and so is a supervisor the commit dropped. An attended run is the person's to close:
+ * they work beside it.
  */
 async function stopReplaced(t: TickContext, before: RunState | null, after: RunState): Promise<void> {
+  // a supervisor that answered, handed back, or was overtaken by the person stands in no longer
+  const sup = before?.supervisor;
+  if (sup?.session && after.supervisor?.id !== sup.id) await t.env.launcher.stop(sup.session);
   const run = before?.run;
   if (!run?.session || run.attended || after.run?.id === run.id) return;
   await t.env.launcher.stop(run.session);

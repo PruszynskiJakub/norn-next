@@ -61,8 +61,53 @@ export const ASKED_PARK = "agent.asked";
  * Why a unit waits for a person, and since when; a parked unit takes no action until a receipt moves
  * it. `reason` is a code or a short reason; `text` is what the agent asked, shown and never decided on.
  */
-export const ParkInfo = Type.Object({ reason: NonEmpty, since: IsoTime, text: Type.Optional(NonEmpty) }, { ...closed, title: "ParkInfo" });
+export const ParkInfo = Type.Object(
+  {
+    reason: NonEmpty,
+    since: IsoTime,
+    text: Type.Optional(NonEmpty),
+    /** the ask an agent's question was recorded under, which an answer names; set on an asked park */
+    input_id: Type.Optional(NonEmpty),
+  },
+  { ...closed, title: "ParkInfo" },
+);
 export type ParkInfo = Static<typeof ParkInfo>;
+
+/** What a supervisor stands in for: an agent's question, or a gate the person's policy grants it. */
+export const SupervisorSubject = Type.Union([Type.Literal("ask"), Type.Literal("gate")]);
+export type SupervisorSubject = Static<typeof SupervisorSubject>;
+
+/**
+ * The supervisor norn launched for this visit, beside the step's own run: its answer or decision stands
+ * only from this run and for this subject, so a word from any other process, run or visit is refused.
+ */
+export const SupervisorRun = Type.Object(
+  {
+    id: NonEmpty,
+    subject: SupervisorSubject,
+    /** the ask it answers (`subject: ask`) */
+    input_id: Type.Optional(NonEmpty),
+    executor: NonEmpty,
+    started_at: IsoTime,
+    /** the launcher's handle, once known, so a supervisor handed back or overtaken is stopped */
+    session: Type.Optional(NonEmpty),
+  },
+  { ...closed, title: "SupervisorRun" },
+);
+export type SupervisorRun = Static<typeof SupervisorRun>;
+
+/**
+ * What stood in for the person in this visit: the questions a supervisor answered, counted against the
+ * step's `limits.asks`, and what it handed back (an ask's id, or `gate`) with why, which stays the person's.
+ */
+export const Supervised = Type.Object(
+  {
+    answered: NonNegInt,
+    escalated: Type.Optional(Type.Array(Type.Object({ input: NonEmpty, reason: NonEmpty }, closed))),
+  },
+  { ...closed, title: "Supervised" },
+);
+export type Supervised = Static<typeof Supervised>;
 
 export const Ended = Type.Union([Type.Literal("done"), Type.Literal("stuck"), Type.Literal("corrupt")]);
 export type Ended = Static<typeof Ended>;
@@ -102,6 +147,10 @@ export const RunState = Type.Object(
     /** the story's own mode, set by a person; absent takes the workflow's, then the config's */
     mode: Type.Optional(Mode),
     parked: Type.Optional(ParkInfo),
+    /** the supervisor at work for this visit; entering a step drops it */
+    supervisor: Type.Optional(SupervisorRun),
+    /** what stood in for the person in this visit; entering a step drops it */
+    supervised: Type.Optional(Supervised),
     /** a person asked for this visit's agent to start though manual mode holds it; entering a step drops it */
     requested: Type.Optional(Type.Object({ by: NonEmpty, at: IsoTime }, closed)),
     ended: Type.Optional(Ended),

@@ -11,6 +11,7 @@ import { createHarnessLauncher, DEFAULT_HOOK_COMMAND } from "./executors.ts";
 import { NO_REPO_WORKFLOWS, overlayRepoWorkflows } from "./repo-workflows.ts";
 import { delegatedGates, loadPackWorkflows, type ResolvedSlots, resolveSlots, roleCapabilities, signalDeclarations } from "./resolve.ts";
 import { holdChanged } from "./confirm.ts";
+import { renderSupervisorBrief, supervisorOfRun } from "./supervisor.ts";
 import { newTickId, tick } from "./tick.ts";
 import type { AgentLauncher, AgentRunRequest, Runtime, RuntimeDeps } from "./types.ts";
 import { newWakeWriter, stampingReceipts } from "./wake.ts";
@@ -22,6 +23,7 @@ function briefRenderer(envOf: () => RuntimeEnv | undefined) {
   return async (run: AgentRunRequest): Promise<PluginResult<string>> => {
     const env = envOf();
     if (!env) return fail("unavailable", "the runtime env is not ready", false);
+    if (run.supervisor !== undefined) return supervisorBrief(env, run.unit, run.run_id);
     const input = await briefRenderInput(env, run.unit, run.brief, run.run_id, run.worktree);
     if (!input.ok) return input;
     try {
@@ -30,6 +32,15 @@ function briefRenderer(envOf: () => RuntimeEnv | undefined) {
       return fail("invalid", `the brief of ${run.unit} could not be rendered: ${message(e)}`, false);
     }
   };
+}
+
+/** A supervisor's brief at its launch: its intent is on the record, not yet applied. */
+async function supervisorBrief(env: RuntimeEnv, unit: string, runId: string): Promise<PluginResult<string>> {
+  const read = await env.journal.readUnit(unit);
+  if (!read.ok) return read;
+  const sup = supervisorOfRun(read.value, runId);
+  if (!sup) return fail("not_found", `run ${runId} is not the supervisor at work for ${unit}`, false);
+  return ok(await renderSupervisorBrief(env, read.value, sup));
 }
 
 function launcherOf(deps: Omit<RuntimeDeps, "tickId">, slots: ResolvedSlots, envOf: () => RuntimeEnv | undefined): PluginResult<AgentLauncher> {
