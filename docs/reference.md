@@ -779,6 +779,7 @@ Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner`, `ru
 
 The `sdlc` pack's workflows:
 
+- `fix`: Reproduce a bug and confirm its cause, fix it test-first, review it, open the draft PR, wait for CI.
 - `quick`: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
 - `refinement`: Agree a story's spec and plan with a person, against the current base; no code.
 - `reproduce`: Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.

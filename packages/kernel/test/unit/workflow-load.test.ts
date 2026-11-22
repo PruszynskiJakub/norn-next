@@ -121,6 +121,8 @@ const OLD_COUNTERS: Record<string, { edges: Record<string, string>; counters: Re
   },
   "triage.yaml": { edges: {}, counters: {} },
 };
+// fix had no old counterpart: past its reproduce step, which loops on nothing, it is bounded as quick is
+OLD_COUNTERS["fix.yaml"] = OLD_COUNTERS["quick.yaml"] as (typeof OLD_COUNTERS)[string];
 
 describe("the shipped workflows", () => {
   const edited = shipped();

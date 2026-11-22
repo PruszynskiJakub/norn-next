@@ -123,10 +123,10 @@ describe("this repo's workflows, as norn loads them", () => {
     expect(config.kernel?.workflow).toBe("triage");
   });
 
-  test("are the pack's six workflows plus release; the repo keeps a copy only of a workflow it changes", () => {
-    expect(Object.keys(repo).sort()).toEqual(["quick", "refinement", "release", "reproduce", "slice", "story", "triage"]);
-    expect(yamlIn(WORKFLOWS).map((f) => f.replace(/\.ya?ml$/, "")).sort()).toEqual(["release", "reproduce", "triage"]);
-    expect(yamlIn(join(WORKFLOWS, "shared"))).toEqual([]);
+  test("are the pack's seven workflows plus release; the repo keeps a copy only of a file it changes", () => {
+    expect(Object.keys(repo).sort()).toEqual(["fix", "quick", "refinement", "release", "reproduce", "slice", "story", "triage"]);
+    expect(yamlIn(WORKFLOWS).map((f) => f.replace(/\.ya?ml$/, "")).sort()).toEqual(["release", "triage"]);
+    expect(yamlIn(join(WORKFLOWS, "shared"))).toEqual(["diagnose.yaml"]);
   });
 
   test("every skill a workflow names is linked under .claude/skills", () => {
@@ -196,6 +196,15 @@ describe("this repo's workflows, as norn loads them", () => {
     expect(Object.keys(steps("reproduce"))).toEqual(["reproduce"]);
     expect(steps("reproduce").reproduce?.skills).toEqual(["norn-diagnose"]);
     expect(steps("reproduce").reproduce?.outcomes).toEqual({ reproduced: "$done", cannot_reproduce: "$done" });
+  });
+
+  test("fix runs the repo's reproduce step, through the dev build, then quick's build, base update, publish and land", () => {
+    const fix = steps("fix");
+    expect(fix.reproduce?.agent).toBe(steps("reproduce").reproduce?.agent as string);
+    expect(String(fix.reproduce?.agent)).toContain("bun packages/cli/src/main.ts");
+    expect(fix.reproduce?.outcomes).toEqual({ reproduced: "implement", cannot_reproduce: "$done" });
+    const after = (wf: string) => Object.fromEntries(Object.entries(steps(wf)).filter(([s]) => !["sync", "sync-resolve", "reproduce"].includes(s)).map(([s, step]) => [s, step.outcomes]));
+    expect(after("fix")).toEqual(after("quick"));
   });
 
   test("the repo's copies of the pack's workflows have the same steps, kinds and edges", () => {

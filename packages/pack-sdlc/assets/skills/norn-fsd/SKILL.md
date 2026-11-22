@@ -28,4 +28,4 @@ A subagent returns with its round report when the round ended: every unit of the
 
 ## When to stop
 
-A story is delivered when its `story` or `quick` round has its `ready` `approve` (and is merged, when the request named the merge), or when the person ends supervision. Then give the `norn-fsd-round` report, adding each round's workflow and the reason it was recommended.
+A story is delivered when its `story`, `quick` or `fix` round has its `ready` `approve` (and is merged, when the request named the merge), or when the person ends supervision. Then give the `norn-fsd-round` report, adding each round's workflow and the reason it was recommended.

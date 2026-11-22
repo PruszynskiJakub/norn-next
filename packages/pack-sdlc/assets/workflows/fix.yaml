@@ -1,0 +1,39 @@
+# For a bug whose fix looks small and settled: one round reproduces it, then fixes it behind a
+# regression test. A merged PR ends the story; a bug that would not reproduce ends the round.
+name: fix
+description: Reproduce a bug and confirm its cause, fix it test-first, review it, open the draft PR, wait for CI.
+start: catch-up
+steps:
+  catch-up:
+    use: catch-up
+    outcomes: { synced: diagnose }
+  diagnose:
+    use: diagnose
+    outcomes: { reproduced: build, cannot_reproduce: $done }
+  build:
+    use: build
+    outcomes: { reviewed: base-update }
+  base-update:
+    use: base-update
+    outcomes:
+      tested: publish
+      failed: build
+      merged: open-pr
+      redescribe: publish
+  # a failed check's rework goes back through open-pr to the new head
+  publish:
+    use: publish
+    outcomes:
+      passed: land
+      failed: { to: build, max: 3 }
+      stale: base-update
+  land:
+    use: land
+    outcomes:
+      rejected: build
+      stale: base-update
+      unpushed: open-pr
+# as in quick: `norn story update-branch` enters the base update, and a base move without a conflict
+# under a story waiting at ready or merge runs `test` on the merged tree
+signals: { vcs.stale: { when: conflict, verify: test } }
+entries: { update-branch: base-update }

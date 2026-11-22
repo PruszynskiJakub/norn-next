@@ -1,6 +1,4 @@
-# For a bug report (label norn:wf:reproduce, set by the bug report template and the `issue` skill).
-# Next round: the fix, with `--workflow quick`, whose implement turns the red loop into a failing test first.
-name: reproduce
+# This repo's reproduce step, in its reproduce and fix rounds: the pack's, run through the dev build.
 description: Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.
 start: reproduce
 steps:
@@ -21,8 +19,8 @@ steps:
     reads: [spec, handoff]
     outcomes:
       reproduced:
-        to: $done
+        exit: reproduced
         means: "the bug was observed as a user and a loop goes red on it; loop, repro, cause and seam posted and in the handoff"
       cannot_reproduce:
-        to: $done
+        exit: cannot_reproduce
         means: "followed the report faithfully and the bug did not occur, nor in any loop tried; what was tried posted and in the handoff"

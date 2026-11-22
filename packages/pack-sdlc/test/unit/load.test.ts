@@ -100,9 +100,9 @@ describe("how the pack's workflows bring in their shared files", () => {
   });
 
   test("the base is caught up by the shared catch-up file, which leaves at synced, in every workflow that changes the branch", () => {
-    expect(Object.keys(SDLC_PACK.shared).sort()).toEqual(["base-update.yaml", "build.yaml", "catch-up.yaml", "land.yaml", "publish.yaml"]);
+    expect(Object.keys(SDLC_PACK.shared).sort()).toEqual(["base-update.yaml", "build.yaml", "catch-up.yaml", "diagnose.yaml", "land.yaml", "publish.yaml"]);
     expect(exitsOf("catch-up")).toEqual(["synced"]);
-    for (const file of ["refinement.yaml", "quick.yaml", "story.yaml"]) {
+    for (const file of ["refinement.yaml", "quick.yaml", "story.yaml", "fix.yaml"]) {
       const doc = written(file);
       expect({ file, start: doc.start, step: doc.steps["catch-up"] }).toEqual({ file, start: "catch-up", step: expect.objectContaining({ use: "catch-up" }) });
       // only the shared files merge the base: no workflow writes an update-branch step of its own
@@ -122,7 +122,7 @@ describe("how the pack's workflows bring in their shared files", () => {
   });
 
   test("slice, quick and story build through the shared build file and write no build step of their own", () => {
-    for (const file of ["slice.yaml", "quick.yaml", "story.yaml"]) {
+    for (const file of ["slice.yaml", "quick.yaml", "story.yaml", "fix.yaml"]) {
       const doc = written(file);
       expect({ file, build: doc.steps.build }).toEqual({ file, build: expect.objectContaining({ use: "build" }) });
       const own = Object.entries(doc.steps).filter(([, s]) => s.by === "builder" && !String(s.do ?? "").includes("merge")).map(([n]) => n);
@@ -162,6 +162,45 @@ describe("how the pack's workflows bring in their shared files", () => {
     expect(entering).toEqual([]);
     // every rework, from QA, the person, a failed check or a rejection at ready, starts at implement
     for (const [s, o] of [["qa", "fail"], ["human-qa", "reject"], ["checks", "fail"], ["ready", "reject"], ["test", "fail"]] as const) expect({ at: `${s}.${o}`, to: steps[s]?.routes[o]?.to }).toEqual({ at: `${s}.${o}`, to: "implement" });
+  });
+
+  test("fix goes catch-up → diagnose → build → base-update → publish → land; a bug that would not reproduce ends the round, every rework goes back through build", () => {
+    const doc = written("fix.yaml");
+    expect(doc.start).toBe("catch-up");
+    expect(Object.keys(doc.steps)).toEqual(["catch-up", "diagnose", "build", "base-update", "publish", "land"]);
+    expect(doc.steps["catch-up"]?.outcomes).toEqual({ synced: "diagnose" });
+    expect(doc.steps.diagnose?.outcomes).toEqual({ reproduced: "build", cannot_reproduce: "$done" });
+    // past the reproduce step, fix is quick
+    for (const step of ["build", "base-update", "publish", "land"]) expect({ step, outcomes: doc.steps[step]?.outcomes }).toEqual({ step, outcomes: written("quick.yaml").steps[step]?.outcomes });
+    const signals = (file: string) => {
+      const d = parse(SDLC_PACK.workflows[file] as string) as { signals?: unknown; entries?: unknown };
+      return { signals: d.signals, entries: d.entries };
+    };
+    expect(signals("fix.yaml")).toEqual(signals("quick.yaml"));
+  });
+
+  test("fix and reproduce run one reproduce step, brought in from the shared diagnose file, which leaves at reproduced or cannot_reproduce", () => {
+    expect(exitsOf("diagnose")).toEqual(["reproduced", "cannot_reproduce"]);
+    expect(Object.keys(sharedDoc("diagnose").steps)).toEqual(["reproduce"]);
+    const reproduce = (file: string) => {
+      const r = load(file);
+      if (!r.ok) throw new Error(JSON.stringify(r.errors));
+      return r.workflow.graph.steps.reproduce;
+    };
+    expect(reproduce("fix.yaml")?.agent?.instructions).toBeString();
+    expect(reproduce("fix.yaml")?.agent).toEqual(reproduce("reproduce.yaml")?.agent as NonNullable<ReturnType<typeof reproduce>>["agent"]);
+    expect(written("reproduce.yaml").steps.diagnose?.outcomes).toEqual({ reproduced: "$done", cannot_reproduce: "$done" });
+  });
+
+  test("fix stands on the person's ready before the merge: without a person there, it does not load", () => {
+    const floored = (sharedFiles: typeof SHARED) => {
+      const r = loadWorkflow(parse(SDLC_PACK.workflows["fix.yaml"] as string), { stepKinds: STEP_KINDS, sharedFiles, config: DEFAULT_KERNEL_CONFIG, inputs: HOST_INPUTS, floor: { delegated: [] } });
+      return r.ok ? [] : r.errors.map((e) => e.message);
+    };
+    expect(floored(SHARED)).toEqual([]);
+    const land = parse(SDLC_PACK.shared["land.yaml"] as string);
+    land.steps.ready = { by: "reviewer", do: "Read the draft PR.", outcomes: { approve: { to: "merge", means: "ready" }, reject: { exit: "rejected", means: "not ready" } } };
+    expect(floored({ ...SHARED, land })).toEqual([expect.stringContaining("no `by: person` step on the way")]);
   });
 
   test("triage ends the round with the outcome that names its recommendation, so the next round is on the record, not only in a note", () => {

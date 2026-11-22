@@ -72,6 +72,6 @@ Escalate, never act:
 
 ## When the round ends
 
-The round ends at `$done`, when every unit of the story has `ended` `done`; for `story` and `quick`, once `ready` has its `approve` (and the merge, when the request named it). Then the subagent reports and stops.
+The round ends at `$done`, when every unit of the story has `ended` `done`; for `story`, `quick` and `fix`, once `ready` has its `approve` (and the merge, when the request named it). Then the subagent reports and stops.
 
 **One report**, when supervision ends, for every supervised story: the steps run, findings fixed, the decisions you made with their reasons, escalations and how they were answered, suspected flakes with the test and the check's output, the PR and its merge state, and for `release` the version. A story that cannot finish is still listed: "waiting: your answer to …", with the command that resumes it.
