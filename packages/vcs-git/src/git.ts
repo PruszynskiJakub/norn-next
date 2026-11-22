@@ -14,9 +14,9 @@ export const GIT_ENV: Readonly<Record<string, string>> = { GIT_TERMINAL_PROMPT: 
 export const REMOTE_TIMEOUT_MS = 120_000;
 const REMOTE_COMMANDS: ReadonlySet<string> = new Set(["fetch", "push"]);
 
-export function git(ctx: HostContext, cwd: string, args: string[]): Promise<ExecOutput> {
+export function git(ctx: HostContext, cwd: string, args: string[], input?: string): Promise<ExecOutput> {
   const remote = REMOTE_COMMANDS.has(args[0] ?? "");
-  return ctx.exec(["git", ...args], { cwd, env: { ...GIT_ENV }, ...(remote ? { timeoutMs: REMOTE_TIMEOUT_MS } : {}) });
+  return ctx.exec(["git", ...args], { cwd, env: { ...GIT_ENV }, ...(remote ? { timeoutMs: REMOTE_TIMEOUT_MS } : {}), ...(input === undefined ? {} : { input }) });
 }
 
 export const lines = (s: string): string[] => s.split("\n").filter((l) => l.length > 0);

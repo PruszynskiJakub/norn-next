@@ -53,6 +53,18 @@ const PR_URL = /\/pull\/(\d+)/;
 /** the buckets of a check that failed or was cut short: neither may pass for green */
 const FAILED: ReadonlySet<string> = new Set(["fail", "cancel"]);
 const NO_CHECKS = /no checks reported/i;
+/** a full commit id, SHA-1 or SHA-256: a ref name or a short sha could later name another commit */
+const FULL_SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
+
+/**
+ * `path` as a URL path, each segment percent-encoded; null for a path no file in a commit has (empty,
+ * an empty segment, `.` or `..`), which GitHub would resolve to some other page.
+ */
+function encodePath(path: string): string | null {
+  const segments = path.split("/");
+  if (segments.some((s) => s === "" || s === "." || s === "..")) return null;
+  return segments.map(encodeURIComponent).join("/");
+}
 
 type Outcome = PluginResult<ForgeEffectOutcome>;
 
@@ -166,6 +178,16 @@ export function createGithubForge(ctx: HostContext, config: GithubConfig): Forge
       if (!m.ok) return m;
       const state = m.value.mergeable.toUpperCase();
       return ok(state === "UNKNOWN" ? report : { ...report, conflicts: state === "CONFLICTING" });
+    },
+
+    async fileUrl(commit, path, form) {
+      const at = encodePath(path);
+      if (!FULL_SHA.test(commit) || at === null) return ok(null);
+      const repo = await gh.repo();
+      // a repository that does not resolve gets no URL at all: a guessed one could point anywhere
+      if (!repo.ok) return ok(null);
+      const url = `https://github.com/${repo.value}/blob/${commit.toLowerCase()}/${at}`;
+      return ok(form === "image" ? `${url}?raw=true` : url);
     },
 
     async perform(effect: ForgeEffect, meta: EffectMeta): Promise<Outcome> {

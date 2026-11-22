@@ -284,6 +284,41 @@ describe("forge reads", () => {
     expect(valueOf(await forge.findChanges(["gh-2-y"]))["gh-2-y"]).toMatchObject({ state: "merged", merge_sha: "f".repeat(40), merged_at: "2026-11-01T00:00:00Z" });
   });
 
+  test("fileUrl pins a commit's file to its full sha: blob ?raw=true for an image, the blob page for a link", async () => {
+    const sha = "0123456789abcdef0123456789abcdef01234567";
+    for (const config of [{ repo: REPO }, {}]) {
+      const { forge } = rig(config);
+      const url = (path: string, form: "image" | "link") => (forge.fileUrl ? forge.fileUrl(sha, path, form) : Promise.reject(new Error("no fileUrl")));
+      expect(forge.capabilities.raw_urls).toBe(true);
+      expect(valueOf(await url("AC1.webp", "image"))).toBe(`https://github.com/${REPO}/blob/${sha}/AC1.webp?raw=true`);
+      expect(valueOf(await url("logs/AC2.log", "link"))).toBe(`https://github.com/${REPO}/blob/${sha}/logs/AC2.log`);
+    }
+  });
+
+  test("fileUrl names only a full commit sha, never a ref name or a short sha", async () => {
+    const { forge } = rig();
+    const url = (commit: string) => (forge.fileUrl ? forge.fileUrl(commit, "AC1.webp", "image") : Promise.reject(new Error("no fileUrl")));
+    for (const commit of ["main", "refs/norn/evidence/gh-1", "0123456", `${"a".repeat(39)}g`, ""]) expect(valueOf(await url(commit))).toBeNull();
+    expect(valueOf(await url("A".repeat(40)))).toBe(`https://github.com/${REPO}/blob/${"a".repeat(40)}/AC1.webp?raw=true`);
+    expect(valueOf(await url("b".repeat(64)))).toBe(`https://github.com/${REPO}/blob/${"b".repeat(64)}/AC1.webp?raw=true`);
+  });
+
+  test("fileUrl percent-encodes the path segment by segment, so the link opens the file", async () => {
+    const { forge } = rig();
+    const sha = "c".repeat(40);
+    const url = (path: string) => (forge.fileUrl ? forge.fileUrl(sha, path, "link") : Promise.reject(new Error("no fileUrl")));
+    expect(valueOf(await url("login page/AC 1 #2?.webp"))).toBe(`https://github.com/${REPO}/blob/${sha}/login%20page/AC%201%20%232%3F.webp`);
+    expect(valueOf(await url("ünï/100%.log"))).toBe(`https://github.com/${REPO}/blob/${sha}/%C3%BCn%C3%AF/100%25.log`);
+    for (const path of ["", "/AC1.webp", "a//b.log", "../AC1.webp", "./AC1.webp"]) expect(valueOf(await url(path))).toBeNull();
+  });
+
+  test("fileUrl gives null for a repository the forge cannot resolve, never a guessed URL", async () => {
+    const { forge, gh } = rig({});
+    gh.override("repo view", NO_REPOSITORY);
+    const url = () => (forge.fileUrl ? forge.fileUrl("d".repeat(40), "AC1.webp", "image") : Promise.reject(new Error("no fileUrl")));
+    expect(valueOf(await url())).toBeNull();
+  });
+
   test("ready on a pull request that is not a draft changes nothing", async () => {
     const { forge, exec } = rig();
     const { change } = valueOf(await forge.perform({ kind: "open", head: "gh-3-z", base: "main", title: "Z", body: "", draft: false }, meta(1)));

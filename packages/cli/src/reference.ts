@@ -184,6 +184,8 @@ function renderConfig(): string[] {
     ...rows.map((r) => `| \`${r.key}\` | ${tableCell(r.type)} | ${defaultCell(r.key)} |`),
     "",
     `Beside \`use\`, ${open.map((k) => `\`${k}\``).join(", ")} take the keys of the plugin they name; that plugin checks them.`,
+    "",
+    "`evidence.publish` keeps an agent QA report's evidence on `refs/norn/evidence/<story>` of the remote and links it from the pull request body, so it is as visible as the repo; `false` keeps nothing and pushes nothing, and forge-none never publishes ([Evidence](#evidence)).",
   ];
 }
 
