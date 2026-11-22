@@ -164,21 +164,30 @@ describe("this repo's workflows, as norn loads them", () => {
     expect(files.filter((f) => /\bgh (pr|run|api)\b|\.agents\/scripts\//.test(readFileSync(join(REPO, WORKFLOWS, f), "utf8")))).toEqual([]);
   });
 
-  test("release goes prepare → open-pr → checks → ready → merge, a failed check goes $stuck, and a base commit or a conflicting PR makes it stale", () => {
+  test("release catches up, then goes prepare → open-pr → checks → ready → merge; a failed check goes $stuck, a reject back to prepare, and a base commit or a conflicting PR catches up again", () => {
     const w = repo.release as Written;
-    expect(w.start).toBe("prepare");
-    expect(Object.keys(w.steps).sort()).toEqual(["checks", "merge", "open-pr", "prepare", "ready", "resolve", "update"]);
+    expect(w.start).toBe("sync");
+    // catch-up's and land's steps come from the pack's shared files: the repo writes only prepare, open-pr and checks
+    expect(Object.keys(w.steps).sort()).toEqual(["checks", "merge", "open-pr", "prepare", "ready", "sync", "sync-resolve"]);
+    expect(w.steps.sync?.outcomes).toEqual({ done: "prepare", conflict: expect.objectContaining({ to: "sync-resolve" }), clean: "prepare", resolved: "prepare" });
     expect(w.steps.prepare?.skills).toEqual(["release"]);
     expect(w.steps.prepare?.outcomes).toEqual({ done: "open-pr" });
     expect(w.steps["open-pr"]?.outcomes).toEqual({ done: "checks" });
-    expect(w.steps.checks?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: { to: "update", counter: "checks.stale" } });
+    expect(w.steps.checks?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: expect.objectContaining({ to: "sync" }) });
     // a signal is routed under `on:`, never among the outcomes a person or a step kind reports
     expect(w.steps.ready?.outcomes).toEqual({ approve: "merge", reject: { to: "prepare", counter: "land.rejected" } });
-    expect(w.steps.ready?.on).toEqual({ stale: { to: "update", counter: "land.stale" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
+    expect(w.steps.ready?.on).toEqual({ stale: { to: "sync", counter: "land.stale" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
     expect(w.counters?.["land.rejected"]).toEqual({ max: 2 });
     expect(w.steps.merge?.outcomes).toEqual({ merged: "$done" });
-    expect(w.steps.merge?.on).toEqual({ stale: { to: "update", counter: "land.stale" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
+    expect(w.steps.merge?.on).toEqual({ stale: { to: "sync", counter: "land.stale" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
     expect(w.base).toEqual({ stale: "behind" });
+  });
+
+  test("release writes no resolve or update of its own: it catches up through the pack's catch-up file", () => {
+    const own = parse(readFileSync(join(REPO, WORKFLOWS, "release.yaml"), "utf8")) as { start?: string; steps: Record<string, { use?: string }> };
+    expect(own.start).toBe("catch-up");
+    expect(Object.fromEntries(Object.entries(own.steps).filter(([, s]) => s.use).map(([n, s]) => [n, s.use]))).toEqual({ "catch-up": "catch-up", land: "land" });
+    expect(Object.keys(own.steps).sort()).toEqual(["catch-up", "checks", "land", "open-pr", "prepare"]);
   });
 
   test("story's and quick's resolve take the base side of each conflict, as the pack's do", () => {

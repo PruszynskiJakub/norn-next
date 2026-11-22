@@ -1,21 +1,26 @@
 # For the release story a person starts with /release-start (label norn:wf:release). The person
 # judges the version and changelog at ready and merges; CI tags and publishes on the merge. A red
-# check means the base is broken: fix it in its own story, then `norn run rerun gh-N --step update`.
+# check means the base is broken: fix it in its own story, then `norn run rerun gh-N --step sync`.
 name: release
 description: Write the changelog and propose the version, open the draft PR, wait for its CI, and let a person judge it at ready.
-start: prepare
+start: catch-up
 steps:
+  # the changelog covers every commit on the base, so the release starts from the current base
+  catch-up:
+    use: catch-up
+    outcomes: { synced: prepare }
   prepare:
     # it writes CHANGELOG.md, the version bumps and the skill copies, so it needs the builder's code:write
     by: builder
     do: >-
       Write the changelog section, the version bumps and the proposed version with its reason as the
-      skill says; a version given in the issue's `## Version` or in the reject at ready (under Rework) wins over
-      your proposal. Also write the PR body to pr.md in the spec folder: the proposed version, its
-      reason and the new changelog section; norn puts the issue link under it. In the same diff as
-      the bump, copy packages/pack-sdlc/assets/skills/norn* over .agents/skills/norn* as the skill
-      says, so that once the PR merges the repo's skill copies match the published binary. Rename the issue to "Release X.Y.Z" with `gh issue edit`, the one remote
-      write this step allows. Change no code.
+      skill says, over whatever a merge of the base left in CHANGELOG.md and the versions; a version given
+      in the issue's `## Version` or in the reject at ready (under Rework) wins over your proposal. Also
+      write the PR body to pr.md in the spec folder: the proposed version, its reason and the new changelog
+      section; norn puts the issue link under it. In the same diff as the bump, copy
+      packages/pack-sdlc/assets/skills/norn* over .agents/skills/norn* as the skill says, so that once the
+      PR merges the repo's skill copies match the published binary. Rename the issue to "Release X.Y.Z"
+      with `gh issue edit`, the one remote write this step allows. Change no code.
     with: { skills: [release] }
     reads: [spec, handoff]
     # open-pr reads it; norn done refuses the report while pr.md is missing or empty
@@ -24,32 +29,18 @@ steps:
       done:
         to: open-pr
         means: "CHANGELOG.md, packages/cli/package.json and the README badge carry version X.Y.Z, .agents/skills/norn* match the bundled sources; pr.md and the handoff name it with its reason"
-  update:
-    by: vcs.update-branch
-    # a branch that already held its base (clean) or took it in after a resolve (resolved) is prepared again too
-    outcomes: { done: prepare, conflict: resolve, clean: prepare, resolved: prepare }
-  resolve:
-    by: builder
-    do: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. CHANGELOG.md and version conflicts: keep the base side; prepare writes the release section again next."
-    with: { skills: [norn-merge] }
-    reads: [spec, handoff, base_side]
-    outcomes:
-      done:
-        to: update
-        means: "base merged into the story branch, conflicts resolved and committed"
   # prepare writes pr.md, so the release opens its PR without the pack's describe (shared/publish.yaml,
-  # whose every step must be reachable): open-pr and the wait for the PR's checks are its own.
-  # release.yml smokes every binary on its own OS after the merge, before it pushes the tag; a red
-  # check means the base is broken
+  # whose every step must be reachable). release.yml smokes every binary on its own OS after the
+  # merge, before it pushes the tag
   open-pr:
     by: forge.open-pr
     outcomes: { done: checks }
   checks:
     by: forge.await-checks
-    outcomes: { pass: land, fail: $stuck, stale: update }
+    outcomes: { pass: land, fail: $stuck, stale: catch-up }
   land:
     use: land
-    outcomes: { rejected: prepare, stale: update, unpushed: open-pr }
-# any commit on the base makes the changelog incomplete, so a release waiting at ready or merge goes
-# back through update and prepare
+    outcomes: { rejected: prepare, stale: catch-up, unpushed: open-pr }
+# any commit on the base makes the changelog incomplete, so a release waiting at ready or merge
+# catches up and prepares again
 signals: { vcs.stale: { when: behind } }
