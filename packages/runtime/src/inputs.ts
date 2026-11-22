@@ -36,6 +36,8 @@ export const RUN_DIR = `${AGENTS_DIR}/run`;
 export const INPUTS_DIR = `${RUN_DIR}/in`;
 /** the folder a run writes its reports to, emptied at every launch */
 export const OUT_DIR = `${RUN_DIR}/out`;
+/** The evidence files a report re-encoded, norn's own beside `out/`, so the agent's files stay as written. */
+export const EVIDENCE_COPIES_DIR = `${RUN_DIR}/evidence`;
 const BASE_DIR = `${RUN_DIR}/.base`;
 /** where a worktree made before the run folder keeps its copies; read so its untouched documents still read as untouched */
 const LEGACY_BASE_DIR = `${AGENTS_DIR}/inputs/.base`;
@@ -63,6 +65,7 @@ export async function clearOut(files: HostFiles, worktree: string): Promise<void
     if (files.readLink && (await files.readLink(path)) !== null) await files.remove(path);
   }
   await emptyFolder(files, `${worktree}/${OUT_DIR}`);
+  await emptyFolder(files, `${worktree}/${EVIDENCE_COPIES_DIR}`);
   await makeOut(files, worktree);
 }
 
