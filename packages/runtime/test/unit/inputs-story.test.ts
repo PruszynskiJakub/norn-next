@@ -131,6 +131,47 @@ describe("the slice files as inputs", () => {
     expect(kept.ok && kept.value).toContain("status: built");
   });
 
+  test("a re-slice that renames and drops slice files leaves only the new cut in the story's documents", async () => {
+    const h = await started();
+    await sliced(h);
+    // the slice gate was rejected; the re-slice renames 01 to 02, drops 02 and adds a new 01
+    await h.files.remove(`${WORKTREE}/${SLICES}/01-parse.md`);
+    await h.files.remove(`${WORKTREE}/${SLICES}/02-export.md`);
+    const spike = SLICE_01.replace("Parse the input", "Spike the parser");
+    const parse = SLICE_02.replace("Export it", "Parse the input");
+    await h.files.write(`${WORKTREE}/${SLICES}/01-spike.md`, spike);
+    await h.files.write(`${WORKTREE}/${SLICES}/02-parse.md`, parse);
+    await readBackDocs(h.env, UNIT);
+    expect(await readStoryDoc(h.env, UNIT, "slices/01-parse.md")).toEqual({ ok: true, value: null });
+    expect(await readStoryDoc(h.env, UNIT, "slices/02-export.md")).toEqual({ ok: true, value: null });
+    expect(await readStoryDoc(h.env, UNIT, "slices/01-spike.md")).toEqual({ ok: true, value: spike });
+    expect(await readStoryDoc(h.env, UNIT, "slices/02-parse.md")).toEqual({ ok: true, value: parse });
+    expect(await h.files.read(`${WORKTREE}/.agents/run/.base/specs/lt-1/slices/01-parse.md`)).toBeNull();
+    // reading back again finds nothing more to remove
+    await readBackDocs(h.env, UNIT);
+    expect(await readStoryDoc(h.env, UNIT, "slices/01-spike.md")).toEqual({ ok: true, value: spike });
+  });
+
+  test("a slice document norn never placed in the story's worktree is kept when its file is not there", async () => {
+    const h = await started();
+    await sliced(h);
+    // a fresh checkout of the story: neither the file nor norn's copy of it is there
+    await h.files.remove(`${WORKTREE}/${SLICES}/01-parse.md`);
+    await h.files.remove(`${WORKTREE}/.agents/run/.base/specs/lt-1/slices/01-parse.md`);
+    await readBackDocs(h.env, UNIT);
+    expect(await readStoryDoc(h.env, UNIT, "slices/01-parse.md")).toEqual({ ok: true, value: SLICE_01 });
+  });
+
+  test("a slice's read-back removes no slice document, though its worktree holds only its own file", async () => {
+    const h = await started();
+    await sliced(h);
+    await only(h, await sliceStarted(h, "lt-1/01"), "slice");
+    await h.files.remove(`${SLICE_WORKTREE}/${SLICES}/01-parse.md`);
+    await readBackDocs(h.env, "lt-1/01");
+    expect(await readStoryDoc(h.env, UNIT, "slices/01-parse.md")).toEqual({ ok: true, value: SLICE_01 });
+    expect(await readStoryDoc(h.env, UNIT, "slices/02-export.md")).toEqual({ ok: true, value: SLICE_02 });
+  });
+
   test("`slice` says precisely why there is no file: a slice none was written for, or the story itself", async () => {
     const h = await started();
     await sliced(h);
