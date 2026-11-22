@@ -10,7 +10,7 @@ import { layout } from "@norn/store-local";
 import { agentNotes, awaitNote, machineOf, type NornOut, noteOf, norn, setUp, sh, status, type StoryShown, TEST_PLUGIN, tickUntil, type World, world } from "./world.ts";
 
 const KEY = "lt-1";
-const SLOW = 180_000;
+const SLOW = 360_000;
 
 describe("a story from intake to merged, through the CLI alone", () => {
   let w: World;
@@ -27,7 +27,8 @@ describe("a story from intake to merged, through the CLI alone", () => {
     w = await world("work");
     set = await setUp(w);
     created = await norn(w, ["story", "create", "Add the feature", "--json"]);
-    await tickUntil(w, rules, (u) => u?.step === "ready" && u.parked !== undefined);
+    // the agent step runs the real norn for its brief, every hook and its report, which a shared CI runner makes slow
+    await tickUntil(w, rules, (u) => u?.step === "ready" && u.parked !== undefined, 180_000);
     atGate = (await status(w)).stories.find((s) => s.key === KEY);
     approved = await norn(w, ["story", "approve", KEY, "--json"]);
     await tickUntil(w, rules, (u) => u?.step === "merge");

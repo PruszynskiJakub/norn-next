@@ -258,15 +258,19 @@ export async function unitOf(w: World, key: string): Promise<UnitShown | null> {
  * the patience throws with them all.
  */
 export async function tickUntil(w: World, rules: string[], done: (u: UnitShown | null) => boolean, maxMs = 60_000, key = "lt-1"): Promise<void> {
-  for (const until = performance.now() + maxMs; performance.now() < until; ) {
+  const started = performance.now();
+  const took: number[] = [];
+  for (const until = started + maxMs; performance.now() < until; ) {
+    const t0 = performance.now();
     const t = await norn(w, ["tick", "--json"]);
+    took.push(Math.round(performance.now() - t0));
     const outcomes = (t.body.outcomes ?? []) as { decision: { rule: string }; ok: boolean }[];
     rules.push(...outcomes.map((o) => `${o.decision.rule}${o.ok ? "" : "!"}`));
     if (t.code !== 0) throw new Error(`tick exited ${t.code}: ${t.stdout}${t.stderr}\nrules: ${rules.join(", ")}`);
     if (done(await unitOf(w, key))) return;
     await Bun.sleep(300);
   }
-  throw new Error(`no convergence; rules: ${rules.join(", ")}; unit: ${JSON.stringify(await unitOf(w, key))}`);
+  throw new Error(`no convergence in ${maxMs}ms; rules: ${rules.join(", ")}; tick ms: ${took.join(", ")}; unit: ${JSON.stringify(await unitOf(w, key))}`);
 }
 
 /** What the agent of each run noted, run by run in launch order of their files' names. */
