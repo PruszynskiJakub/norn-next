@@ -4,6 +4,7 @@ import { GitVcsConfig } from "./config.ts";
 import { conflictMarkers } from "./markers.ts";
 import { mergeInto } from "./merge.ts";
 import { publishHead } from "./heads.ts";
+import { keepFiles, moveRef, pushRef } from "./kept.ts";
 import { fetchRemote, pushBranch } from "./push.ts";
 import { changedPaths, deleteBranch, isAncestor, mergeBase, remoteIfAny, revParse, trialConflicts, uncommitted, unfinished, untracked, worktreeList } from "./refs.ts";
 import { changedSince, restore, snapshot } from "./snapshot.ts";
@@ -56,6 +57,9 @@ export function createGitVcs(ctx: HostContext, config: GitVcsConfig): Vcs {
       return has.value === null ? ok(null) : revParse(ctx, root, `refs/remotes/${remote}/${branch}`);
     },
     publishHead: (branch) => publishHead(ctx, root, remote, branch),
+    keepFiles: (ref, files, message) => keepFiles(ctx, root, ref, files, message),
+    moveRef: (ref, commit) => moveRef(ctx, root, ref, commit),
+    pushRef: (ref) => pushRef(ctx, root, remote, ref),
     async push(branch, opts) {
       const r = await pushBranch(ctx, root, remote, branch, opts?.lease);
       return r.ok ? ok(undefined) : r;
