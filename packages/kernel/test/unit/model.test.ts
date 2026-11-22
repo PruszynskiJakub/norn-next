@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
 import {
@@ -180,9 +180,9 @@ describe("kernel schemas", () => {
 });
 
 describe("workflow documents", () => {
-  /** Shipped workflows, both the bundled copies and this repo's own. */
+  /** Shipped workflows, both the bundled copies and this repo's own; a folder this repo does not override may be absent. */
   const dirs = [join(ROOT, "packages", "pack-sdlc", "assets", "workflows"), join(ROOT, ".agents", "workflows")];
-  const yamls = (dir: string) => readdirSync(dir).filter((n) => n.endsWith(".yaml")).map((n) => join(dir, n));
+  const yamls = (dir: string) => (existsSync(dir) ? readdirSync(dir) : []).filter((n) => n.endsWith(".yaml")).map((n) => join(dir, n));
 
   test.each(dirs.flatMap(yamls).map((f) => [f.slice(ROOT.length + 1), f]))("%s fits the workflow file schema", (_name, file) => {
     expect(errorsOf(validateWorkflowFile(parse(readFileSync(file, "utf8"))))).toEqual([]);
