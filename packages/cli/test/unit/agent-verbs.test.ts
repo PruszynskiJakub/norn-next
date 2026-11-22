@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { INPUTS_DIR, OUT_DIR, reportReceiptId, SPEC_ARTIFACT, worktreeOf, writeStoryDoc } from "@norn/runtime";
 import type { RunState } from "@norn/kernel";
 import type { CriterionVerdict } from "@norn/schema";
+import { doneMarkdown } from "../../src/commands/done.ts";
 import { ExitCode, runCli } from "../../src/index.ts";
 import { machine, ROOT, type TestMachine } from "./support.ts";
 import { AGENT_STEP, configured, envOf, GATE_STEP, RUN, receiptsOf, runEnv, seedUnit, UNIT, withEnv } from "./units.ts";
@@ -585,5 +586,23 @@ describe("a supervisor norn launched beside a step's run", () => {
     expect((await runCli(["done", "answer", "--note", "Postgres."], m.io)).exit).toBe(ExitCode.ok);
     const answer = (await receiptsOf(m)).find((r) => r.data.kind === "answer.sent");
     expect(answer?.data).toMatchObject({ kind: "answer.sent", input_id: "q-1", by: "supervisor", supervisor_run: SUP, text: expect.stringContaining("Postgres.") });
+  });
+});
+
+describe("what done prints of the evidence it kept", () => {
+  test("the commit and a line per evidence file left out or kept as it was", () => {
+    const md = doneMarkdown("gh-1", "pass", {
+      seq: 4,
+      replayed: false,
+      evidence: { commit: "a".repeat(40), files: [{ name: "AC1.md", kept: "AC1.md" }] },
+      evidenceNotes: ["AC3.png kept uncompressed: not a readable PNG", "AC4.log not kept: 14.2 MB is over the 10 MB limit"],
+    });
+    expect(md).toBe(
+      "Reported gh-1 done with outcome `pass`. Kept 1 evidence file in aaaaaaaaaaaa.\n- AC3.png kept uncompressed: not a readable PNG\n- AC4.log not kept: 14.2 MB is over the 10 MB limit\n\nEnd your turn.",
+    );
+  });
+
+  test("a report that kept nothing prints as before", () => {
+    expect(doneMarkdown("gh-1", "done", { seq: 4, replayed: true })).toBe("Reported gh-1 done with outcome `done` (recorded before). End your turn.");
   });
 });

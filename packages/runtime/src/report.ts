@@ -24,7 +24,7 @@ import {
 } from "@norn/kernel";
 import type { Capability, HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
 import { parseUnitId, STORE_ID_PATTERN } from "@norn/plugin-api";
-import { type CriterionVerdict, type Finding, type Note, OUT_ENV, REPORT_TYPES, reportPath, type Verdict } from "@norn/schema";
+import { type CriterionVerdict, type Finding, type Note, OUT_ENV, REPORT_TYPES, type ReportEvidence, reportPath, type Verdict } from "@norn/schema";
 import { changesSince, hookDigest, ownedBy, snapshotOf } from "./detect.ts";
 import { branchOf, baseRefOf, cutFrom } from "./branches.ts";
 import { renderInputFrom } from "./brief-context.ts";
@@ -32,6 +32,7 @@ import { declaredCriteria } from "./criteria.ts";
 import { baseConflictOf } from "./input-history.ts";
 import { producedOf, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
 import { collectReports } from "./reports.ts";
+import { keepEvidence, keepsEvidence, moveEvidenceRef } from "./evidence-keep.ts";
 import { renderSupervisorBrief, supervisorOfRun, supervisorReceipt } from "./supervisor.ts";
 import { handoffArtifact } from "./story-docs.ts";
 import type { RuntimeEnv } from "./env.ts";
@@ -59,6 +60,10 @@ export interface ReportRecorded {
   replayed: boolean;
   /** the criteria report as checked, when one came with the report */
   criteria?: CriteriaSummary;
+  /** the commit the report's evidence files were kept in, as the receipt names it */
+  evidence?: ReportEvidence;
+  /** a line per evidence file left out or kept uncompressed, and a ref that could not be moved */
+  evidenceNotes?: string[];
 }
 
 export interface CriteriaSummary {
@@ -154,7 +159,13 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     if (earlier) {
       const kept = earlier.data.kind === "run.reported" ? earlier.data.criteria : undefined;
       const summary = kept ? await replayedSummary(env, unit, kept) : undefined;
-      return { ok: true, value: { seq: earlier.seq, replayed: true, ...(summary !== undefined && { criteria: summary }) } };
+      const evidence = earlier.data.kind === "run.reported" ? earlier.data.evidence : undefined;
+      // a crash may have come between the receipt and the move; at the same commit the move is a no-op
+      const unmoved = evidence ? await moveEvidenceRef(env, unit, evidence) : null;
+      return {
+        ok: true,
+        value: { seq: earlier.seq, replayed: true, ...(summary !== undefined && { criteria: summary }), ...(evidence !== undefined && { evidence }), ...(unmoved !== null && { evidenceNotes: [unmoved] }) },
+      };
     }
   }
   const supervised = await supervisorReport(env, unit, runId, req, receiptId);
@@ -209,6 +220,15 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   }
   const findings = req.verb === "done" && req.findings !== undefined && req.findings.length > 0 ? req.findings : undefined;
   const notes = notesOf(criteria?.report);
+  // last before the receipt, once nothing can refuse the report: only the report that counts keeps its files
+  let evidence: ReportEvidence | undefined;
+  const evidenceNotes: string[] = [];
+  if (req.verb === "done" && keepsEvidence(env, live.criteria)) {
+    const kept = await keepEvidence(env, unit, runId);
+    if (!kept.ok) return refuse(kept.error, "report again with the same command", kept.code);
+    evidence = kept.value.evidence;
+    evidenceNotes.push(...kept.value.notes);
+  }
   const wrote = await env.journal.record(unit, {
     id: receiptId,
     data: {
@@ -222,6 +242,7 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
       ...(criteria !== undefined && { criteria: criteria.report }),
       ...(findings !== undefined && { findings }),
       ...(notes.length > 0 && { notes }),
+      ...(evidence !== undefined && { evidence }),
     },
   });
   if (!wrote.ok) return refuse(`cannot record the report: ${wrote.failure.message}`, "report again with the same report id", wrote.failure.code);
@@ -230,7 +251,19 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     const { next_seq } = await readEvents(env.ctx, unit, runId);
     await appendEvents(env.ctx, unit, runId, [{ ...eventOf(runId, req), seq: next_seq, at: env.ctx.now() }]);
   }
-  return { ok: true, value: { seq: wrote.value.seq, replayed: wrote.value.replayed, ...(criteria !== undefined && { criteria: criteria.summary }) } };
+  // after the receipt naming the commit: a ref never points at evidence no record holds
+  const unmoved = evidence ? await moveEvidenceRef(env, unit, evidence) : null;
+  if (unmoved !== null) evidenceNotes.push(unmoved);
+  return {
+    ok: true,
+    value: {
+      seq: wrote.value.seq,
+      replayed: wrote.value.replayed,
+      ...(criteria !== undefined && { criteria: criteria.summary }),
+      ...(evidence !== undefined && { evidence }),
+      ...(evidenceNotes.length > 0 && { evidenceNotes }),
+    },
+  };
 }
 
 /**

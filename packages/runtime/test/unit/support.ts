@@ -70,10 +70,10 @@ export function fakeTracker(items: TrackerItem[]): Tracker {
 }
 
 /** A forge whose changes are a map by branch the test edits. */
-export function fakeForge(changes: Record<string, ChangeRequest>): Forge {
+export function fakeForge(changes: Record<string, ChangeRequest>, rawUrls = false): Forge {
   return {
     name: "fake",
-    capabilities: { draft: true, checks: true, raw_urls: false },
+    capabilities: { draft: true, checks: true, raw_urls: rawUrls },
     findChanges: async (branches) => ok(Object.fromEntries(branches.map((b) => [b, changes[b] ?? null]))),
     checks: async () => ok("none"),
     perform: async () => fail("invalid", "the fake forge performs nothing"),
@@ -606,6 +606,10 @@ export interface HarnessOptions {
   roles?: Record<string, RoleDefinition>;
   /** the vcs cannot snapshot a checkout */
   noSnapshot?: boolean;
+  /** the forge serves a commit's files at a URL (`raw_urls`), as GitHub does */
+  rawUrls?: boolean;
+  /** the config's `evidence.publish`; absent, as a config that leaves it at its default */
+  evidencePublish?: boolean;
 }
 
 export function harness(opts: HarnessOptions = {}): Harnessed {
@@ -632,7 +636,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     api: "^1.4",
     provides: {
       tracker: { fake: { configSchema: Type.Object({}), create: () => fakeTracker(items) } },
-      forge: { fake: { configSchema: Type.Object({}), create: () => fakeForge(changes) } },
+      forge: { fake: { configSchema: Type.Object({}), create: () => fakeForge(changes, opts.rawUrls) } },
       vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped, dirty, untracked, checkouts) } },
       harness: { fake: { ...HARNESS, hookConfig: async (wt: string) => hookConfigs[wt] ?? null } },
       stepKinds: fakeStepKinds(stepAnswers, stepCalls),
@@ -653,6 +657,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     holder: "machine-a",
     ...(opts.formerHolders ? { formerHolders: opts.formerHolders } : {}),
     ...(opts.checks ? { checks: opts.checks } : {}),
+    ...(opts.evidencePublish !== undefined ? { evidencePublish: opts.evidencePublish } : {}),
   };
   const tickIds: string[] = [];
   const built = createRuntimeEnv({ ctx, plugins, config, launcher, sessions });
