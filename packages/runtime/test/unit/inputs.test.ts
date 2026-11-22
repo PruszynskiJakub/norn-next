@@ -151,6 +151,14 @@ describe("the run folder", () => {
     expect(left).toEqual([`${WORKTREE}/.agents/run/out/.gitignore`]);
   });
 
+  test("a launch empties the evidence copies an earlier report compressed into .agents/run/evidence/", async () => {
+    const h = harness({ workflow: "handed" });
+    h.items.push(trackerItem(1, ITEM));
+    await h.files.write(`${WORKTREE}/.agents/run/evidence/AC1.webp`, "old");
+    await tickUntil(h, has("agent.start"));
+    expect(Object.keys(h.files.snapshot()).filter((p) => p.startsWith(`${WORKTREE}/.agents/run/evidence/`))).toEqual([]);
+  });
+
   test("a launch on a fresh worktree makes .agents/run/out/, so a shell redirect into $NORN_OUT finds its folder", async () => {
     const h = harness({ workflow: "handed" });
     h.items.push(trackerItem(1, ITEM));
