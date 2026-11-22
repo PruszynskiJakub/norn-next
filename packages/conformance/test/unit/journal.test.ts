@@ -110,6 +110,20 @@ describe("Journal: reading a unit", () => {
     expect(unit.corrupt).toContain("/verb");
   });
 
+  test("a done naming its evidence commit reads back whole; one whose evidence is malformed makes the unit corrupt, naming the field", async () => {
+    const evidence = { commit: "a".repeat(40), files: [{ name: "AC1.png", kept: "AC1.webp" }] };
+    const kept = await seeded();
+    await kept.store.appendReceipt(UNIT, { id: "r1", data: { kind: "run.reported", run_id: "a1", verb: "done", outcome: "pass", evidence } });
+    const unit = await read(kept.store);
+    expect(unit.corrupt).toBeUndefined();
+    expect(unit.receipts.map((r) => r.data)).toEqual([{ kind: "run.reported", run_id: "a1", verb: "done", outcome: "pass", evidence }]);
+    const bad = await seeded();
+    await bad.store.appendReceipt(UNIT, { id: "r1", data: { kind: "run.reported", run_id: "a1", verb: "done", outcome: "pass", evidence: { commit: "a".repeat(40), files: [{ name: "AC1.png" }] } } });
+    const corrupt = await read(bad.store);
+    expect(corrupt.corrupt).toStartWith("receipt 1 (r1): ");
+    expect(corrupt.corrupt).toContain("/evidence");
+  });
+
   test("decide's corrupt mark appended to a corrupt record reads back as corrupt_marked, and nothing else of the record does", async () => {
     const { store } = await seeded();
     await store.appendReceipt(UNIT, { id: "r1", data: { kind: "run.reported", run_id: "a1", verb: "shipped" } });

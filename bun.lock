@@ -106,6 +106,9 @@
       "dependencies": {
         "@norn/plugin-api": "workspace:*",
       },
+      "devDependencies": {
+        "@norn/conformance": "workspace:*",
+      },
     },
     "packages/kernel": {
       "name": "@norn/kernel",

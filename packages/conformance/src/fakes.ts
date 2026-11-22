@@ -12,6 +12,8 @@ export interface MemoryFiles extends HostFiles {
   /** whether the file was last written by `writeExecutable` */
   executable(path: string): boolean;
   writeExecutable(path: string, data: string): Promise<void>;
+  readBytes(path: string): Promise<Uint8Array | null>;
+  writeBytes(path: string, data: Uint8Array): Promise<void>;
   symlink(target: string, path: string): Promise<void>;
   readLink(path: string): Promise<string | null>;
   /** every link and its target, by path */
@@ -35,6 +37,8 @@ export function memoryFiles(seed: Record<string, string> = {}): MemoryFiles {
   const files = new Map<string, string>(Object.entries(seed).map(([p, d]) => [trim(p), d]));
   let failing = false;
   const executables = new Set<string>();
+  // bytes as written by writeBytes; `files` holds their text as a disk read would decode it, so read, list and snapshot see them
+  const blobs = new Map<string, Uint8Array>();
   const links = new Map<string, string>();
   const guard = (op: string, path: string): void => {
     if (failing) throw new Error(`memoryFiles: ${op} ${path} failed (injected)`);
@@ -69,12 +73,28 @@ export function memoryFiles(seed: Record<string, string> = {}): MemoryFiles {
     write: async (path, data) => {
       guard("write", path);
       files.set(real(path), data);
+      blobs.delete(real(path));
       executables.delete(real(path));
     },
     writeExecutable: async (path, data) => {
       guard("write", path);
       files.set(real(path), data);
+      blobs.delete(real(path));
       executables.add(real(path));
+    },
+    readBytes: async (path) => {
+      const p = real(path);
+      const blob = blobs.get(p);
+      if (blob) return blob.slice();
+      const text = files.get(p);
+      return text === undefined ? null : new TextEncoder().encode(text);
+    },
+    writeBytes: async (path, data) => {
+      guard("write", path);
+      const p = real(path);
+      blobs.set(p, data.slice());
+      files.set(p, new TextDecoder().decode(data));
+      executables.delete(p);
     },
     executable: (path) => executables.has(real(path)),
     create: async (path, data) => {
@@ -82,6 +102,7 @@ export function memoryFiles(seed: Record<string, string> = {}): MemoryFiles {
       const p = real(path);
       if (files.has(p)) return false;
       files.set(p, data);
+      blobs.delete(p);
       return true;
     },
     list: async (dir) => {
@@ -102,6 +123,7 @@ export function memoryFiles(seed: Record<string, string> = {}): MemoryFiles {
       guard("remove", path);
       const p = real(path, false);
       files.delete(p);
+      blobs.delete(p);
       executables.delete(p);
       links.delete(p);
     },

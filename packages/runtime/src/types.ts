@@ -57,6 +57,8 @@ export interface RuntimeConfig {
   traceRetainMs?: number | null;
   /** the commands a check step names as `{checks.<name>}`, over DEFAULT_CHECKS */
   checks?: Record<string, string>;
+  /** whether QA's evidence files are kept and pushed for the pull request (`evidence.publish`); absent: true */
+  evidencePublish?: boolean;
   /**
    * What the person's policy lets stand in for them, each a step as `<workflow>.<step>`: the gates a
    * supervisor may decide and the `attended: agent` steps whose questions it may answer. A granted gate is no

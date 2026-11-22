@@ -133,6 +133,8 @@ export function fakeVcs(
         },
       };
   const path = (unit: string) => `${ctx.repo.dataDir}/worktrees/${unit.replace("/", "-")}`;
+  // kept commits are numbered, so a test reads which keep made which commit from the calls alone
+  let keeps = 0;
   const call = <T>(op: string, args: unknown[], value: T): Promise<PluginResult<T>> => {
     calls.push({ op, args });
     return Promise.resolve(ok(value));
@@ -155,6 +157,9 @@ export function fakeVcs(
     deleteBranch: (branch) => call("deleteBranch", [branch], undefined),
     push: (branch) => call("push", [branch], undefined),
     fetch: () => call("fetch", [], undefined),
+    keepFiles: (ref, files, message) => call("keepFiles", [ref, files.map((f) => ({ ...f })), message], { commit: (++keeps).toString(16).padStart(40, "e") }),
+    moveRef: (ref, commit) => call("moveRef", [ref, commit], { moved: true }),
+    pushRef: (ref) => call("pushRef", [ref], { pushed: true }),
     ...snapshotting,
   };
 }

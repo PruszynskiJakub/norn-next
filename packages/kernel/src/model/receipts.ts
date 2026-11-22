@@ -5,7 +5,7 @@
  * written for, so one written for an earlier visit is refused rather than routing the current one.
  */
 import { EndReason, ReportVerb } from "@norn/plugin-api";
-import { CriterionVerdict, Finding, IsoTime, Mode, NonEmpty, Note, OutcomeName, PosInt, SignalRef, StepName, TaggedUnion } from "@norn/schema";
+import { CriterionVerdict, Finding, IsoTime, Mode, NonEmpty, Note, OutcomeName, PosInt, ReportEvidence, SignalRef, StepName, TaggedUnion } from "@norn/schema";
 import { type Static, type TProperties, Type } from "@sinclair/typebox";
 import { GraphCounterName, PinnedWorkflow } from "../workflow/graph.ts";
 import { Ended, GuardedCode, SupervisorSubject } from "./run-state.ts";
@@ -107,6 +107,8 @@ const KINDS = [
     findings: Type.Optional(Type.Array(Finding, { minItems: 1 })),
     /** notes for a person the report carried; they never block and never change the route */
     notes: Type.Optional(Type.Array(Note, { minItems: 1 })),
+    /** the commit a QA report's evidence files were kept in, for the pull request to link; decide never reads it */
+    evidence: Type.Optional(ReportEvidence),
   }),
   kind("run.ended", { run_id: Id, reason: RunEndReason }),
   /** an outcome the kernel read off the session (silent, died, ...), routed like a reported one */

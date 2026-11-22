@@ -41,6 +41,7 @@ export type ForgeContractTest =
   | "a close by a person is seen"
   | "checks: none, then what the provider reports"
   | "checkReport: the summary checks gives, each failed check named, a conflict with the base said while the checks are unsettled"
+  | "fileUrl: a forge that offers it serves raw URLs, and pins each form of a commit's file to that commit"
   | "an effect on a missing change is a not_found failure"
   | "a forge without changes refuses every effect as invalid"
   | "a failing provider answers every call with a failure and opens nothing";
@@ -191,6 +192,23 @@ export function forgeContract(name: string, makeWorld: () => ForgeWorld | Promis
       await need("setConflicts", world.setConflicts)(change.id, false);
       expect((await report(change.id)).conflicts).not.toBe(true);
       failureOf(await fg.checkReport(999));
+    });
+
+    t("fileUrl: a forge that offers it serves raw URLs, and pins each form of a commit's file to that commit", async () => {
+      const { fg } = await made();
+      if (!fg.fileUrl) return;
+      const url = fg.fileUrl.bind(fg);
+      expect(fg.capabilities.raw_urls).toBe(true);
+      const other = MERGE_SHA.split("").reverse().join("");
+      for (const form of ["image", "link"] as const) {
+        const a = valueOf(await url(MERGE_SHA, "AC1.webp", form));
+        expect(typeof a).toBe("string");
+        expect(a).toContain(MERGE_SHA);
+        expect(a).toContain("AC1.webp");
+        expect(valueOf(await url(MERGE_SHA, "AC1.webp", form))).toBe(a as string);
+        expect(valueOf(await url(other, "AC1.webp", form))).not.toBe(a as string);
+        expect(valueOf(await url(MERGE_SHA, "AC2.log", form))).not.toBe(a as string);
+      }
     });
 
     tc("an effect on a missing change is a not_found failure", async () => {

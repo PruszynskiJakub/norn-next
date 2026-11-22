@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { memoryHost } from "@norn/conformance";
 import { type Harness, ok, type Runner } from "@norn/plugin-api";
 import { batchName, batchSeq, decodeLaunchHandle, encodeLaunchHandle, HarnessLauncher, runEventsDir, sentDir } from "../../src/index.ts";
+import { fakeVcs, type VcsCall } from "./support.ts";
 
 describe("launch handle", () => {
   test("round-trips, keeping a runner handle that holds the separator", () => {
@@ -62,5 +63,21 @@ describe("harness launcher modes", () => {
     });
     expect(boxed.modesOf("boxed")?.sandbox).toBe(true);
     expect(launcher.modesOf("bg")).not.toHaveProperty("sandbox");
+  });
+});
+
+describe("the fake vcs keeps evidence by recording it", () => {
+  test("keepFiles answers a new commit per keep, and every keep, move and push is a call a test reads, never a ref", async () => {
+    const calls: VcsCall[] = [];
+    const vcs = fakeVcs(memoryHost({ repo: { root: "/repo", dataDir: "/m" } }), {}, calls);
+    const first = await vcs.keepFiles?.("refs/norn/evidence/gh-1", [{ path: "AC1.webp", at: "/m/run/evidence/AC1.webp" }], "gh-1 evidence");
+    const second = await vcs.keepFiles?.("refs/norn/evidence/gh-1", [{ path: "AC2.log", at: "/w/out/AC2.log" }], "gh-1 evidence");
+    expect(first?.ok && second?.ok && first.value.commit !== second.value.commit).toBe(true);
+    const commit = first?.ok ? first.value.commit : "";
+    expect(commit).toMatch(/^[0-9a-f]{40}$/);
+    expect(await vcs.moveRef?.("refs/norn/evidence/gh-1", commit)).toEqual(ok({ moved: true }));
+    expect(await vcs.pushRef?.("refs/norn/evidence/gh-1")).toEqual(ok({ pushed: true }));
+    expect(calls.map((c) => c.op)).toEqual(["keepFiles", "keepFiles", "moveRef", "pushRef"]);
+    expect(calls[0]?.args).toEqual(["refs/norn/evidence/gh-1", [{ path: "AC1.webp", at: "/m/run/evidence/AC1.webp" }], "gh-1 evidence"]);
   });
 });

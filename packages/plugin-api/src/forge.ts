@@ -96,8 +96,18 @@ export interface Forge {
   checks(id: number): Promise<PluginResult<ChecksSummary>>;
   /** the checks with their failures' whereabouts (plugin API 1.27); a forge without it reports only `checks` */
   checkReport?(id: number): Promise<PluginResult<ChecksReport>>;
+  /**
+   * where the forge serves `path` of `commit` (plugin API 1.28): `image` a URL a markdown image shows
+   * inline, `link` one a reader opens. Pinned to the commit, so it keeps naming that file whatever
+   * moves later; visible to whoever can see the repo. Null when the forge cannot serve it. Optional; a
+   * forge that offers it reports `raw_urls`, and without it the files are named as text.
+   */
+  fileUrl?(commit: string, path: string, form: FileUrlForm): Promise<PluginResult<string | null>>;
   perform(effect: ForgeEffect, meta: EffectMeta): Promise<PluginResult<ForgeEffectOutcome>>;
 }
+
+/** How a forge's file URL is used: shown inline as an image, or opened as a link. */
+export type FileUrlForm = "image" | "link";
 
 export interface ForgeFactory<S extends TSchema = TSchema> {
   configSchema: S;
