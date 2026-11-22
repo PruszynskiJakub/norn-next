@@ -13,15 +13,15 @@ To drop a story instead, `norn story close gh-N` closes the issue and stops its 
 
 ## Workflows
 
-Picked by the issue label `norn:wf:<name>`. The shipped ones are in `packages/pack-sdlc/assets/workflows/`; this repo's own, with its check commands and its CI wait, are in `.agents/workflows/` and replace the pack's of the same name.
+Picked by the issue label `norn:wf:<name>`. The shipped ones are in `packages/pack-sdlc/assets/workflows/`; this repo's test command is `checks.test` in `.agents/norn.yaml`, and its own files in `.agents/workflows/` (`release`, and its triage and reproduce) replace the pack's of the same name.
 
 | Label | Workflow | For |
 |---|---|---|
 | `norn:wf:triage` | triage | Check the issue, recommend `refinement`, `quick`, `reproduce` or closing it, as an issue comment. |
 | `norn:wf:reproduce` | reproduce | Bugs: reproduce read-only, confirm the cause and the seam for a regression test. |
-| `norn:wf:refinement` | refinement | Spec and plan with you: sync → refine → clarify → plan. No code, no PR. |
-| `norn:wf:story` | story | A planned feature: sync → slices → test → QA → PR → CI. Each slice: implement → test → review → integrate. |
-| `norn:wf:quick` | quick | Refactors, docs, chores, small changes, a reproduced bug's fix: sync → implement → test → review → PR → CI. |
+| `norn:wf:refinement` | refinement | Spec and plan with you: catch-up → refine → clarify → plan. No code, no PR. |
+| `norn:wf:story` | story | A planned feature: catch-up → slices → base update → QA → PR → CI. Each slice: build (implement → check → review) → integrate; a rework is built, then base-updated. |
+| `norn:wf:quick` | quick | Refactors, docs, chores, small changes, a reproduced bug's fix: catch-up → build (implement → check → review) → base update → PR → CI. |
 | `norn:wf:release` | release | Changelog, version bump → PR, wait for its CI. Started by `/release-start`. |
 
 ## Labels

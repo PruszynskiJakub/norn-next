@@ -52,7 +52,7 @@ describe("the sdlc pack's workflows", () => {
       return r.ok ? [] : r.errors.map((e) => e.message);
     };
     expect(errors("quick.yaml")).toEqual([
-      "shared/publish.yaml: step 'open-pr' (open-pr) reads `pr_body`, but no step produces it on the path sync.done → implement.done → update.clean → test-merge.pass → open-pr: give a step on that path produces: pr_body",
+      "shared/publish.yaml: step 'open-pr' (open-pr) reads `pr_body`, but no step produces it on the path sync.done → implement.done → check.pass → review.approve → update.clean → test-merge.pass → open-pr: give a step on that path produces: pr_body",
     ]);
     expect(errors("story.yaml")).toEqual([
       "shared/publish.yaml: step 'open-pr' (open-pr) reads `pr_body`, but no step produces it on the path sync.done → slice.done → approve-slices.approve → slices.done → update.clean → test-merge.pass → open-pr: give a step on that path produces: pr_body",
@@ -100,7 +100,7 @@ describe("how the pack's workflows bring in their shared files", () => {
   });
 
   test("the base is caught up by the shared catch-up file, which leaves at synced, in every workflow that changes the branch", () => {
-    expect(Object.keys(SDLC_PACK.shared).sort()).toEqual(["base-update.yaml", "catch-up.yaml", "land.yaml", "publish.yaml"]);
+    expect(Object.keys(SDLC_PACK.shared).sort()).toEqual(["base-update.yaml", "build.yaml", "catch-up.yaml", "land.yaml", "publish.yaml"]);
     expect(exitsOf("catch-up")).toEqual(["synced"]);
     for (const file of ["refinement.yaml", "quick.yaml", "story.yaml"]) {
       const doc = written(file);
@@ -112,6 +112,68 @@ describe("how the pack's workflows bring in their shared files", () => {
 
   test("the base update leaves at tested, failed, merged or redescribe", () => {
     expect(exitsOf("base-update").sort()).toEqual(["failed", "merged", "redescribe", "tested"]);
+  });
+
+  test("the build loop is the shared build file, implement → check → review, which leaves at reviewed; its check is not named test, base-update's step", () => {
+    const build = sharedDoc("build");
+    expect({ start: build.start, steps: Object.keys(build.steps) }).toEqual({ start: "implement", steps: ["implement", "check", "review"] });
+    expect(exitsOf("build")).toEqual(["reviewed"]);
+    expect(Object.keys(sharedDoc("base-update").steps)).toContain("test");
+  });
+
+  test("slice, quick and story build through the shared build file and write no build step of their own", () => {
+    for (const file of ["slice.yaml", "quick.yaml", "story.yaml"]) {
+      const doc = written(file);
+      expect({ file, build: doc.steps.build }).toEqual({ file, build: expect.objectContaining({ use: "build" }) });
+      const own = Object.entries(doc.steps).filter(([, s]) => s.by === "builder" && !String(s.do ?? "").includes("merge")).map(([n]) => n);
+      expect({ file, own }).toEqual({ file, own: [] });
+    }
+  });
+
+  test("slice goes build → integrate, a conflict through merge back to integrate", () => {
+    const doc = written("slice.yaml");
+    expect(doc.start).toBe("build");
+    expect(Object.keys(doc.steps)).toEqual(["build", "integrate", "merge"]);
+    expect(doc.steps.build?.outcomes).toEqual({ reviewed: "integrate" });
+  });
+
+  test("quick goes catch-up → build → base-update → publish → land, and every rework goes back through build", () => {
+    const doc = written("quick.yaml");
+    expect(Object.keys(doc.steps)).toEqual(["catch-up", "build", "base-update", "publish", "land"]);
+    expect(doc.steps["catch-up"]?.outcomes).toEqual({ synced: "build" });
+    expect(doc.steps.build?.outcomes).toEqual({ reviewed: "base-update" });
+    expect(doc.steps["base-update"]?.outcomes).toEqual({ tested: "publish", failed: "build", merged: "open-pr", redescribe: "publish" });
+    expect(doc.steps.publish?.outcomes).toEqual({ passed: "land", failed: { to: "build", max: 3 }, stale: "base-update" });
+    expect(doc.steps.land?.outcomes).toEqual({ rejected: "build", stale: "base-update", unpushed: "open-pr" });
+  });
+
+  test("story's rework is built, then base-updated before it is tested: no route enters the base update past its start", () => {
+    const r = load("story.yaml");
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    const steps = r.workflow.graph.steps;
+    expect(steps.review?.routes.approve).toEqual({ to: "update" });
+    const base = Object.keys(sharedDoc("base-update").steps);
+    const inner = base.filter((s) => s !== sharedDoc("base-update").start);
+    const entering = Object.entries(steps).flatMap(([s, step]) =>
+      Object.entries(step.routes)
+        .filter(([, route]) => inner.includes(route.to) && !base.includes(s))
+        .map(([o, route]) => `${s}.${o} → ${route.to}`),
+    );
+    expect(entering).toEqual([]);
+    // every rework, from QA, the person, a failed check or a rejection at ready, starts at implement
+    for (const [s, o] of [["qa", "fail"], ["human-qa", "reject"], ["checks", "fail"], ["ready", "reject"], ["test", "fail"]] as const) expect({ at: `${s}.${o}`, to: steps[s]?.routes[o]?.to }).toEqual({ at: `${s}.${o}`, to: "implement" });
+  });
+
+  test("implement is told one thing everywhere; what a reproduce round's red loop asks of it is in the norn-implement skill", () => {
+    const build = sharedDoc("build");
+    const text = String(build.steps.implement?.do);
+    expect(text).toMatch(/slice/);
+    expect(text).toMatch(/Plan/);
+    expect(text).toMatch(/Triage/);
+    expect(text).toMatch(/Reproduce/);
+    expect(text).toMatch(/findings/);
+    const skill = SDLC_PACK.skills["norn-implement"]?.["SKILL.md"] ?? "";
+    expect(skill).toMatch(/`## Reproduce`[^\n]*failing test[^\n]*before/);
   });
 
   test("the resolver that merges the base is told the same before the work and after it", () => {

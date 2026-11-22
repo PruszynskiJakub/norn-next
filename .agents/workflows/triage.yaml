@@ -7,10 +7,8 @@ steps:
   explore:
     by: investigator
     do: >-
-      The issue is mirrored in spec.md. Run norn's behaviour from this checkout's code, `bun packages/cli/src/main.ts …`
-      after `bun install --frozen-lockfile`, never the installed `norn`, and only in a throwaway git repo under $TMPDIR:
-      this worktree is a live norn unit. A change to norn's
-      documented behaviour is a `refinement`, unless the change is small and settled. Post the `## Triage` comment on it and add the kind, risk and priority
+      The issue is mirrored in spec.md. A change to norn's documented behaviour is a `refinement`, unless
+      the change is small and settled. Post the `## Triage` comment on it and add the kind, risk and priority
       labels: `norn:kind:bug|feature|security|chore|docs`, `norn:risk:low|medium|high`,
       `norn:priority:low|medium|high|extreme`; a label missing on the remote is named in the comment
       for a person to create. That comment and those labels are the only remote writes this step allows,

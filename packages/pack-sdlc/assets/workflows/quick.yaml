@@ -6,53 +6,28 @@ start: catch-up
 steps:
   catch-up:
     use: catch-up
-    outcomes: { synced: implement }
-  implement:
-    by: builder
-    do: >-
-      Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one,
-      otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask.
-      A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the
-      suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Notes and
-      the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
-      changing any code, then fix the cause.
-    with: { skills: [norn-implement] }
-    reads: [spec, handoff, last_check, findings?]
-    outcomes:
-      done:
-        to: base-update
-        means: "the change is made; each behaviour change and rework point has a passing test"
+    outcomes: { synced: build }
+  build:
+    use: build
+    outcomes: { reviewed: base-update }
   base-update:
     use: base-update
     outcomes:
-      tested: review
-      failed: implement
+      tested: publish
+      failed: build
       merged: open-pr
       redescribe: publish
-  review:
-    by: reviewer
-    do: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
-    with: { skills: [norn-review] }
-    reads: [spec, diff, findings?]
-    outcomes:
-      approve:
-        to: publish
-        means: "the change does what the story asks and nothing else, no blocking findings"
-      changes_requested:
-        to: implement
-        means: "blocking findings, handed back as findings"
-        produces: [findings]
   # a failed check's rework goes back through open-pr to the new head
   publish:
     use: publish
     outcomes:
       passed: land
-      failed: { to: implement, max: 3 }
+      failed: { to: build, max: 3 }
       stale: base-update
   land:
     use: land
     outcomes:
-      rejected: implement
+      rejected: build
       stale: base-update
       unpushed: open-pr
 # `norn story update-branch` enters the base update, not catch-up (the first update-branch step); a base

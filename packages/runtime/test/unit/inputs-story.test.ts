@@ -197,7 +197,6 @@ function resolverInputs(): { where: string; inputs: string[] }[] {
     of("pack shared/catch-up.yaml", SDLC_PACK.shared["catch-up.yaml"] ?? "", "sync-resolve"),
     of("pack shared/base-update.yaml", SDLC_PACK.shared["base-update.yaml"] ?? "", "resolve"),
     of("repo release.yaml", repo("release.yaml"), "resolve"),
-    of("repo shared/base-update.yaml", repo("shared/base-update.yaml"), "resolve"),
   ];
 }
 
@@ -220,10 +219,7 @@ describe("each step sent to merge the base, as its workflow file lists its input
     const h = await started();
     await sliced(h);
     const slice = withReceipts(await sliceStarted(h, "lt-1/01"), integrateConflict);
-    const steps = [
-      { where: "pack slice.yaml#merge", text: SDLC_PACK.workflows["slice.yaml"] ?? "" },
-      { where: "repo slice.yaml#merge", text: readFileSync(join(REPO_ROOT, ".agents", "workflows", "slice.yaml"), "utf8") },
-    ];
+    const steps = [{ where: "pack slice.yaml#merge", text: SDLC_PACK.workflows["slice.yaml"] ?? "" }];
     for (const { where, text } of steps) {
       const inputs = listedInputs(text, "merge");
       const made = await materializeInputs(h.env, slice, briefWith(inputs));

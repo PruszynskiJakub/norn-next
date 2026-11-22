@@ -37,13 +37,15 @@ const SYNC_CONFLICT = c(2, "sync.done", "sync.clean", "sync.resolved");
  * The counters the old engine derived for each shipped workflow, pinned so the kernel keeps its bounds. Only `sync.conflict`'s resets differ, by the edits,
  * and the edits' `unpushed` routes back to open-pr, which the old engine took with no edge and no
  * counter, share a counter bounded as a stale one is. The CI wait, publishing and landing come from
- * two shared files, so each exit's derived counter is named after its use step. Story declares no
+ * shared files, so each exit's derived counter is named after its use step; the build loop's own
+ * check, `check`, is bounded inside its file as a slice's `test` was. Story declares no
  * stale budget of its own: each of its stale routes is bounded at the default, as quick's are.
  */
 const OLD_COUNTERS: Record<string, { edges: Record<string, string>; counters: Record<string, { max: number; reset_on: string[] }> }> = {
   "quick.yaml": {
     edges: {
       "sync.conflict": "sync.conflict",
+      "check.fail": "check.fail",
       "update.conflict": "update.conflict",
       "test.fail": "base-update.failed",
       "test-merge.fail": "base-update.failed",
@@ -60,6 +62,7 @@ const OLD_COUNTERS: Record<string, { edges: Record<string, string>; counters: Re
     },
     counters: {
       "sync.conflict": SYNC_CONFLICT,
+      "check.fail": c(5),
       "update.conflict": UPDATE_CONFLICT,
       "resolution-review.changes_requested": c(2),
       "review.changes_requested": c(3),
@@ -74,13 +77,14 @@ const OLD_COUNTERS: Record<string, { edges: Record<string, string>; counters: Re
   "refinement.yaml": { edges: { "sync.conflict": "sync.conflict" }, counters: { "sync.conflict": SYNC_CONFLICT } },
   "reproduce.yaml": { edges: {}, counters: {} },
   "slice.yaml": {
-    edges: { "test.fail": "test.fail", "review.changes_requested": "review.changes_requested", "integrate.conflict": "integrate.conflict" },
-    counters: { "test.fail": c(5), "integrate.conflict": c(2, "integrate.done"), "review.changes_requested": c(3) },
+    edges: { "check.fail": "check.fail", "review.changes_requested": "review.changes_requested", "integrate.conflict": "integrate.conflict" },
+    counters: { "check.fail": c(5), "integrate.conflict": c(2, "integrate.done"), "review.changes_requested": c(3) },
   },
   "story.yaml": {
     edges: {
       "sync.conflict": "sync.conflict",
       "approve-slices.reject": "approve-slices.reject",
+      "check.fail": "check.fail",
       "update.conflict": "update.conflict",
       "test.fail": "base-update.failed",
       "test-merge.fail": "base-update.failed",
@@ -103,6 +107,7 @@ const OLD_COUNTERS: Record<string, { edges: Record<string, string>; counters: Re
       "human-qa.stale": c(10),
       "sync.conflict": SYNC_CONFLICT,
       "approve-slices.reject": c(3),
+      "check.fail": c(5),
       "update.conflict": UPDATE_CONFLICT,
       "resolution-review.changes_requested": c(2),
       "review.changes_requested": c(3),

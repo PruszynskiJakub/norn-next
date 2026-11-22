@@ -100,8 +100,8 @@ describe("a check that keeps failing", () => {
     const unit = "lt-1";
     const reports = await tickUntil(m, async () => (await unitRecord(m, unit)).state?.ended !== undefined, 60);
     const state = (await unitRecord(m, unit)).state;
-    expect([state?.ended, state?.step]).toEqual(["stuck", "test"]);
-    expect(state?.ended_reason).toContain("test");
+    expect([state?.ended, state?.step]).toEqual(["stuck", "check"]);
+    expect(state?.ended_reason).toContain("check");
     // the first failure and the one the counter allows go back to implement; the third ends it
     expect(m.agents.starts.map((s) => s.step)).toEqual(["implement", "implement", "implement"]);
     // each check runs detached: the tick that starts it returns at once, and a later tick routes its outcome

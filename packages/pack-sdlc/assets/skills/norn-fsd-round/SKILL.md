@@ -41,7 +41,7 @@ You supervise the stories the person named, in this checkout, until each one's c
 
 ## Sending work back: the person's, unless handed to you
 
-`norn run rerun <unit> [--step <step>] [--reset <counter>]` runs a unit's step again or moves it to another step of its workflow (a slice included); `norn story round` starts a new round. A new round is always the person's. A rerun is the person's too unless the request handed reruns to you: then run it yourself, once per failure, with `--reason "fsd: <evidence>"` (`norn run rerun gh-201/02 --step test` after a suspected flake, `--step <to> --reset <counter>` for an exhausted loop). Otherwise escalate each case below with what you found and the rerun that would fix it:
+`norn run rerun <unit> [--step <step>] [--reset <counter>]` runs a unit's step again or moves it to another step of its workflow (a slice included); `norn story round` starts a new round. A new round is always the person's. A rerun is the person's too unless the request handed reruns to you: then run it yourself, once per failure, with `--reason "fsd: <evidence>"` (`norn run rerun gh-201/02 --step check` after a suspected flake, `--step <to> --reset <counter>` for an exhausted loop). Otherwise escalate each case below with what you found and the rerun that would fix it:
 
 - **A stuck unit** (`parked` with any reason but `agent.ready.manual`, or `ended` with anything but `done`): read the unit's handoff and the check's output, find the cause, and escalate with it and a recommended fix.
 - **A loop exhausted**: escalate with each round's findings.

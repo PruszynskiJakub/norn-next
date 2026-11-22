@@ -17,7 +17,8 @@ const WORKFLOWS = join(".agents", "workflows");
 const SKILLS = join(".agents", "skills");
 const PATHS = configPaths(HOME, ROOT);
 
-const yamlIn = (dir: string): string[] => readdirSync(join(REPO, dir)).filter((f) => /\.ya?ml$/.test(f));
+// git keeps no empty folder, so a repo with no shared file of its own has no shared/ at all
+const yamlIn = (dir: string): string[] => (existsSync(join(REPO, dir)) ? readdirSync(join(REPO, dir)).filter((f) => /\.ya?ml$/.test(f)) : []);
 
 /** Every workflow and shared file of this repo, and its own skills, at the same paths under the test machine's checkout. */
 function repoFiles(): Record<string, string> {
@@ -122,9 +123,10 @@ describe("this repo's workflows, as norn loads them", () => {
     expect(config.kernel?.workflow).toBe("triage");
   });
 
-  test("are the pack's six workflows plus release", () => {
+  test("are the pack's six workflows plus release; the repo keeps a copy only of a workflow it changes", () => {
     expect(Object.keys(repo).sort()).toEqual(["quick", "refinement", "release", "reproduce", "slice", "story", "triage"]);
-    expect(yamlIn(WORKFLOWS).map((f) => f.replace(/\.ya?ml$/, "")).sort()).toEqual(Object.keys(repo).sort());
+    expect(yamlIn(WORKFLOWS).map((f) => f.replace(/\.ya?ml$/, "")).sort()).toEqual(["release", "reproduce", "triage"]);
+    expect(yamlIn(join(WORKFLOWS, "shared"))).toEqual([]);
   });
 
   test("every skill a workflow names is linked under .claude/skills", () => {
@@ -133,14 +135,18 @@ describe("this repo's workflows, as norn loads them", () => {
     expect(named.filter(({ skill }) => !existsSync(join(REPO, ".claude", "skills", skill, "SKILL.md")))).toEqual([]);
   });
 
-  test("the test check of quick, story and slice runs the unit tier, then the type check, in 15m; the integration tier runs only in CI", () => {
+  test("the test checks of quick, story and slice run the team config's checks.test, the unit tier then the type check, in 15m; the integration tier runs only in CI", () => {
+    const config = parse(readFileSync(join(REPO, REPO_COMMITTED_FILE), "utf8")) as { checks?: Record<string, string> };
+    expect(config.checks?.test).toBe(UNIT_ONLY);
     const delivery = ["quick", "story", "slice"];
-    const checks = delivery.map((wf) => ({ wf, check: steps(wf).test?.check, timeout: steps(wf).test?.timeout }));
-    expect(checks).toEqual(delivery.map((wf) => ({ wf, check: UNIT_ONLY, timeout: "15m" })));
+    const checks = delivery.flatMap((wf) => ["check", "test"].filter((s) => steps(wf)[s]).map((s) => ({ wf, s, check: steps(wf)[s]?.check, timeout: steps(wf)[s]?.timeout })));
+    expect(checks.map(({ wf, s }) => `${wf}.${s}`)).toEqual(["quick.check", "quick.test", "story.check", "story.test", "slice.check"]);
+    expect(checks.filter((c) => c.check !== "{checks.test}" || c.timeout !== "15m")).toEqual([]);
   });
 
-  test("the implement step of quick names bun run test as the loop after each change", () => {
-    expect(steps("quick").implement?.agent).toMatch(/`bun run test`[^.]*after each change/);
+  test("no step of this repo's workflows repeats what AGENTS.md and the brief's rules already tell an agent: the unit tier loop, or the dev build only under $TMPDIR", () => {
+    const files = [...yamlIn(WORKFLOWS), ...yamlIn(join(WORKFLOWS, "shared")).map((f) => `shared/${f}`)];
+    expect(files.filter((f) => /\$TMPDIR|`bun run test`/.test(readFileSync(join(REPO, WORKFLOWS, f), "utf8")))).toEqual([]);
   });
 
   test("quick and story wait for the PR's checks after open-pr, send a failed check back to implement and a conflicting PR to update", () => {
@@ -192,10 +198,6 @@ describe("this repo's workflows, as norn loads them", () => {
     expect(steps("reproduce").reproduce?.outcomes).toEqual({ reproduced: "$done", cannot_reproduce: "$done" });
   });
 
-  test("quick's implement turns a red loop from reproduce into a failing test first", () => {
-    expect(steps("quick").implement?.agent).toContain("## Reproduce");
-  });
-
   test("the repo's copies of the pack's workflows have the same steps, kinds and edges", () => {
     // what a step does is the one key beside these; its text (agent, check, gate), its means and its timeout are the repo's own
     const NOT_KIND = new Set(["outcomes", "on", "skills", "inputs", "means", "timeout", "exits"]);
@@ -214,6 +216,6 @@ describe("this repo's workflows, as norn loads them", () => {
         Object.entries(w.steps).map(([s, step]) => [s, { kind: Object.keys(step).filter((k) => !NOT_KIND.has(k)), role: step.role, skills: step.skills, outcomes: bounded(w, step.outcomes), on: step.on && bounded(w, step.on) }]),
       ),
     });
-    for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(repo[wf] as Written) }).toEqual({ wf, ...shape(pack[wf] as Written) });
+    for (const wf of ["triage", "reproduce"]) expect({ wf, ...shape(repo[wf] as Written) }).toEqual({ wf, ...shape(pack[wf] as Written) });
   });
 });

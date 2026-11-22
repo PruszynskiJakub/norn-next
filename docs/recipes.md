@@ -88,7 +88,7 @@ Read `norn story view <story>` and fix the cause where it lies: a broken check c
 
 ```sh
 norn run rerun gh-18/02
-norn run rerun gh-18/02 --step implement --reset test.fail --reason "test command fixed"
+norn run rerun gh-18/02 --step implement --reset check.fail --reason "test command fixed"
 ```
 
 The unit keeps the workflow it pinned: `--step` names one of its steps and `--reset` one of its counters (both are refused otherwise, naming the ones it has). The next tick takes the story up again and the unit enters the step as a new attempt. When a slice stuck, its story usually ended stuck at its `slices` step too: rerun the slice first, then the story at that step (`norn run rerun gh-18 --step slices`), so the story waits for the slice instead of seeing it stuck again. To start over on another workflow, start a new round instead ([Start a story's next round](#start-a-storys-next-round)).
@@ -181,18 +181,18 @@ A unit pins its workflow when it starts, so your edit applies to stories that st
 
 ### Share steps between workflows
 
-Steps that several workflows run the same way (the base update, publishing the PR, landing it) go in a shared file, `.agents/workflows/shared/<name>.yaml`, which holds `start`, `steps` and an optional `description`. A route inside it names one of its own steps, `$done` or `$stuck`, or leaves through a named exit, `{ exit: <name> }`. A workflow brings it in with a step that holds only `use: <name>` and the routes for its exits:
+Steps that several workflows run the same way (the build loop, the base update, publishing the PR, landing it) go in a shared file, `.agents/workflows/shared/<name>.yaml`, which holds `start`, `steps` and an optional `description`. A route inside it names one of its own steps, `$done` or `$stuck`, or leaves through a named exit, `{ exit: <name> }`. A workflow brings it in with a step that holds only `use: <name>` and the routes for its exits:
 
 ```yaml
   publish:
     use: publish
     outcomes:
       passed: land
-      failed: { to: implement, max: 3 }
+      failed: { to: build, max: 3 }
       stale:  base-update
 ```
 
-The shared steps keep their own names, so the brief and the record show `describe`, `open-pr` and `checks`, never `publish`. A route to the use step enters the file at its `start`; a route may also name one of its steps, as a base update's light path names `open-pr` to skip `describe`. Name the use step after its file (`publish: { use: publish }`), so a route to it reads as the file it enters. The pack ships `catch-up` (merge the base before the work starts; exit `synced`), `base-update` (merge the base after the work and test the merged tree; exits `tested`, `failed`, `merged` for the light path, `redescribe`), `publish` (describe, open the draft PR, wait for its checks; exits `passed`, `failed`, `stale`) and `land` (the person's `ready`, then the merge; exits `rejected`, `stale`, `unpushed`).
+The shared steps keep their own names, so the brief and the record show `describe`, `open-pr` and `checks`, never `publish`. A route to the use step enters the file at its `start`; a route may also name one of its steps, as a base update's light path names `open-pr` to skip `describe`. Name the use step after its file (`publish: { use: publish }`), so a route to it reads as the file it enters. The pack ships `catch-up` (merge the base before the work starts; exit `synced`), `build` (implement, the `check` step running `{checks.test}`, and the review; exit `reviewed`, and every rework of a quick or story round goes through it before the base update), `base-update` (merge the base after the work and test the merged tree; exits `tested`, `failed`, `merged` for the light path, `redescribe`), `publish` (describe, open the draft PR, wait for its checks; exits `passed`, `failed`, `stale`) and `land` (the person's `ready`, then the merge; exits `rejected`, `stale`, `unpushed`).
 
 ### Wait for a pull request's checks
 
