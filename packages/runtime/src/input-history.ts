@@ -8,7 +8,7 @@
  */
 import type { KernelReceipt, RunState, UnitJournal } from "@norn/kernel";
 import { parseUnitId } from "@norn/plugin-api";
-import { type CriterionVerdict, check } from "@norn/schema";
+import { type CriterionVerdict, check, type ReportEvidence } from "@norn/schema";
 import { Type } from "@sinclair/typebox";
 import { branchOf } from "./branches.ts";
 import type { RuntimeEnv } from "./env.ts";
@@ -242,6 +242,16 @@ function criteriaReports(record: UnitJournal): string[] {
     out.push("", `Criteria report of ${code(`${r.data.step ?? "?"} #${r.data.attempt ?? "?"}`)} (${r.at}), outcome \`${r.data.outcome ?? "?"}\`:`, "", ...r.data.criteria.map(verdictLine));
   }
   return out;
+}
+
+/**
+ * The evidence the story's latest criteria report kept, across all its units; undefined when that
+ * report kept none, so an earlier, superseded QA run's files are never what a pull request shows.
+ */
+export function latestReportEvidence(units: readonly UnitJournal[]): ReportEvidence | undefined {
+  let latest: KernelReceipt | undefined;
+  for (const u of units) for (const r of u.receipts) if (r.data.kind === "run.reported" && r.data.criteria && (!latest || r.at >= latest.at)) latest = r;
+  return latest?.data.kind === "run.reported" ? latest.data.evidence : undefined;
 }
 
 /** The story's record: each unit's outcomes, gate rulings and criteria reports with their evidence. */

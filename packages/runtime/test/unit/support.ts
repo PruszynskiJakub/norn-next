@@ -606,6 +606,8 @@ export interface HarnessOptions {
   roles?: Record<string, RoleDefinition>;
   /** the vcs cannot snapshot a checkout */
   noSnapshot?: boolean;
+  /** the config's `evidence.publish` */
+  evidencePublish?: boolean;
 }
 
 export function harness(opts: HarnessOptions = {}): Harnessed {
@@ -653,6 +655,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     holder: "machine-a",
     ...(opts.formerHolders ? { formerHolders: opts.formerHolders } : {}),
     ...(opts.checks ? { checks: opts.checks } : {}),
+    ...(opts.evidencePublish !== undefined ? { evidencePublish: opts.evidencePublish } : {}),
   };
   const tickIds: string[] = [];
   const built = createRuntimeEnv({ ctx, plugins, config, launcher, sessions });

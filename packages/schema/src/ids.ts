@@ -338,6 +338,16 @@ export function headsRef(story: string): string {
   return `${HEADS_REF_PREFIX}${story}`;
 }
 
+/**
+ * The ref holding a story's kept QA evidence, one commit per report that kept files, each parented on
+ * the one before so every link pinned to an earlier commit still resolves. Neither branch nor tag, so
+ * a push of it opens nothing and starts no build of a branch.
+ */
+export const EVIDENCE_REF_PREFIX = "refs/norn/evidence/";
+export function evidenceRef(story: string): string {
+  return `${EVIDENCE_REF_PREFIX}${story}`;
+}
+
 /** A receipt's number as its file name spells it: 7 → `0007`. */
 export const receiptNumber = (n: number): string => String(n).padStart(4, "0");
 /** Receipt file name `NNNN-<kind>.json`. */
