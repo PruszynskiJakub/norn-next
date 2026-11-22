@@ -17,7 +17,7 @@ import { editPane, fakeHerdr, type HerdrState, herdrCalls, herdrCallsOf, herdrSt
 import { machineOf, type NornOut, noteOf, norn, plans, setUp, sh, TEST_PLUGIN, unitOf, type World, world } from "./world.ts";
 
 const KEY = "lt-1";
-const SLOW = 180_000;
+const SLOW = 400_000;
 /** The line a terminal reads at once on macOS: a `pane run` longer than this is cut off. */
 const LINE_MAX = 1024;
 
@@ -78,14 +78,18 @@ class Ticks {
     return t;
   }
 
-  async until(done: (u: UnitSeen | null) => boolean, maxMs = 60_000): Promise<UnitSeen | null> {
+  // every tick and every hook the agent runs is the CLI from source, which a shared CI runner makes slow
+  async until(done: (u: UnitSeen | null) => boolean, maxMs = 180_000): Promise<UnitSeen | null> {
+    const took: number[] = [];
     for (const until = performance.now() + maxMs; performance.now() < until; ) {
+      const t0 = performance.now();
       await this.once();
+      took.push(Math.round(performance.now() - t0));
       const u = (await unitOf(this.w, KEY)) as UnitSeen | null;
       if (done(u)) return u;
       await Bun.sleep(200);
     }
-    throw new Error(`no convergence; rules: ${this.rules.join(", ")}; errors: ${this.errors.join(" | ")}; unit: ${JSON.stringify(await unitOf(this.w, KEY))}`);
+    throw new Error(`no convergence in ${maxMs}ms; tick ms: ${took.join(", ")}; rules: ${this.rules.join(", ")}; errors: ${this.errors.join(" | ")}; unit: ${JSON.stringify(await unitOf(this.w, KEY))}`);
   }
 }
 
