@@ -1,9 +1,9 @@
 /**
- * The tracker, forge, store and signal source suites run against in-memory references, and against
+ * The tracker, forge, store, signal source and host files suites run against in-memory references, and against
  * references broken on purpose (as known failures), so the suites are shown both to pass a keeper of
  * the contract and to catch a breaker of it.
  */
-import { forgeContract, signalSourceContract, steppingClock, storeContract, trackerContract } from "@norn/conformance";
+import { forgeContract, hostFilesContract, memoryFiles, signalSourceContract, steppingClock, storeContract, trackerContract } from "@norn/conformance";
 import { absentForge, memoryForge } from "./reference/memory-forge.ts";
 import { memorySignalWorld } from "./reference/memory-signal.ts";
 import { memoryStore } from "./reference/memory-store.ts";
@@ -25,6 +25,10 @@ trackerContract("memory reference that forgets receipt ids", () => memoryTracker
 });
 
 forgeContract("memory reference", () => memoryForge({ now: now() }));
+
+forgeContract("memory reference whose file URLs follow the newest commit", () => memoryForge({ now: now(), unpinned: true }), {
+  failing: { "fileUrl: a forge that offers it serves raw URLs, and pins each form of a commit's file to that commit": "names the newest commit's file whatever commit is asked for" },
+});
 
 forgeContract("absent forge", () => absentForge(), { changes: false });
 
@@ -58,3 +62,31 @@ signalSourceContract("memory reference that notes what it saw", () => memorySign
 signalSourceContract("memory reference that guesses when it cannot tell", () => memorySignalWorld({ guesses: true }), {
   failing: { "a source that cannot tell answers a failure, never a signal or null": "answers null when its provider is down" },
 });
+
+hostFilesContract("memory files", () => ({ files: memoryFiles(), dir: "/work" }));
+
+hostFilesContract("memory files without bytes", () => {
+  const { readBytes: _r, writeBytes: _w, ...files } = memoryFiles();
+  return { files, dir: "/work" };
+});
+
+hostFilesContract(
+  "memory files that carry bytes as text",
+  () => {
+    const files = memoryFiles();
+    return {
+      dir: "/work",
+      files: { ...files, writeBytes: (path: string, data: Uint8Array) => files.write(path, new TextDecoder().decode(data)) },
+    };
+  },
+  { failing: { "bytes written with writeBytes read back identical with readBytes, every byte value": "decodes the bytes as UTF-8 on the way in" } },
+);
+
+hostFilesContract(
+  "memory files with readBytes alone",
+  () => {
+    const { writeBytes: _w, ...files } = memoryFiles();
+    return { files, dir: "/work" };
+  },
+  { failing: { "a host offers readBytes and writeBytes together or neither": "offers readBytes without writeBytes" } },
+);

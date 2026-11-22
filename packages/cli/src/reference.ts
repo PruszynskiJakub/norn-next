@@ -129,6 +129,7 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   "vcs.use": CONFIG_DEFAULTS.vcs?.use,
   packs: CONFIG_DEFAULTS.packs,
   base: CONFIG_DEFAULTS.base,
+  "evidence.publish": CONFIG_DEFAULTS.evidence?.publish,
   base_ref: { derived: "the remote's fetched copy of `base` (`origin/main`), else `base`" },
   holder: { derived: "user@ the machine's LocalHostName, else its hostname, fixed in `~/.norn/holder.json` on first use" },
   executor: { derived: "the only executor" },

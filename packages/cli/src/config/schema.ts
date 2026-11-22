@@ -116,6 +116,13 @@ export type Policy = Static<typeof Policy>;
 /** The keys a repo file can only narrow, and the user's file alone grants. */
 export const POLICY_KEY = "policy";
 
+/**
+ * QA's evidence files: `publish` keeps them on a ref of the remote that only norn reads and links them
+ * from the pull request body, which makes them as visible as the repo. False keeps nothing and pushes
+ * nothing, so the body names the files as text.
+ */
+export const EvidenceKnobs = Type.Object({ publish: Type.Optional(Type.Boolean()) }, closed);
+
 export const CONFIG_FORMAT = 1;
 
 /** The merged config every command runs on. */
@@ -150,6 +157,8 @@ export const NornConfig = Type.Object(
     sources: Type.Optional(Sources),
     /** what the person lets stand in for them; the user's file grants it, a repo file only narrows it */
     policy: Type.Optional(Policy),
+    /** whether QA's evidence is published with the pull request */
+    evidence: Type.Optional(EvidenceKnobs),
   },
   { ...closed, title: "NornConfig" },
 );
@@ -193,6 +202,7 @@ export const ConfigLayer = Type.Object(
     checks: Type.Optional(Checks),
     sources: Type.Optional(Sources),
     policy: Type.Optional(Policy),
+    evidence: Type.Optional(EvidenceKnobs),
   },
   { ...closed, title: "NornConfigLayer" },
 );
@@ -205,4 +215,5 @@ export const CONFIG_DEFAULTS: ConfigLayer = {
   packs: ["sdlc"],
   plugins: {},
   base: "main",
+  evidence: { publish: true },
 };

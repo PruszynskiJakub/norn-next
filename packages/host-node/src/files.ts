@@ -31,12 +31,12 @@ async function fsyncDir(dir: string): Promise<void> {
 }
 
 /** Write `data` to a fresh temp file beside `path` and fsync it, so what a rename or link puts in place is on disk first. */
-async function writeTemp(path: string, data: string): Promise<string> {
+async function writeTemp(path: string, data: string | Uint8Array): Promise<string> {
   await mkdir(dirname(path), { recursive: true });
   const tmp = tempName(path);
   const h = await open(tmp, "wx");
   try {
-    await h.writeFile(data, "utf8");
+    await h.writeFile(data);
     await h.sync();
   } catch (e) {
     await h.close();
@@ -50,7 +50,7 @@ async function writeTemp(path: string, data: string): Promise<string> {
 /** rwxr-xr-x */
 const EXECUTABLE = 0o755;
 
-async function replace(p: string, data: string, mode?: number): Promise<void> {
+async function replace(p: string, data: string | Uint8Array, mode?: number): Promise<void> {
   const tmp = await writeTemp(p, data);
   try {
     if (mode !== undefined) await chmod(tmp, mode);
@@ -75,6 +75,15 @@ export function nodeFiles(root: string): HostFiles {
       }
     },
     write: (path, data) => replace(at(path), data),
+    readBytes: async (path) => {
+      try {
+        return new Uint8Array(await readFile(at(path)));
+      } catch (e) {
+        if (errno(e) === "ENOENT") return null;
+        throw e;
+      }
+    },
+    writeBytes: (path, data) => replace(at(path), data),
     // the bit goes on the temp file, so the name never points at a script that cannot run
     writeExecutable: (path, data) => replace(at(path), data, EXECUTABLE),
     // link, not open("wx") on the target: a reader racing the creator (a lock's owner reading its

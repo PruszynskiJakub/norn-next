@@ -1,5 +1,5 @@
 import { type Static, Type } from "@sinclair/typebox";
-import { NonEmpty, TaggedUnion, Ulid } from "./common.ts";
+import { GitSha, NonEmpty, TaggedUnion, Ulid } from "./common.ts";
 
 /** Criterion id as written in a slice/story Acceptance section, e.g. `AC1`, `B3`, `AC2.1`. */
 export const CRITERION_ID_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._-]*$";
@@ -77,6 +77,25 @@ export const Note = Type.Object(
   { additionalProperties: false },
 );
 export type Note = Static<typeof Note>;
+
+/**
+ * An evidence file a report kept: `name` as QA wrote it in the run's evidence folder, `kept` the path
+ * it has in the evidence commit's tree, at its root. They differ when the file was re-encoded
+ * (`AC2.png` → `AC2.webp`), and a re-encoded name that would clash with another file keeps the
+ * original extension too (`AC2.png.webp`).
+ */
+export const KeptEvidenceFile = Type.Object({ name: NonEmpty, kept: Type.String({ pattern: "^[^/]+$" }) }, { additionalProperties: false });
+export type KeptEvidenceFile = Static<typeof KeptEvidenceFile>;
+
+/**
+ * Where a report's evidence was kept: the commit holding exactly its files, never empty, since a
+ * report without evidence keeps no commit. A retried report names the same commit.
+ */
+export const ReportEvidence = Type.Object(
+  { commit: GitSha, files: Type.Array(KeptEvidenceFile, { minItems: 1 }) },
+  { additionalProperties: false, title: "ReportEvidence" },
+);
+export type ReportEvidence = Static<typeof ReportEvidence>;
 
 /** Inbox id of a note — `note:<receipt_id>:<n>`, `n` from 1 in the receipt's `notes` order. */
 export const NOTE_ID_PATTERN = "^note:[0-9A-HJKMNP-TV-Z]{26}:[1-9][0-9]*$";

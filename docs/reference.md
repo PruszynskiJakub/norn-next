@@ -772,6 +772,7 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `policy.stand_in.attended` | list of strings | derived: none: a supervisor answers no step's questions |
 | `policy.stand_in.gates` | list of strings | derived: none: every gate is the person's |
 | `policy.allow` | list of capabilities | derived: none: every capability a role names may be granted |
+| `evidence.publish` | boolean | `true` |
 
 Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner`, `runners.person`, `runners.agent`, `runners.none` take the keys of the plugin they name; that plugin checks them.
 

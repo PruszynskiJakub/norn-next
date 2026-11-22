@@ -9,6 +9,8 @@ export interface MemoryForgeOptions {
   now: () => string;
   /** a defect on purpose: findChanges answers with a branch's oldest change */
   oldestFirst?: boolean;
+  /** a defect on purpose: fileUrl names the file at the newest commit, not the one asked for */
+  unpinned?: boolean;
 }
 
 export function memoryForge(opts: MemoryForgeOptions): ForgeWorld {
@@ -23,7 +25,7 @@ export function memoryForge(opts: MemoryForgeOptions): ForgeWorld {
 
   const forge: Forge = {
     name: "memory",
-    capabilities: { draft: true, checks: true, raw_urls: false },
+    capabilities: { draft: true, checks: true, raw_urls: true },
     findChanges: async (branches) => {
       if (failing) return down();
       const out: Record<string, ChangeRequest | null> = {};
@@ -40,6 +42,10 @@ export function memoryForge(opts: MemoryForgeOptions): ForgeWorld {
       if (!byId(id)) return fail("not_found", `memory forge: no change ${id}`);
       const summary = checks.get(id) ?? "none";
       return ok({ summary, failed: summary === "failure" ? [{ name: "test", url: `memory://changes/${id}/checks/test` }] : [], conflicts: conflicting.has(id) });
+    },
+    fileUrl: async (commit, path, form) => {
+      if (failing) return down();
+      return ok(`memory://files/${opts.unpinned ? "latest" : commit}/${path}${form === "image" ? "?raw=true" : ""}`);
     },
     perform: async (effect, meta) => {
       if (failing) return down();

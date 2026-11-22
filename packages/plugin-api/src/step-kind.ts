@@ -4,7 +4,7 @@
  * host calls `run` and records the outcome as a receipt, so a step kind performs and reports and never
  * picks the next step.
  */
-import { OUTCOME_NAME_PATTERN } from "@norn/schema";
+import { OUTCOME_NAME_PATTERN, type ReportEvidence } from "@norn/schema";
 import type { Static, TSchema } from "@sinclair/typebox";
 import type { Forge } from "./forge.ts";
 import type { HostContext } from "./host.ts";
@@ -128,6 +128,12 @@ export interface StepKindInput<C = Record<string, unknown>> {
    * tick and keeps nothing between polls, so this is how it bounds how long it waits for something.
    */
   started_at?: string;
+  /**
+   * The evidence the story's latest report with criteria kept, as its receipt names it (plugin API
+   * 1.28): the commit and each file's name as QA wrote it and its path there. Absent when that report
+   * kept none, or no report has criteria.
+   */
+  evidence?: ReportEvidence;
 }
 
 export interface StepKindBase {
@@ -305,3 +311,6 @@ export function stepKindAnswerProblem(def: Pick<StepKindDefinition, "name" | "mo
   if (outcome === WAITING_OUTCOME) return def.mode === "wait" ? null : `step kind ${def.name} is an effect and cannot answer ${WAITING_OUTCOME}`;
   return def.outcomes.includes(outcome) ? null : `step kind ${def.name} answered ${JSON.stringify(outcome)}, which it does not declare`;
 }
+
+/** The evidence shape a step kind reads, re-exported so a plugin needs only the plugin API. */
+export type { KeptEvidenceFile, ReportEvidence } from "@norn/schema";

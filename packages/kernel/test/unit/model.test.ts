@@ -170,6 +170,24 @@ describe("kernel schemas", () => {
     expect(validateReceiptData({ kind: "branch.update", base: "main", base_sha: "b", from: "a", by: "p" }).ok).toBe(false);
   });
 
+  test("a done may name the commit its evidence was kept in, each file by the name QA wrote and the path it was kept at; a malformed one does not validate", () => {
+    const done = { kind: "run.reported", run_id: "r", verb: "done", outcome: "done" } as const;
+    const evidence = { commit: "a".repeat(40), files: [{ name: "AC1.png", kept: "AC1.webp" }, { name: "AC2.png", kept: "AC2.png.webp" }, { name: "AC3.log", kept: "AC3.log" }] };
+    expect(errorsOf(validateReceiptData(done))).toEqual([]);
+    expect(errorsOf(validateReceiptData({ ...done, evidence }))).toEqual([]);
+    const malformed: unknown[] = [
+      { commit: "a".repeat(40) },
+      { commit: "a".repeat(40), files: [] },
+      { commit: "not-a-sha", files: evidence.files },
+      { commit: "a".repeat(40), files: [{ name: "AC1.png" }] },
+      { commit: "a".repeat(40), files: [{ name: "AC1.png", kept: "" }] },
+      { commit: "a".repeat(40), files: [{ name: "AC1.png", kept: "shots/AC1.webp" }] },
+      { commit: "a".repeat(40), files: [{ name: "AC1.png", kept: "AC1.webp", size: 3 }] },
+      { commit: "a".repeat(40), files: evidence.files, pushed: true },
+    ];
+    for (const e of malformed) expect({ e, ok: validateReceiptData({ ...done, evidence: e }).ok }).toEqual({ e, ok: false });
+  });
+
   test("a decision carries its unit and rule, and names one of the known action kinds", () => {
     const d: Decision = { kind: "noop", unit: "gh-1", rule: "gate.wait", reason: "waiting for approve or reject" };
     expect(errorsOf(validateDecision(d))).toEqual([]);
