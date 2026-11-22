@@ -315,6 +315,24 @@ describe("the runtime config derived from the person's", () => {
     expect(planSet(c, LOCAL_CONFIG, "local", "sources.Brand", "x").ok).toBe(false);
   });
 
+  test("evidence.publish: true when no file sets it, false from any layer that does, the committed file's over the local one's; a non-boolean it refuses", async () => {
+    const plain = await loaded({ local: LOCAL_CONFIG });
+    expect(getKey(plain.config, "evidence.publish")).toBe(true);
+    expect(runtimeConfigOf(plain, "me@box").evidencePublish).toBe(true);
+    for (const files of [{ user: "evidence: { publish: false }\n", local: LOCAL_CONFIG }, { local: `${LOCAL_CONFIG}evidence: { publish: false }\n` }, { local: LOCAL_CONFIG, repo: "evidence: { publish: false }\n" }]) {
+      const c = await loaded(files);
+      expect(getKey(c.config, "evidence.publish")).toBe(false);
+      expect(runtimeConfigOf(c, "me@box").evidencePublish).toBe(false);
+    }
+    const back = await loaded({ local: `${LOCAL_CONFIG}evidence: { publish: false }\n`, repo: "evidence: { publish: true }\n" });
+    expect(runtimeConfigOf(back, "me@box").evidencePublish).toBe(true);
+    expect(planSet(plain, LOCAL_CONFIG, "local", "evidence.publish", false).ok).toBe(true);
+    expect(planSet(plain, LOCAL_CONFIG, "local", "evidence.publish", "sometimes").ok).toBe(false);
+    const refused = await problems({ local: `${LOCAL_CONFIG}evidence: { publish: yes please }\n` });
+    expect(refused.map((p) => `${p.layer} ${p.path}`)).toContain("local /evidence/publish");
+    expect((await problems({ local: `${LOCAL_CONFIG}evidence: { publish: true, keep: 3 }\n` })).length).toBeGreaterThan(0);
+  });
+
   test("durations", () => {
     expect([durationMs("250ms"), durationMs("30s"), durationMs("15m"), durationMs("2h"), durationMs("7d")]).toEqual([250, 30_000, 900_000, 7_200_000, 604_800_000]);
     expect(() => durationMs("15 m")).toThrow();

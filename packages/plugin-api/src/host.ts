@@ -54,6 +54,13 @@ export interface HostFiles {
   symlink?(target: string, path: string): Promise<void>;
   /** the target the link at `path` names, as written; null when nothing is there or it is no link */
   readLink?(path: string): Promise<string | null>;
+  /**
+   * the file's bytes, or null when it does not exist (plugin API 1.28): an image or any file no text
+   * encoding carries whole. Optional, with `writeBytes`; a caller without them does without the file.
+   */
+  readBytes?(path: string): Promise<Uint8Array | null>;
+  /** replace the file with `data` atomically, as `write` does */
+  writeBytes?(path: string, data: Uint8Array): Promise<void>;
 }
 
 export interface HostRepo {

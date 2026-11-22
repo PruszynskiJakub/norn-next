@@ -129,6 +129,7 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   "vcs.use": CONFIG_DEFAULTS.vcs?.use,
   packs: CONFIG_DEFAULTS.packs,
   base: CONFIG_DEFAULTS.base,
+  "evidence.publish": CONFIG_DEFAULTS.evidence?.publish,
   base_ref: { derived: "the remote's fetched copy of `base` (`origin/main`), else `base`" },
   holder: { derived: "user@ the machine's LocalHostName, else its hostname, fixed in `~/.norn/holder.json` on first use" },
   executor: { derived: "the only executor" },
@@ -183,6 +184,8 @@ function renderConfig(): string[] {
     ...rows.map((r) => `| \`${r.key}\` | ${tableCell(r.type)} | ${defaultCell(r.key)} |`),
     "",
     `Beside \`use\`, ${open.map((k) => `\`${k}\``).join(", ")} take the keys of the plugin they name; that plugin checks them.`,
+    "",
+    "`evidence.publish` keeps an agent QA report's evidence on `refs/norn/evidence/<story>` of the remote and links it from the pull request body, so it is as visible as the repo; `false` keeps nothing and pushes nothing, and forge-none never publishes ([Evidence](#evidence)).",
   ];
 }
 

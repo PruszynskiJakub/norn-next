@@ -10,10 +10,11 @@
  * step sent to merge the base has not merged it (`merge_unfinished`), while the worktree holds
  * uncommitted work (`dirty_worktree`), while the unit's commits leave a conflict unresolved
  * (`conflict_markers`), or while its handoff holds more than 8 KB (`handoff_too_large`); this command
- * only renders those refusals.
+ * only renders those refusals. A QA report's evidence files (`$NORN_OUT/evidence/`) are kept by the
+ * runtime as a commit the receipt names; this command prints a line for each one left out or kept as it was.
  */
 import { isAbsolute, resolve } from "node:path";
-import { CRITERIA_HINT, FINDINGS_HINT, parseCriteria, parseFindings, reportRun } from "@norn/runtime";
+import { CRITERIA_HINT, FINDINGS_HINT, parseCriteria, parseFindings, type ReportRecorded, reportRun } from "@norn/runtime";
 import type { CriterionVerdict, Finding } from "@norn/schema";
 import { defineCommand, opt } from "../command.ts";
 import type { CliContext } from "../context.ts";
@@ -75,9 +76,18 @@ export const doneCommand = defineCommand({
     const reportId = reportIdOf(ctx, args, `${runId}.done.${outcome}`);
     const r = await reportRun(await ctx.runtimeEnv(), unit, runId, { verb: "done", outcome, ...(note !== undefined && { text: note }), ...(criteria !== undefined && { criteria }), ...(findings !== undefined && { findings }) }, reportId);
     if (!r.ok) throw fromRefusal(r.refusal);
-    const value = { unit, run_id: runId, verb: "done", outcome, report_id: reportId, ...r.value };
-    const c = r.value.criteria;
-    const judged = c ? ` (criteria: worst \`${c.worst}\`${c.coverage ? `, coverage ${c.coverage}` : ""})` : "";
-    return rendered(value, `Reported ${unit} done with outcome \`${outcome}\`${judged}${r.value.replayed ? " (recorded before)" : ""}. End your turn.`);
+    // the notes are prose for the agent; the JSON names what was kept, so a file missing there was left out
+    const { evidenceNotes, ...recorded } = r.value;
+    const value = { unit, run_id: runId, verb: "done", outcome, report_id: reportId, ...recorded };
+    return rendered(value, doneMarkdown(unit, outcome, r.value));
   },
 });
+
+/** What `norn done` prints: the report as recorded, then a line per evidence file left out or kept as it was. */
+export function doneMarkdown(unit: string, outcome: string, r: ReportRecorded): string {
+  const c = r.criteria;
+  const judged = c ? ` (criteria: worst \`${c.worst}\`${c.coverage ? `, coverage ${c.coverage}` : ""})` : "";
+  const kept = r.evidence ? ` Kept ${r.evidence.files.length} evidence file${r.evidence.files.length === 1 ? "" : "s"} in ${r.evidence.commit.slice(0, 12)}.` : "";
+  const notes = (r.evidenceNotes ?? []).map((n) => `\n- ${n}`).join("");
+  return `Reported ${unit} done with outcome \`${outcome}\`${judged}${r.replayed ? " (recorded before)" : ""}.${kept}${notes}${notes ? "\n\n" : " "}End your turn.`;
+}

@@ -51,6 +51,12 @@ export interface VcsSnapshot {
   hooks: string;
 }
 
+/** A file to keep in a commit: `path` in the commit's tree, `at` where its bytes are on disk. */
+export interface KeptFile {
+  path: string;
+  at: string;
+}
+
 export interface VcsMergeOptions {
   /**
    * on a conflict, abort the merge so the branch and its worktree are as they were before it began;
@@ -171,6 +177,24 @@ export interface Vcs {
    * removed. Safe to repeat: a checkout already back is left as it is.
    */
   restore?(path: string, to: { head: string; tree: string }, paths: readonly string[]): Promise<PluginResult<void>>;
+  /**
+   * write a commit holding exactly `files`, each at its `path` from the root of the tree, parented on
+   * the commit `ref` names (none when it names none), and answer it. It writes objects only: `ref`
+   * stays where it was until `moveRef`, so a commit no record names is garbage and nothing more.
+   * Optional (plugin API 1.28), with `moveRef` and `pushRef`; without them a host keeps no evidence.
+   */
+  keepFiles?(ref: string, files: readonly KeptFile[], message: string): Promise<PluginResult<{ commit: string }>>;
+  /**
+   * move the local `ref` to `commit`, which it must already reach or be: `moved` is false when it is
+   * there, and a `commit` that does not descend from it is `conflict`, so no kept commit is dropped
+   */
+  moveRef?(ref: string, commit: string): Promise<PluginResult<{ moved: boolean }>>;
+  /**
+   * push the local `ref` to the same ref of the remote, which only norn reads (never a branch, so it
+   * starts no build of a branch and opens nothing). Fast-forward only: `pushed` is false when the
+   * remote already had it, and a remote ref that diverged is `conflict`.
+   */
+  pushRef?(ref: string): Promise<PluginResult<{ pushed: boolean }>>;
   push(branch: string, opts?: VcsPushOptions): Promise<PluginResult<void>>;
   fetch(): Promise<PluginResult<void>>;
 }

@@ -337,6 +337,46 @@ describe("git vcs conflictMarkers", () => {
   });
 });
 
+describe("git vcs kept files", () => {
+  test("keepFiles refuses a bare ref, no files or a name off the tree root before writing any object", async () => {
+    const h = gitHost([["check-ref-format refs/norn/evidence/gh-12", { code: 0 }]]);
+    const vcs = vcsOf(h.ctx);
+    const codes = await Promise.all([
+      vcs.keepFiles?.("main", [{ path: "a.txt", at: "/m/a.txt" }], "m"),
+      vcs.keepFiles?.("refs/norn/evidence/gh-12", [], "m"),
+      vcs.keepFiles?.("refs/norn/evidence/gh-12", [{ path: "sub/a.txt", at: "/m/a.txt" }], "m"),
+    ]);
+    expect(codes.map((r) => (r?.ok ? "ok" : r?.failure.code))).toEqual(["invalid", "invalid", "invalid"]);
+    expect(h.calls.every((c) => c[1] === "check-ref-format")).toBe(true);
+  });
+
+  test("keepFiles writes each blob from disk, a tree from them and a commit on the ref's previous one, never touching a ref", async () => {
+    const PARENT = "b".repeat(40);
+    const h = gitHost([
+      ["check-ref-format", { code: 0 }],
+      ["rev-parse --verify --quiet --end-of-options refs/norn/evidence/gh-12^{commit}", { stdout: `${PARENT}\n` }],
+      ["hash-object -w --no-filters -- /m/a.webp", { stdout: `${"1".repeat(40)}\n` }],
+      ["mktree -z", { stdout: `${"2".repeat(40)}\n` }],
+      ["commit-tree", { stdout: `${SHA}\n` }],
+    ]);
+    expect(await vcsOf(h.ctx).keepFiles?.("refs/norn/evidence/gh-12", [{ path: "AC1.webp", at: "/m/a.webp" }], "evidence")).toEqual({ ok: true, value: { commit: SHA } });
+    expect(h.calls.at(-1)).toEqual(["git", "commit-tree", "2".repeat(40), "-p", PARENT, "-m", "evidence"]);
+    expect(h.calls.some((c) => c[1] === "update-ref")).toBe(false);
+  });
+
+  test("pushRef never forces and reads a ref the remote already had as not pushed", async () => {
+    const h = gitHost([
+      ["check-ref-format", { code: 0 }],
+      ["rev-parse", { stdout: `${SHA}\n` }],
+      ["remote", { stdout: "origin\n" }],
+      ["push", { stdout: `To /remote.git\n=\t${SHA}:refs/norn/evidence/gh-12\t[up to date]\nDone\n` }],
+    ]);
+    expect(await vcsOf(h.ctx).pushRef?.("refs/norn/evidence/gh-12")).toEqual({ ok: true, value: { pushed: false } });
+    const push = h.calls.find((c) => c[1] === "push") ?? [];
+    expect(push.some((a) => a.startsWith("--force") || a.startsWith("+"))).toBe(false);
+  });
+});
+
 describe("git vcs push and fetch", () => {
   test("push names the branch on both sides, carries the lease, and is bounded", async () => {
     const exec = scriptedExec((argv) => (argv[1] === "remote" ? { stdout: "origin\n" } : argv[1] === "push" ? { code: 0 } : undefined));

@@ -8,7 +8,7 @@
  */
 import type { KernelReceipt, RunState, UnitJournal } from "@norn/kernel";
 import { parseUnitId } from "@norn/plugin-api";
-import { type CriterionVerdict, check } from "@norn/schema";
+import { type CriterionVerdict, check, type ReportEvidence } from "@norn/schema";
 import { Type } from "@sinclair/typebox";
 import { branchOf } from "./branches.ts";
 import type { RuntimeEnv } from "./env.ts";
@@ -239,9 +239,29 @@ function criteriaReports(record: UnitJournal): string[] {
   const out: string[] = [];
   for (const r of latest.values()) {
     if (r.data.kind !== "run.reported" || !r.data.criteria) continue;
-    out.push("", `Criteria report of ${code(`${r.data.step ?? "?"} #${r.data.attempt ?? "?"}`)} (${r.at}), outcome \`${r.data.outcome ?? "?"}\`:`, "", ...r.data.criteria.map(verdictLine));
+    out.push("", `Criteria report of ${code(`${r.data.step ?? "?"} #${r.data.attempt ?? "?"}`)} (${r.at}), outcome \`${r.data.outcome ?? "?"}\`:`, "", ...r.data.criteria.map(verdictLine), "", publishedLine(r.data.evidence));
   }
   return out;
+}
+
+/**
+ * The evidence files a report published, by the name QA wrote: open-pr maps that name to the kept
+ * file, so a link written by the kept name or a URL would not resolve. A file left out for its size
+ * is in no report's list, so it is never cited.
+ */
+function publishedLine(evidence: ReportEvidence | undefined): string {
+  if (!evidence) return "Published evidence: none; describe its evidence in words.";
+  return `Published evidence, to cite as \`evidence:<name>\`: ${evidence.files.map((f) => code(f.name)).join(", ")}`;
+}
+
+/**
+ * The evidence the story's latest criteria report kept, across all its units; undefined when that
+ * report kept none, so an earlier, superseded QA run's files are never what a pull request shows.
+ */
+export function latestReportEvidence(units: readonly UnitJournal[]): ReportEvidence | undefined {
+  let latest: KernelReceipt | undefined;
+  for (const u of units) for (const r of u.receipts) if (r.data.kind === "run.reported" && r.data.criteria && (!latest || r.at >= latest.at)) latest = r;
+  return latest?.data.kind === "run.reported" ? latest.data.evidence : undefined;
 }
 
 /** The story's record: each unit's outcomes, gate rulings and criteria reports with their evidence. */
@@ -250,7 +270,7 @@ export async function recordOf(env: RuntimeEnv, record: UnitJournal): Promise<Re
   const units = await storyUnits(env, record.unit);
   if (units.length === 0) return { note: `norn holds no record for ${story} yet` };
   const lines = [
-    `The record of ${code(story)}: what each of its units reported, every check and gate ruling, and the criteria reports with the evidence each verdict cites. The record is the story's receipts, kept with its run data and not in the repo; this file is its summary. norn keeps no evidence files of its own, so evidence is what the reports wrote.`,
+    `The record of ${code(story)}: what each of its units reported, every check and gate ruling, and the criteria reports with the evidence each verdict cites. The record is the story's receipts, kept with its run data and not in the repo; this file is its summary. Evidence is what the reports wrote; each report lists the evidence files it published, the only ones a pull request can show.`,
   ];
   for (const u of units) {
     lines.push("", `## ${code(u.unit)}${u.unit === story ? " (the story)" : ""}: ${standing(u)}`, "");

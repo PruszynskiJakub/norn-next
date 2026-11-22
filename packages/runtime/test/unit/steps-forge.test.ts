@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { memoryFiles, memoryHost, steppingClock } from "@norn/conformance";
-import { type ForgeEffect, ok, type PluginResult, type StepKindInput, type Tracker, type Vcs, type VcsMergeOptions, type VcsMergeOutcome } from "@norn/plugin-api";
+import { type ForgeEffect, fail, ok, type PluginResult, type StepKindInput, type Tracker, type Vcs, type VcsMergeOptions, type VcsMergeOutcome } from "@norn/plugin-api";
 import { awaitChecks, awaitMerge, checksText, openPr, stepsForgePlugin } from "../../src/index.ts";
 import { memoryForge } from "../../../conformance/test/unit/reference/memory-forge.ts";
 
@@ -13,7 +13,11 @@ const WT = "/machine/repo/worktrees/gh-12";
  * A vcs over a commit graph given as child → parents; it pushes into `pushed` and records every
  * merge. `remote` is each branch's remote copy as last fetched; `merge` answers a merge.
  */
-function fakeVcs(refs: Record<string, string>, parents: Record<string, string[]>, opts: { push?: boolean; remote?: Record<string, string>; merge?: VcsMergeOutcome } = {}) {
+function fakeVcs(
+  refs: Record<string, string>,
+  parents: Record<string, string[]>,
+  opts: { push?: boolean; remote?: Record<string, string>; merge?: VcsMergeOutcome; pushRef?: PluginResult<{ pushed: boolean }> } = {},
+) {
   const pushed: string[] = [];
   const merges: { branch: string; from: string; opts?: VcsMergeOptions }[] = [];
   const reach = (from: string, to: string): boolean => from === to || (parents[from] ?? []).some((p) => reach(p, to));
@@ -34,6 +38,11 @@ function fakeVcs(refs: Record<string, string>, parents: Record<string, string[]>
       return ok(undefined);
     },
     fetch: async () => ok(undefined),
+    pushRef: async (ref) => {
+      if (opts.pushRef && !opts.pushRef.ok) return opts.pushRef;
+      pushed.push(ref);
+      return opts.pushRef ?? ok({ pushed: true });
+    },
   };
   return { vcs, pushed, merges };
 }
@@ -206,6 +215,75 @@ describe("open-pr", () => {
     expect(r.ok ? "" : r.failure.message).toContain("by hand");
     expect(pushed).toEqual([]);
     expect(value(await world.forge.findChanges(["gh-12-login"]))["gh-12-login"] ?? null).toBeNull();
+  });
+});
+
+describe("open-pr's evidence links", () => {
+  const EVIDENCE = "e".repeat(40);
+  const REF = "refs/norn/evidence/gh-12";
+  const KEPT = { commit: EVIDENCE, files: [{ name: "AC2.png", kept: "AC2.webp" }, { name: "AC1.md", kept: "AC1.md" }] };
+  const BODY = "# Login fix\n\n![the settings page](evidence:AC2.png)\n\nSee [full output](evidence:AC1.md).\n";
+
+  /** open-pr over a body, the forge's file URLs and the vcs's pushes in one log, so a test reads their order */
+  async function opened(body: string, over: Partial<StepKindInput<object>>, opts: { local?: boolean; pushRef?: PluginResult<{ pushed: boolean }>; rawUrls?: boolean } = {}) {
+    const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
+    const effects = recorded(world);
+    const refs: Record<string, string> = { "gh-12-login": HEAD, ...(opts.local !== false ? { [EVIDENCE]: EVIDENCE } : {}) };
+    const { vcs, pushed } = fakeVcs(refs, {}, opts.pushRef ? { pushRef: opts.pushRef } : {});
+    const perform = world.forge.perform;
+    world.forge.perform = (effect, meta) => {
+      pushed.push(`forge ${effect.kind}`);
+      return perform(effect, meta);
+    };
+    const forge = opts.rawUrls === false ? { ...world.forge, capabilities: { ...world.forge.capabilities, raw_urls: false } } : world.forge;
+    const files = memoryFiles({ [`${WT}/.agents/specs/gh-12/pr.md`]: body });
+    const r = await openPr.run(input({}, { slots: { forge, vcs }, ...over }), memoryHost({ files }));
+    const sent = effects.map((e) => (e.kind === "open" || e.kind === "update" ? (e.body ?? "").split("\n\n---")[0] : null));
+    return { r, sent, pushed };
+  }
+
+  test("an image link shows the kept file from the forge's raw URL at the evidence commit, a plain link opens its file page, the text kept", async () => {
+    const { r, sent } = await opened(BODY, { evidence: KEPT });
+    expect(value(r).outcome).toBe("done");
+    expect(sent).toEqual([`# Login fix\n\n![the settings page](memory://files/${EVIDENCE}/AC2.webp?raw=true)\n\nSee [full output](memory://files/${EVIDENCE}/AC1.md).`]);
+  });
+
+  test("a name the latest report kept no file for reads as text, never a broken image or link", async () => {
+    const body = "![](evidence:AC2.png)\n\n[the log](evidence:AC9.log)\n";
+    const { sent, pushed } = await opened(body, { evidence: { commit: EVIDENCE, files: [{ name: "AC1.md", kept: "AC1.md" }] } });
+    expect(sent).toEqual(["AC2.png (evidence not published)\n\nthe log: AC9.log (evidence not published)"]);
+    expect(pushed).toEqual(["gh-12-login", "forge open"]);
+  });
+
+  test("with no evidence from the host every evidence link reads as text", async () => {
+    const { sent } = await opened(BODY, {});
+    expect(sent).toEqual(["# Login fix\n\nthe settings page: AC2.png (evidence not published)\n\nSee full output: AC1.md (evidence not published)."]);
+  });
+
+  test("the evidence ref is pushed before the forge opens or updates the change; with no link resolved nothing is pushed", async () => {
+    expect((await opened(BODY, { evidence: KEPT })).pushed).toEqual(["gh-12-login", REF, "forge open"]);
+    expect((await opened("# No evidence cited\n", { evidence: KEPT })).pushed).toEqual(["gh-12-login", "forge open"]);
+  });
+
+  test("a failed evidence push fails the step retryably and the forge performs nothing", async () => {
+    const { r, pushed } = await opened(BODY, { evidence: KEPT }, { pushRef: fail("auth", "git push: permission denied") });
+    expect(r.ok ? null : { code: r.failure.code, retryable: r.failure.retryable }).toEqual({ code: "auth", retryable: true });
+    expect(r.ok ? "" : r.failure.message).toContain("permission denied");
+    expect(pushed).toEqual(["gh-12-login"]);
+  });
+
+  test("an evidence commit the local repo lacks (the story taken to another machine) leaves every link as text, pushes nothing and opens the change", async () => {
+    const { r, sent, pushed } = await opened(BODY, { evidence: KEPT }, { local: false });
+    expect(value(r).outcome).toBe("done");
+    expect(sent[0]).toContain("the settings page: AC2.png (evidence not published)");
+    expect(sent[0]).not.toContain("evidence:");
+    expect(pushed).toEqual(["gh-12-login", "forge open"]);
+  });
+
+  test("a forge that serves no raw URLs leaves every link as text and pushes nothing", async () => {
+    const { sent, pushed } = await opened(BODY, { evidence: KEPT }, { rawUrls: false });
+    expect(sent[0]).toContain("See full output: AC1.md (evidence not published).");
+    expect(pushed).toEqual(["gh-12-login", "forge open"]);
   });
 });
 

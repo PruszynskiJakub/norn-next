@@ -70,10 +70,10 @@ export function fakeTracker(items: TrackerItem[]): Tracker {
 }
 
 /** A forge whose changes are a map by branch the test edits. */
-export function fakeForge(changes: Record<string, ChangeRequest>): Forge {
+export function fakeForge(changes: Record<string, ChangeRequest>, rawUrls = false): Forge {
   return {
     name: "fake",
-    capabilities: { draft: true, checks: true, raw_urls: false },
+    capabilities: { draft: true, checks: true, raw_urls: rawUrls },
     findChanges: async (branches) => ok(Object.fromEntries(branches.map((b) => [b, changes[b] ?? null]))),
     checks: async () => ok("none"),
     perform: async () => fail("invalid", "the fake forge performs nothing"),
@@ -133,6 +133,8 @@ export function fakeVcs(
         },
       };
   const path = (unit: string) => `${ctx.repo.dataDir}/worktrees/${unit.replace("/", "-")}`;
+  // kept commits are numbered, so a test reads which keep made which commit from the calls alone
+  let keeps = 0;
   const call = <T>(op: string, args: unknown[], value: T): Promise<PluginResult<T>> => {
     calls.push({ op, args });
     return Promise.resolve(ok(value));
@@ -155,6 +157,9 @@ export function fakeVcs(
     deleteBranch: (branch) => call("deleteBranch", [branch], undefined),
     push: (branch) => call("push", [branch], undefined),
     fetch: () => call("fetch", [], undefined),
+    keepFiles: (ref, files, message) => call("keepFiles", [ref, files.map((f) => ({ ...f })), message], { commit: (++keeps).toString(16).padStart(40, "e") }),
+    moveRef: (ref, commit) => call("moveRef", [ref, commit], { moved: true }),
+    pushRef: (ref) => call("pushRef", [ref], { pushed: true }),
     ...snapshotting,
   };
 }
@@ -601,6 +606,10 @@ export interface HarnessOptions {
   roles?: Record<string, RoleDefinition>;
   /** the vcs cannot snapshot a checkout */
   noSnapshot?: boolean;
+  /** the forge serves a commit's files at a URL (`raw_urls`), as GitHub does */
+  rawUrls?: boolean;
+  /** the config's `evidence.publish`; absent, as a config that leaves it at its default */
+  evidencePublish?: boolean;
 }
 
 export function harness(opts: HarnessOptions = {}): Harnessed {
@@ -627,7 +636,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     api: "^1.4",
     provides: {
       tracker: { fake: { configSchema: Type.Object({}), create: () => fakeTracker(items) } },
-      forge: { fake: { configSchema: Type.Object({}), create: () => fakeForge(changes) } },
+      forge: { fake: { configSchema: Type.Object({}), create: () => fakeForge(changes, opts.rawUrls) } },
       vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped, dirty, untracked, checkouts) } },
       harness: { fake: { ...HARNESS, hookConfig: async (wt: string) => hookConfigs[wt] ?? null } },
       stepKinds: fakeStepKinds(stepAnswers, stepCalls),
@@ -648,6 +657,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     holder: "machine-a",
     ...(opts.formerHolders ? { formerHolders: opts.formerHolders } : {}),
     ...(opts.checks ? { checks: opts.checks } : {}),
+    ...(opts.evidencePublish !== undefined ? { evidencePublish: opts.evidencePublish } : {}),
   };
   const tickIds: string[] = [];
   const built = createRuntimeEnv({ ctx, plugins, config, launcher, sessions });

@@ -43,9 +43,10 @@ describe("defineNornPlugin", () => {
 
   test("refuses an API range the running API does not satisfy, naming both", () => {
     expect(() => defineNornPlugin({ name: "future", api: "^2", provides: {} })).toThrow(
-      'norn plugin future: wants plugin API "^2", but this norn implements 1.27.0',
+      'norn plugin future: wants plugin API "^2", but this norn implements 1.28.0',
     );
-    expect(() => defineNornPlugin({ name: "newer-minor", api: "^1.28", provides: {} })).toThrow(/implements 1\.27\.0/);
+    expect(() => defineNornPlugin({ name: "newer-minor", api: "^1.29", provides: {} })).toThrow(/implements 1\.28\.0/);
+    expect(defineNornPlugin({ name: "older-minor", api: "^1.27", provides: {} }).api).toBe("^1.27");
     expect(() => defineNornPlugin({ name: "loose", api: ">=1", provides: {} })).toThrow(/wants plugin API ">=1"/);
   });
 

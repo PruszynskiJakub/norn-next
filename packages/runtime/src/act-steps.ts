@@ -14,6 +14,7 @@ import { checkCommandOf } from "./check-command.ts";
 import { removeLeftovers, untrackedFiles } from "./check-leftovers.ts";
 import { canDetach, checkOutcome, OUTPUT_TAIL, startDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
+import { latestReportEvidence, storyUnits } from "./input-history.ts";
 import { producerOf, readBackDocs, specFolder } from "./inputs.ts";
 import { unitInFacts } from "./record.ts";
 import { readStepRun, type StepRunRecord, writeStepRun } from "./step-runs.ts";
@@ -123,6 +124,8 @@ export async function runStep(t: TickContext, d: DecisionOf<"run_step">): Promis
   // the run's first poll goes under its intent before the state holds it: it starts now
   const run = unitInFacts(t.facts, unit)?.state?.run;
   const started_at = run?.id === d.run_id ? run.started_at : t.env.ctx.now();
+  // read off every unit of the story, so only an effect kind, which runs once, pays for it; a wait kind is polled every tick
+  const evidence = def.mode === "effect" && t.env.config.evidencePublish !== false ? latestReportEvidence(await storyUnits(t.env, unit)) : undefined;
   // a kind over the provider-neutral slots cannot learn the branch, the base or the receipt any other way
   const input = {
     unit,
@@ -137,6 +140,7 @@ export async function runStep(t: TickContext, d: DecisionOf<"run_step">): Promis
     started_at,
     ...(reads && { reads }),
     ...(produces && { produces }),
+    ...(evidence && { evidence }),
   };
   return underIntent(t, unit, d.intent, async () => {
     const record = base(t, unit, d, d.step_kind, d.intent);

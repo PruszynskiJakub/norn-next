@@ -3,7 +3,8 @@
  * first, then swept over the real doc set expecting no hits; each hit names file, line and the fix.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { SLICE_NN_PATTERN } from "@norn/schema";
 import { allDocs, CODE_SPAN, textFiles, URL, userDocs } from "../support/docs.ts";
@@ -44,6 +45,15 @@ function strayHandoff(relPath: string): boolean {
   return parts.at(-1) === "handoff.md" && !OLD_HANDOFF.test(relPath);
 }
 
+/** Under a folder whose `.gitignore` is `*`: norn's own run state and spec copies, which git never tracks. */
+function ignoredByFolder(relPath: string, root = ROOT): boolean {
+  const parts = relPath.split("/").slice(0, -1);
+  return parts.some((_, i) => {
+    const marker = join(root, ...parts.slice(0, i + 1), ".gitignore");
+    return existsSync(marker) && read(marker).trim() === "*";
+  });
+}
+
 describe("no stray handoff (B34)", () => {
   test("matcher", () => {
     expect(strayHandoff("handoff.md")).toBe(true);
@@ -66,8 +76,22 @@ describe("no stray handoff (B34)", () => {
     expect(strayHandoff("packages/core/src/handoff.ts")).toBe(false);
   });
 
+  test("ignoredByFolder", () => {
+    const dir = mkdtempSync(join(tmpdir(), "norn-ignored-"));
+    try {
+      mkdirSync(join(dir, ".agents/specs/gh-1"), { recursive: true });
+      writeFileSync(join(dir, ".agents/specs/gh-1/.gitignore"), "*\n");
+      expect(ignoredByFolder(".agents/specs/gh-1/handoffs/gh-1-01.md", dir)).toBe(true);
+      writeFileSync(join(dir, ".agents/specs/gh-1/.gitignore"), "*.log\n");
+      expect(ignoredByFolder(".agents/specs/gh-1/handoffs/gh-1-01.md", dir)).toBe(false);
+      expect(ignoredByFolder("docs/handoff.md", dir)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("no handoff in the repo outside a spec folder's handoffs/ (or an older norn's runs/)", () => {
-    expect(textFiles(ROOT, [".md"]).map(rel).filter(strayHandoff).map((f) => `${f}: a handoff is tracked outside a spec folder's handoffs/; delete it`)).toEqual([]);
+    expect(textFiles(ROOT, [".md"]).map(rel).filter((f) => !ignoredByFolder(f)).filter(strayHandoff).map((f) => `${f}: a handoff is tracked outside a spec folder's handoffs/; delete it`)).toEqual([]);
   });
 });
 
