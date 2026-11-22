@@ -40,7 +40,7 @@ Use the `norn-diagnose` loop only when the symptom does not show on the first tr
 **Risk:** <risk label> — <reason in one line>
 **Priority:** <priority label> — <reason in one line>
 
-**Recommend:** <refinement | quick | reproduce | close> — <reason in one or two lines>
+**Recommend:** <refinement | quick | reproduce | fix | close> — <reason in one or two lines>
 ```
 
 Recommend exactly one, and never act on it yourself: a person decides.
@@ -49,7 +49,8 @@ Recommend exactly one, and never act on it yourself: a person decides.
 |---|---|
 | `refinement` | new behaviour, or a rule to settle or change first: it needs a spec and a plan agreed with a person before anyone builds it |
 | `quick` | a refactor, docs, a chore or a small change with no open design question; also a rule change that is small and settled |
-| `reproduce` | it is a bug: something that should work does not. Its cause is confirmed before anyone fixes it, even when your repro already shows the symptom; a specific report you could not make happen may still go here |
+| `reproduce` | it is a bug whose fix is not yet clear: its cause is confirmed, and the fix decided, before anyone builds it; a specific report you could not make happen may still go here |
+| `fix` | it is a bug whose fix looks small and settled: one round confirms its cause with a red loop, then fixes it behind a regression test |
 | `close` | it no longer applies, is a duplicate, or is out of scope (name the issue, PR or rule that says so); a bug you could not make happen, with what you tried |
 
 Judge one of each set. Your instructions name the label for each value (for example `<prefix>kind:bug`); without them, write the bare value (`bug`) and add no label.
@@ -72,4 +73,4 @@ Post only when your instructions say to or the person asked you to triage the is
 
 The comment and adding these labels are your only remote writes: never create, edit or delete a label definition, never remove a label from the issue (the one that took the issue in included), never edit the issue body or title, assign or close. On a rerun, post a new comment that starts with `## Triage (updated)`; the labels already on the issue stay, and the comment says where your judgement now differs.
 
-Done when the labels you could set are on the issue and the comment is posted. The comment is the one place the findings live; hand back only a one-line summary of the recommendation.
+Done when the labels you could set are on the issue and the comment is posted. The comment is the one place the findings live. When your instructions say how to report, report the recommendation as the outcome of the same name, its reason in one line as the note (`norn done <recommendation> --note "<reason>"`); otherwise hand back only a one-line summary of the recommendation.
