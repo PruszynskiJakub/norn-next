@@ -353,6 +353,37 @@ describe("the story's record", () => {
     expect(text).toContain("- `AC2` person; how to check: open the help page");
     expect(text).toContain("## `lt-1/01`: at `build` #1\n\n- nothing reported yet");
   });
+
+  test("lists each criteria report's published evidence by the names QA wrote, and none for a report that published nothing", async () => {
+    const h = await started();
+    const append = async (unit: string, id: string, data: ReceiptData) => {
+      const r = await h.env.slots.store.appendReceipt(unit, { id, data });
+      if (!r.ok) throw new Error(r.failure.message);
+    };
+    const commit = "e".repeat(40);
+    await append(UNIT, "qa-1", {
+      kind: "run.reported",
+      step: "qa",
+      attempt: 1,
+      run_id: "r-qa",
+      verb: "done",
+      outcome: "pass",
+      criteria: [{ id: "AC1", verdict: "pass", evidence: "AC1.md" }, { id: "AC2", verdict: "pass", evidence: "AC2.png" }, { id: "AC3", verdict: "pass", evidence: "AC3.png" }],
+      // AC3.png was left out for its size, so the report kept only the other two
+      evidence: { commit, files: [{ name: "AC1.md", kept: "AC1.md" }, { name: "AC2.png", kept: "AC2.webp" }] },
+    });
+    await sliceStarted(h, "lt-1/01");
+    await append("lt-1/01", "qa-2", { kind: "run.reported", step: "qa", attempt: 1, run_id: "r-qa-2", verb: "done", outcome: "pass", criteria: [{ id: "AC1", verdict: "pass", evidence: "parse.test.ts passes" }] });
+    await only(h, await record(h, UNIT), "record");
+    const text = (await h.files.read(`${WORKTREE}/.agents/run/in/record.md`)) ?? "";
+    const [story = "", slice = ""] = text.split("## `lt-1/01`");
+    expect(story).toContain("Published evidence, to cite as `evidence:<name>`: `AC1.md`, `AC2.png`");
+    expect(story).not.toContain("`AC3.png`,");
+    expect(story).not.toMatch(/Published evidence.*AC3\.png/);
+    expect(story).not.toContain("AC2.webp");
+    expect(story).not.toContain(commit);
+    expect(slice).toContain("Published evidence: none; describe its evidence in words.");
+  });
 });
 
 describe("where a unit stands", () => {
