@@ -47,7 +47,7 @@ A rejection sends the unit back by the gate's `reject` route with your reason in
 
 ## Start a story's next round
 
-**You see:** a round ended without a change to merge. A triage or reproduce round posted its recommendation, a refinement round agreed the plan, or a delivery round ended stuck with `replan`.
+**You see:** a round ended without a change to merge. A triage round ended with the outcome it recommends (`refinement`, `quick`, `reproduce`, `fix` or `close`), a reproduce round posted its findings, a refinement round agreed the plan, or a delivery round ended stuck with `replan`.
 
 ```sh
 norn story round gh-17 --workflow refinement

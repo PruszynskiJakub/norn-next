@@ -784,7 +784,7 @@ The `sdlc` pack's workflows:
 - `reproduce`: Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.
 - `slice`: Build one slice test-first, check and review it, and integrate it into the story branch.
 - `story`: Slice a planned story against the current base, run the slices, verify the story, open the draft PR, wait for CI.
-- `triage`: Check an issue still holds, add its context, and recommend what comes next (refinement, quick, reproduce) or closing it.
+- `triage`: Check an issue still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it.
 
 ### Exit codes
 

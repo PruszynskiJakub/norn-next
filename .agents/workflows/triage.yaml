@@ -1,7 +1,7 @@
 # norn's own default round for a new issue; a bug starts in reproduce instead. Next round: the one its
-# comment recommends (`norn story round <story> --workflow refinement|quick|reproduce`), or closing it.
+# outcome names (`norn story round <story> --workflow refinement|quick|reproduce|fix`); after close, a person closes it.
 name: triage
-description: Check an issue still holds, add its context, and recommend what comes next (refinement, quick, reproduce) or closing it.
+description: Check an issue still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it.
 start: explore
 steps:
   explore:
@@ -13,11 +13,23 @@ steps:
       `norn:priority:low|medium|high|extreme`; a label missing on the remote is named in the comment
       for a person to create. That comment and those labels are the only remote writes this step allows,
       an exception to the brief's rule on remote writes; never remove a label, the intake label `norn` included. Change no file, spec.md included,
-      but the handoff. The recommendation lives only in that comment:
-      report `norn done done --note "<recommendation>: <reason>"`.
+      but the handoff. Report the outcome the comment recommends, with its reason as the note:
+      `norn done <recommendation> --note "<reason>"`.
     with: { skills: [norn-triage] }
     reads: [spec, handoff]
     outcomes:
-      done:
+      refinement:
         to: $done
-        means: "the ## Triage comment is posted, with one recommendation (refinement, quick, reproduce or close) and its reason, and the kind, risk and priority labels that could be set are on the issue"
+        means: "the ## Triage comment and the labels that could be set are posted; it needs a spec and a plan agreed with a person before anyone builds it"
+      quick:
+        to: $done
+        means: "the ## Triage comment and the labels that could be set are posted; a small change with no open design question"
+      reproduce:
+        to: $done
+        means: "the ## Triage comment and the labels that could be set are posted; a bug whose cause is confirmed before anyone decides how to fix it"
+      fix:
+        to: $done
+        means: "the ## Triage comment and the labels that could be set are posted; a bug to reproduce and fix in one round, its fix small and settled"
+      close:
+        to: $done
+        means: "the ## Triage comment and the labels that could be set are posted; it no longer applies, is a duplicate or out of scope, for a person to close"

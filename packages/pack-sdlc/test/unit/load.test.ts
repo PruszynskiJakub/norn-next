@@ -164,6 +164,18 @@ describe("how the pack's workflows bring in their shared files", () => {
     for (const [s, o] of [["qa", "fail"], ["human-qa", "reject"], ["checks", "fail"], ["ready", "reject"], ["test", "fail"]] as const) expect({ at: `${s}.${o}`, to: steps[s]?.routes[o]?.to }).toEqual({ at: `${s}.${o}`, to: "implement" });
   });
 
+  test("triage ends the round with the outcome that names its recommendation, so the next round is on the record, not only in a note", () => {
+    const r = load("triage.yaml");
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    const explore = r.workflow.graph.steps.explore;
+    expect(Object.keys(explore?.routes ?? {})).toEqual(["refinement", "quick", "reproduce", "fix", "close"]);
+    for (const route of Object.values(explore?.routes ?? {})) expect(route.to).toBe("$done");
+    // the skill reports the outcome the comment recommends, one for one
+    const skill = SDLC_PACK.skills["norn-triage"]?.["SKILL.md"] ?? "";
+    expect(skill).toContain("**Recommend:** <refinement | quick | reproduce | fix | close>");
+    expect(skill).toMatch(/norn done <recommendation>/);
+  });
+
   test("implement is told one thing everywhere; what a reproduce round's red loop asks of it is in the norn-implement skill", () => {
     const build = sharedDoc("build");
     const text = String(build.steps.implement?.do);

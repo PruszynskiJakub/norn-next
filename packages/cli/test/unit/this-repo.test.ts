@@ -185,10 +185,10 @@ describe("this repo's workflows, as norn loads them", () => {
     for (const wf of ["story", "quick"]) expect({ wf, inputs: steps(wf).resolve?.inputs }).toEqual({ wf, inputs: expect.arrayContaining(["base_side"]) });
   });
 
-  test("triage is one norn-triage step that ends the round with done: the recommendation is only in its comment", () => {
+  test("triage is one norn-triage step whose outcome is its recommendation, each ending the round", () => {
     expect(Object.keys(steps("triage"))).toEqual(["explore"]);
     expect(steps("triage").explore?.skills).toEqual(["norn-triage"]);
-    expect(steps("triage").explore?.outcomes).toEqual({ done: "$done" });
+    expect(steps("triage").explore?.outcomes).toEqual({ refinement: "$done", quick: "$done", reproduce: "$done", fix: "$done", close: "$done" });
   });
 
   test("reproduce is one norn-diagnose agent step whose reproduced or cannot_reproduce ends the round", () => {
