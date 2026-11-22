@@ -43,6 +43,11 @@ describe("reference render", () => {
     expect(fresh).toMatch(/^Beside `use`, `tracker`, `forge`, `store`, `vcs`/m);
   });
 
+  test("the evidence.publish key says what it publishes, who sees it and how to turn it off", () => {
+    expect(fresh).toContain("| `evidence.publish` | boolean | `true` |");
+    expect(fresh).toMatch(/^`evidence\.publish` keeps an agent QA report's evidence on `refs\/norn\/evidence\/<story>`.*as visible as the repo.*`false` keeps nothing.*forge-none never publishes.*\(#evidence\)/m);
+  });
+
   test("every kernel knob has a default, and every default names a key the schema has", () => {
     const keys = new Set(configKeys().rows.map((r) => r.key));
     for (const k of Object.keys(KernelKnobs.properties).filter((k) => k !== "counters")) expect(KEY_DEFAULTS, k).toHaveProperty([`kernel.${k}`]);
