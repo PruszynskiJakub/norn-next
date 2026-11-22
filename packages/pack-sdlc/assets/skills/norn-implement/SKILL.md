@@ -7,7 +7,7 @@ description: Builds a slice or story test-first at the seams its plan agreed, or
 
 Without this, code lands before its test, rework gets patched without a test that saw it fail, and the diff carries more than was asked. Make every behaviour change true, each proven by a test that failed before the code existed.
 
-1. **Read.** The acceptance criteria, the spec items they cite, and the spec's Plan, its Seams and Testing decisions above all. With no Plan (a quick round), work from the issue and its latest `## Triage` or `## Reproduce` comment. Run the existing tests once for a baseline. Then read only the code the work touches, as you reach it: no tour of the repository.
+1. **Read.** The acceptance criteria, the spec items they cite, and the spec's Plan, its Seams and Testing decisions above all. In a slice, the slice file's criteria are the work: stay inside the slice, as later slices have their own steps. With no Plan (a quick round), work from the issue and its latest `## Triage` or `## Reproduce` comment. A bug a reproduce step confirmed (a reproduce round, or the start of a fix round) has a red loop and a seam in the handoff's Notes and the issue's latest `## Reproduce` comment: turn that loop into a failing test at that seam before changing any code, then fix the cause. Run the existing tests once for a baseline. Then read only the code the work touches, as you reach it: no tour of the repository.
 2. **Rework first.** Rework points (failing check output, review findings, a QA repro, a person's rejection at a gate) come before anything else, each a test made red before you touch code:
    - failing check: reproduce it locally and read the full output;
    - review finding or rejection: write the test that exposes it;

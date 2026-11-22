@@ -1,77 +1,37 @@
-# Quick workflow — shipped in the sdlc pack; a repo copy under .agents/workflows/ replaces it.
-# For refactors, docs, chores, other small changes and the fix of a bug a reproduce round confirmed.
-# A story workflow without `slices`: every step works in the story worktree. Bring the story up
-# to date with its base, implement, bring it up to date again, check, review, describe, open the
-# draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a person at
-# ready, then wait at merge until the person merges the PR.
-# A story waiting at ready or merge goes back through update when the base moved under it in a way
-# that conflicts (`signals: { vcs.stale: { when: conflict } }`).
-# Steps shared with other workflows come from `shared/` (`use:`): the test command is the config's
-# `checks.test`; change the CI wait in `shared/ship.yaml`.
+# For refactors, docs, chores and other small changes, and the fix of a bug a reproduce round
+# confirmed. A merged PR ends the story.
 name: quick
 description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
-start: sync
+start: catch-up
 steps:
-  # the sync, its conflict resolution (shared/sync.yaml); the step is `sync`, the use step only brings it in
-  sync-base:
-    use: sync
-    outcomes: { synced: implement }
-  implement:
-    by: builder
-    do: >-
-      Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one,
-      otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask.
-      A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the
-      suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Notes and
-      the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
-      changing any code, then fix the cause.
-    with: { skills: [norn-implement] }
-    reads: [spec, handoff, last_check, findings?]
-    outcomes:
-      done:
-        to: update
-        means: "the change is made; each behaviour change and rework point has a passing test"
-  # update, resolve, test and the light path's steps (shared/base-update.yaml)
+  catch-up:
+    use: catch-up
+    outcomes: { synced: build }
+  build:
+    use: build
+    outcomes: { reviewed: base-update }
   base-update:
     use: base-update
     outcomes:
-      tested: review
-      broken: implement
-      ship: ship
-      redescribe: describe
-  review:
-    by: reviewer
-    do: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
-    with: { skills: [norn-review] }
-    reads: [spec, diff, findings?]
+      tested: publish
+      failed: build
+      merged: open-pr
+      redescribe: publish
+  # a failed check's rework goes back through open-pr to the new head
+  publish:
+    use: publish
     outcomes:
-      approve:
-        to: describe
-        means: "the change does what the story asks and nothing else, no blocking findings"
-      changes_requested:
-        to: implement
-        means: "blocking findings, handed back as findings"
-        produces: [findings]
-  describe:
-    by: writer
-    do: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
-    with: { skills: [norn-pr] }
-    reads: [spec, diff, handoff]
-    # open-pr reads it; norn done refuses the report while pr.md is missing or empty
-    produces: [{ name: pr_body, file: pr.md }]
+      passed: land
+      failed: { to: build, max: 3 }
+      stale: base-update
+  land:
+    use: land
     outcomes:
-      done:
-        to: ship
-        means: "pr.md describes the branch as it is now: summary, evidence, merge danger"
-  # open-pr, ci, ready and merge (shared/ship.yaml)
-  ship:
-    use: ship
-    outcomes:
-      ci-failed: { to: implement, max: 3 }
-      rejected: implement
-      stale: update
-# `norn story update-branch` re-enters update, not sync (the default would be the first update step); a base move
-# without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once per
-# base move (no push, no CI): red goes back through update like a conflict
+      rejected: build
+      stale: base-update
+      unpushed: open-pr
+# `norn story update-branch` enters the base update, not catch-up (the first update-branch step); a base
+# move without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once
+# per base move (no push, no CI): red goes back through the base update like a conflict
 signals: { vcs.stale: { when: conflict, verify: test } }
-entries: { update-branch: update }
+entries: { update-branch: base-update }

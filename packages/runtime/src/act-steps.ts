@@ -120,6 +120,9 @@ export async function runStep(t: TickContext, d: DecisionOf<"run_step">): Promis
   const { vcs, forge, tracker } = t.env.slots;
   const reads = readsOf(t, unit, def.reads);
   const produces = productsOf(unit, def.produces);
+  // the run's first poll goes under its intent before the state holds it: it starts now
+  const run = unitInFacts(t.facts, unit)?.state?.run;
+  const started_at = run?.id === d.run_id ? run.started_at : t.env.ctx.now();
   // a kind over the provider-neutral slots cannot learn the branch, the base or the receipt any other way
   const input = {
     unit,
@@ -131,6 +134,7 @@ export async function runStep(t: TickContext, d: DecisionOf<"run_step">): Promis
     branch: branchOf(unit),
     base: { branch: t.env.config.base, ref: await baseRefOf(t.env) },
     ...(d.intent ? { receipt_id: d.intent.id } : {}),
+    started_at,
     ...(reads && { reads }),
     ...(produces && { produces }),
   };

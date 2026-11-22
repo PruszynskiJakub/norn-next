@@ -710,6 +710,25 @@ describe("brief", () => {
   });
 });
 
+describe("the rework of a change's failed checks", () => {
+  test("the brief's Rework and last_check name each failed check and its link, never a log", async () => {
+    const h = harness({ workflow: "awaited" });
+    h.stepAnswers["await-checks"] = [{ outcome: "fail", detail: { change: 7, url: "https://forge.example/7", failed: [{ name: "test", url: "https://forge.example/7/checks/test" }], reason: "checks failed on change 7" } }];
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    const r = await briefOf(h.env, UNIT);
+    if (!r.ok) throw new Error(r.refusal.error);
+    expect(r.value.markdown).toContain("## Rework");
+    expect(r.value.markdown).toContain("Check `checks` ended `fail`: checks failed on change 7 (https://forge.example/7).");
+    expect(r.value.markdown).toContain("- test: https://forge.example/7/checks/test");
+    expect(await h.files.read(`${WORKTREE}/.agents/run/in/last_check.md`)).toContain("- test: https://forge.example/7/checks/test");
+    // a wait kind keeps nothing between polls: the host tells it when its run started, so it can bound its wait
+    const polled = h.stepCalls.filter((c) => c.kind === "await-checks").map((c) => (c.input as { started_at?: string }).started_at);
+    expect(polled.length).toBeGreaterThan(0);
+    expect(polled.every((at) => at === polled[0] && typeof at === "string")).toBe(true);
+  });
+});
+
 describe("the resolve of a base update", () => {
   const BASE_SHA = "b".repeat(40);
 

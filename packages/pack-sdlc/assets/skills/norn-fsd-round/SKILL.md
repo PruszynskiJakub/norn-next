@@ -41,7 +41,7 @@ You supervise the stories the person named, in this checkout, until each one's c
 
 ## Sending work back: the person's, unless handed to you
 
-`norn run rerun <unit> [--step <step>] [--reset <counter>]` runs a unit's step again or moves it to another step of its workflow (a slice included); `norn story round` starts a new round. A new round is always the person's. A rerun is the person's too unless the request handed reruns to you: then run it yourself, once per failure, with `--reason "fsd: <evidence>"` (`norn run rerun gh-201/02 --step test` after a suspected flake, `--step <to> --reset <counter>` for an exhausted loop). Otherwise escalate each case below with what you found and the rerun that would fix it:
+`norn run rerun <unit> [--step <step>] [--reset <counter>]` runs a unit's step again or moves it to another step of its workflow (a slice included); `norn story round` starts a new round. A new round is always the person's. A rerun is the person's too unless the request handed reruns to you: then run it yourself, once per failure, with `--reason "fsd: <evidence>"` (`norn run rerun gh-201/02 --step check` after a suspected flake, `--step <to> --reset <counter>` for an exhausted loop). Otherwise escalate each case below with what you found and the rerun that would fix it:
 
 - **A stuck unit** (`parked` with any reason but `agent.ready.manual`, or `ended` with anything but `done`): read the unit's handoff and the check's output, find the cause, and escalate with it and a recommended fix.
 - **A loop exhausted**: escalate with each round's findings.
@@ -72,6 +72,6 @@ Escalate, never act:
 
 ## When the round ends
 
-The round ends at `$done`, when every unit of the story has `ended` `done`; for `story` and `quick`, once `ready` has its `approve` (and the merge, when the request named it). Then the subagent reports and stops.
+The round ends at `$done`, when every unit of the story has `ended` `done`; for `story`, `quick` and `fix`, once `ready` has its `approve` (and the merge, when the request named it). Then the subagent reports and stops.
 
 **One report**, when supervision ends, for every supervised story: the steps run, findings fixed, the decisions you made with their reasons, escalations and how they were answered, suspected flakes with the test and the check's output, the PR and its merge state, and for `release` the version. A story that cannot finish is still listed: "waiting: your answer to …", with the command that resumes it.

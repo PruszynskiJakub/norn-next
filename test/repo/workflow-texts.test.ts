@@ -63,7 +63,7 @@ describe("agent step texts", () => {
 
   test("a step that resolves a merge lists base_side, the only input that names the commit to merge and the conflicting paths", () => {
     const resolvers = agentSteps().filter((s) => s.skills.includes("norn-merge"));
-    expect(resolvers.map((s) => s.where)).toEqual(expect.arrayContaining([expect.stringMatching(/slice\.yaml#merge$/), expect.stringMatching(/release\.yaml#resolve$/)]));
+    expect(resolvers.map((s) => s.where)).toEqual(expect.arrayContaining([expect.stringMatching(/slice\.yaml#merge$/), expect.stringMatching(/catch-up\.yaml#sync-resolve$/)]));
     expect(resolvers.filter((s) => !s.inputs.includes("base_side")).map((s) => s.where)).toEqual([]);
   });
 

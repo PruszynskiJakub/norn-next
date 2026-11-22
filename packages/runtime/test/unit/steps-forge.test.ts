@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { memoryFiles, memoryHost, steppingClock } from "@norn/conformance";
 import { type ForgeEffect, ok, type PluginResult, type StepKindInput, type Tracker, type Vcs, type VcsMergeOptions, type VcsMergeOutcome } from "@norn/plugin-api";
-import { awaitMerge, openPr, stepsForgePlugin } from "../../src/index.ts";
+import { awaitChecks, awaitMerge, checksText, openPr, stepsForgePlugin } from "../../src/index.ts";
 import { memoryForge } from "../../../conformance/test/unit/reference/memory-forge.ts";
 
 const ZERO = "0".repeat(40);
@@ -79,12 +79,12 @@ const value = <T>(r: PluginResult<T>): T => {
 };
 
 describe("norn-steps-forge", () => {
-  test("provides open-pr and await-merge", () => {
-    expect(Object.keys(stepsForgePlugin.provides.stepKinds ?? {}).sort()).toEqual(["await-merge", "open-pr"]);
+  test("provides open-pr, await-checks and await-merge", () => {
+    expect(Object.keys(stepsForgePlugin.provides.stepKinds ?? {}).sort()).toEqual(["await-checks", "await-merge", "open-pr"]);
   });
 
-  test("both work over the forge slot, so a workflow names them forge.open-pr and forge.await-merge", () => {
-    expect(Object.values(stepsForgePlugin.provides.stepKinds ?? {}).map((k) => k.slot)).toEqual(["forge", "forge"]);
+  test("each works over the forge slot, so a workflow names it forge.open-pr, forge.await-checks, forge.await-merge", () => {
+    expect(Object.values(stepsForgePlugin.provides.stepKinds ?? {}).map((k) => k.slot)).toEqual(["forge", "forge", "forge"]);
   });
 });
 
@@ -285,5 +285,79 @@ describe("await-merge", () => {
     expect(value(await poll()).outcome).toBe("waiting");
     const bare = await awaitMerge.run(input<Record<string, never>>({}, { step: "merge", slots: { forge: world.forge } }), memoryHost());
     expect(value(bare).outcome).toBe("waiting");
+  });
+});
+
+describe("await-checks", () => {
+  const START = "2026-11-17T00:00:00.000Z";
+  const at = (minutes: number) => new Date(Date.parse(START) + minutes * 60_000).toISOString();
+
+  async function opened(over: { checks?: boolean } = {}) {
+    const world = memoryForge({ now: steppingClock(START) });
+    const { vcs } = fakeVcs({ "gh-12-login": HEAD }, {});
+    value(await openPr.run(input({}, { slots: { forge: world.forge, vcs } }), memoryHost()));
+    const forge = over.checks === false ? { ...world.forge, capabilities: { ...world.forge.capabilities, checks: false } } : world.forge;
+    const poll = (minutes = 0, config: { appear?: string; settle?: string } = {}) =>
+      awaitChecks.run(input(config, { step: "checks", started_at: START, slots: { forge, vcs } }), memoryHost({ now: () => at(minutes) }));
+    return { world, poll };
+  }
+
+  test("waits while the checks are pending, passes once they all passed", async () => {
+    const { world, poll } = await opened();
+    await world.setChecks?.(1, "pending");
+    expect(value(await poll()).outcome).toBe("waiting");
+    await world.setChecks?.(1, "success");
+    expect(value(await poll()).outcome).toBe("pass");
+  });
+
+  test("fails on a failed check, naming each failed check and its link for the step that reworks it", async () => {
+    const { world, poll } = await opened();
+    await world.setChecks?.(1, "failure");
+    const r = value(await poll());
+    expect(r).toMatchObject({ outcome: "fail", detail: { change: 1, failed: [{ name: "test", url: "memory://changes/1/checks/test" }] } });
+    const text = checksText("checks", r.outcome, r.detail) ?? "";
+    expect(text).toContain("Check `checks` ended `fail`");
+    expect(text).toContain("- test: memory://changes/1/checks/test");
+  });
+
+  test("stale when the change conflicts with its base, since no check runs on it until it takes the base", async () => {
+    const { world, poll } = await opened();
+    await world.setChecks?.(1, "pending");
+    await world.setConflicts?.(1, true);
+    expect(value(await poll()).outcome).toBe("stale");
+  });
+
+  test("no check at all waits for one to appear, then passes: the repo runs no CI", async () => {
+    const { poll } = await opened();
+    expect(value(await poll(4)).outcome).toBe("waiting");
+    expect(value(await poll(5)).outcome).toBe("pass");
+    expect(value(await poll(1, { appear: "1m" })).outcome).toBe("pass");
+  });
+
+  test("checks still pending past settle fail", async () => {
+    const { world, poll } = await opened();
+    await world.setChecks?.(1, "pending");
+    expect(value(await poll(29)).outcome).toBe("waiting");
+    const r = value(await poll(30));
+    expect(r.outcome).toBe("fail");
+    expect(checksText("checks", r.outcome, r.detail)).toContain("still pending after 30m");
+    expect(value(await poll(10, { settle: "10m" })).outcome).toBe("fail");
+  });
+
+  test("a forge that runs no checks passes at once; no change, or no forge, fails the step", async () => {
+    const { poll } = await opened({ checks: false });
+    expect(value(await poll()).outcome).toBe("pass");
+    const world = memoryForge({ now: steppingClock(START) });
+    const none = await awaitChecks.run(input({}, { step: "checks", slots: { forge: world.forge } }), memoryHost());
+    expect(none.ok ? null : none.failure.code).toBe("not_found");
+    const noForge = await awaitChecks.run(input({}, { step: "checks" }), memoryHost());
+    expect(noForge.ok ? null : noForge.failure.code).toBe("invalid");
+  });
+
+  test("a forge without a checks report is read through its summary alone", async () => {
+    const { world, poll } = await opened();
+    delete world.forge.checkReport;
+    await world.setChecks?.(1, "failure");
+    expect(value(await poll())).toMatchObject({ outcome: "fail", detail: { failed: [] } });
   });
 });

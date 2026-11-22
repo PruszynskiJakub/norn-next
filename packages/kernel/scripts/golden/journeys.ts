@@ -48,8 +48,8 @@ function storyJourney(): GoldenCase[] {
   const w = world({ files: shippedFiles("story", "slice") });
   const key = "gh-12";
   w.intake.push(item(12, "Sign in with a passkey"));
-  Object.assign(w.script.step, { sync: ["done"], update: ["done"], "open-pr": ["done"], merge: ["waiting", "waiting", "merged"], integrate: ["done"], [`${key}/02:integrate`]: ["conflict", "done"] });
-  Object.assign(w.script.check, { [`${key}/01:test`]: ["fail", "pass"], test: ["pass"], ci: ["pass"] });
+  Object.assign(w.script.step, { sync: ["done"], update: ["done"], "open-pr": ["done"], checks: ["pass"], merge: ["waiting", "waiting", "merged"], integrate: ["done"], [`${key}/02:integrate`]: ["conflict", "done"] });
+  Object.assign(w.script.check, { [`${key}/01:test`]: ["fail", "pass"], test: ["pass"] });
   Object.assign(w.script.agent, { slice: ["done"], implement: ["done"], review: ["approve"], [`${key}/03:review`]: ["changes_requested", "approve"], merge: ["done"], qa: ["pass"], describe: ["done"] });
   w.tick();
   w.run(parkedAt(key, "approve-slices"));
@@ -79,8 +79,8 @@ function quickJourney(): GoldenCase[] {
   const w = world({ files: shippedFiles("quick"), config: config({ mode: "manual", workflow: "quick" }) });
   const key = "gh-7";
   w.intake.push(item(7, "Fix the typo in the help text"));
-  Object.assign(w.script.step, { sync: ["done"], update: ["done"], "open-pr": ["done"], merge: ["waiting"] });
-  Object.assign(w.script.check, { test: ["pass"], ci: ["fail", "pass"] });
+  Object.assign(w.script.step, { sync: ["done"], update: ["done"], "open-pr": ["done"], checks: ["fail", "pass"], merge: ["waiting"] });
+  Object.assign(w.script.check, { test: ["pass"] });
   Object.assign(w.script.agent, { implement: ["done"], review: ["changes_requested", "approve"], describe: ["done"] });
   w.run(parkedAt(key, "implement"));
   w.tick();
@@ -116,8 +116,8 @@ function gateRejected(): GoldenCase[] {
   const w = world({ files: shippedFiles("quick") });
   const key = "gh-31";
   seed(w, key, { workflow: "quick", step: "describe" });
-  Object.assign(w.script.step, { update: ["done"], "open-pr": ["done"] });
-  Object.assign(w.script.check, { test: ["pass"], ci: ["pass"] });
+  Object.assign(w.script.step, { update: ["done"], "open-pr": ["done"], checks: ["pass"] });
+  Object.assign(w.script.check, { test: ["pass"] });
   Object.assign(w.script.agent, { implement: ["done"], review: ["approve"], describe: ["done"] });
   for (let i = 1; i <= 3; i++) {
     w.run(parkedAt(key, "ready"), 60);
@@ -128,7 +128,7 @@ function gateRejected(): GoldenCase[] {
   }
   w.run(ended(key));
   w.tick();
-  return distinct(w, "gate-rejected", "A ready gate a person rejects three times: the first two send the story back to implement and through review and CI again, the third runs the counter ship.rejected (2) out and the story ends stuck.");
+  return distinct(w, "gate-rejected", "A ready gate a person rejects three times: the first two send the story back to implement and through review and CI again, the third runs the counter land.rejected (2) out and the story ends stuck.");
 }
 
 function agentTroubles(): GoldenCase[] {

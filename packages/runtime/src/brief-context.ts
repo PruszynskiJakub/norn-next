@@ -16,6 +16,7 @@ import { historyOf, rulingsOf } from "./input-history.ts";
 import { findingsList, INPUTS_NOTE, materializeInputs, OUT_DIR, specFolder, unsettledCriteria, worktreeOf } from "./inputs.ts";
 import { reportableOutcomes } from "./live-run.ts";
 import { readStepRun } from "./step-runs.ts";
+import { AWAIT_CHECKS, checksText } from "./steps-forge/await-checks.ts";
 import { loadPinned } from "./workflows.ts";
 
 /** The workflow a brief names, by its hash: the pack's when it still loads to it, else the unit's pinned copy. */
@@ -42,7 +43,7 @@ async function reworkText(env: RuntimeEnv, unit: string, receipt: KernelReceipt 
     case "run.reported":
       return `\`${d.step ?? "a step"}\` reported \`${d.verb}${d.outcome ? ` ${d.outcome}` : ""}\`${d.text ? `: ${d.text}` : "."}${findingsList(d.findings)}${unsettledCriteria(d.criteria)}`;
     case "step.finished":
-      return `\`${d.step ?? d.step_kind}\` ended \`${d.outcome}\`.`;
+      return (d.step_kind === AWAIT_CHECKS ? checksText(d.step ?? d.step_kind, d.outcome, d.detail) : null) ?? `\`${d.step ?? d.step_kind}\` ended \`${d.outcome}\`.`;
     default:
       return undefined;
   }

@@ -4,6 +4,7 @@
  */
 import {
   type ChangeRequest,
+  type ChecksReport,
   type ChecksSummary,
   type EffectMeta,
   fail,
@@ -16,11 +17,12 @@ import {
   type PluginResult,
   validateForgeEffect,
 } from "@norn/plugin-api";
+import type { Static, TSchema } from "@sinclair/typebox";
 import type { GithubConfig } from "./config.ts";
 import { classify } from "./failure.ts";
 import { createGh, type Gh } from "./gh.ts";
 import { hasMarker, isReceiptId, markersIn, withMarker } from "./marker.ts";
-import { GhChecks, GhPr, GhPrs, GhPrsByBranch, PR_FIELDS, toChange } from "./wire.ts";
+import { GhCheckRows, GhChecks, GhMergeable, GhPr, GhPrs, GhPrsByBranch, PR_FIELDS, toChange } from "./wire.ts";
 
 /** How many branches one GraphQL query asks about: one alias each, well inside GitHub's query cost. */
 export const BRANCHES_PER_QUERY = 50;
@@ -48,6 +50,8 @@ export function summarize(buckets: readonly string[]): ChecksSummary {
 }
 
 const PR_URL = /\/pull\/(\d+)/;
+/** the buckets of a check that failed or was cut short: neither may pass for green */
+const FAILED: ReadonlySet<string> = new Set(["fail", "cancel"]);
 const NO_CHECKS = /no checks reported/i;
 
 type Outcome = PluginResult<ForgeEffectOutcome>;
@@ -56,6 +60,20 @@ export function createGithubForge(ctx: HostContext, config: GithubConfig): Forge
   const gh: Gh = createGh(ctx, config);
   const done = (kind: ForgeEffect["kind"], change: ChangeRequest, replayed = false): Outcome => ok({ kind, change, replayed });
   const view = (id: number) => gh.json(GhPr, ["pr", "view", String(id), "--json", `${PR_FIELDS},body`]);
+
+  /** `gh pr checks` rows with `fields`; an empty list when the pull request has no check at all. */
+  async function checkRows<S extends TSchema>(id: number, fields: string, schema: S): Promise<PluginResult<Static<S>>> {
+    const r = await gh.inRepoRaw(["pr", "checks", String(id), "--json", fields]);
+    if (!r.ok) return r;
+    const out = r.value;
+    if (out.timedOut) return classify(out, "gh pr checks");
+    // gh exits 8 while a check is pending and 1 when one failed, printing the JSON either way;
+    // with no check at all it exits 1 saying so
+    if (out.code !== 0 && NO_CHECKS.test(out.stderr)) return ok([] as Static<S>);
+    const answered = out.code === 0 || ((out.code === 1 || out.code === 8) && out.stdout.trim() !== "");
+    if (!answered) return classify(out, "gh pr checks");
+    return parseJson(schema, out.stdout, "gh pr checks");
+  }
 
   async function open(effect: Extract<ForgeEffect, { kind: "open" }>, receipt: string): Promise<Outcome> {
     // a branch's own pull requests are listed straight from the repository, never through search, which lags
@@ -131,18 +149,23 @@ export function createGithubForge(ctx: HostContext, config: GithubConfig): Forge
     },
 
     async checks(id) {
-      const r = await gh.inRepoRaw(["pr", "checks", String(id), "--json", "bucket"]);
-      if (!r.ok) return r;
-      const out = r.value;
-      if (out.timedOut) return classify(out, "gh pr checks");
-      // gh exits 8 while a check is pending and 1 when one failed, printing the JSON either way;
-      // with no check at all it exits 1 saying so
-      if (out.code !== 0 && NO_CHECKS.test(out.stderr)) return ok("none");
-      const answered = out.code === 0 || ((out.code === 1 || out.code === 8) && out.stdout.trim() !== "");
-      if (!answered) return classify(out, "gh pr checks");
-      const rows = parseJson(GhChecks, out.stdout, "gh pr checks");
+      const rows = await checkRows(id, "bucket", GhChecks);
       if (!rows.ok) return rows;
       return ok(summarize(rows.value.map((c) => c.bucket)));
+    },
+
+    async checkReport(id) {
+      const rows = await checkRows(id, "name,bucket,link", GhCheckRows);
+      if (!rows.ok) return rows;
+      const summary = summarize(rows.value.map((c) => c.bucket));
+      const failed = rows.value.filter((c) => FAILED.has(c.bucket)).map((c) => ({ name: c.name || "check", ...(c.link ? { url: c.link } : {}) }));
+      const report: ChecksReport = { summary, failed: summary === "failure" ? failed : [] };
+      if (summary === "success" || summary === "failure") return ok(report);
+      // GitHub starts no check run on a pull request that conflicts with its base: unsettled checks then never settle
+      const m = await gh.json(GhMergeable, ["pr", "view", String(id), "--json", "mergeable"]);
+      if (!m.ok) return m;
+      const state = m.value.mergeable.toUpperCase();
+      return ok(state === "UNKNOWN" ? report : { ...report, conflicts: state === "CONFLICTING" });
     },
 
     async perform(effect: ForgeEffect, meta: EffectMeta): Promise<Outcome> {

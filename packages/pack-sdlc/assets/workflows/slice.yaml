@@ -1,38 +1,11 @@
-# Slice workflow — shipped in the sdlc pack; a repo copy under .agents/workflows/ replaces it.
-# Runs on a slice: build test-first, check, review, then integrate into the story branch.
-# A slice has no QA of its own: its criteria stay in its file and the story's qa checks them all, once.
-# The `test` step runs the config's `checks.test` (norn config set checks.test "<command>"; default bun test).
+# Runs on each slice a story workflow cuts; the story's qa checks the slice's criteria, once.
 name: slice
 description: Build one slice test-first, check and review it, and integrate it into the story branch.
-start: implement
+start: build
 steps:
-  implement:
-    by: builder
-    do: "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps."
-    with: { skills: [norn-implement] }
-    reads: [slice, spec, handoff, last_check, findings?]
-    outcomes:
-      done:
-        to: test
-        means: "every acceptance criterion (or rework point) has a passing test"
-  test:
-    by: shell
-    do: "{checks.test}"
-    limits: { timeout: 10m }
-    outcomes: { pass: review, fail: implement }
-  review:
-    by: reviewer
-    do: "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch."
-    with: { skills: [norn-review] }
-    reads: [slice, spec, diff, findings?]
-    outcomes:
-      approve:
-        to: integrate
-        means: "all criteria met, no blocking findings"
-      changes_requested:
-        to: implement
-        means: "blocking findings, handed back as findings"
-        produces: [findings]
+  build:
+    use: build
+    outcomes: { reviewed: integrate }
   integrate:
     by: vcs.integrate
     outcomes: { done: $done, conflict: merge }

@@ -101,11 +101,11 @@ describe("the repo's own workflows in .agents/workflows", () => {
   });
 
   test("a broken repo shared file is named for the pack workflow that loads it", async () => {
-    const m = repoWith({ "shared/sync.yaml": "start: sync\nsteps: [unclosed\n" });
+    const m = repoWith({ "shared/catch-up.yaml": "start: sync\nsteps: [unclosed\n" });
     const tick = await runCli(["tick", "--json"], m.io);
     const body = json(tick.stdout);
     expect(body.code).toBe("repo_workflow_invalid");
-    expect(body.error).toContain(".agents/workflows/shared/sync.yaml (workflow story)");
+    expect(body.error).toContain(".agents/workflows/shared/catch-up.yaml (workflow story)");
   });
 
   test("a repo workflow naming an input norn does not provide: a tick refuses naming the file, the step's input and the inputs norn has, and doctor fails its workflows check", async () => {

@@ -33,6 +33,22 @@ export type ChangeRequest = Static<typeof ChangeRequest>;
 export const ChecksSummary = Type.Union([Type.Literal("pending"), Type.Literal("success"), Type.Literal("failure"), Type.Literal("none")]);
 export type ChecksSummary = Static<typeof ChecksSummary>;
 
+/** A check that failed on a change's head: what the forge calls it, and where its run is. */
+export const FailedCheck = Type.Object({ name: NonEmpty, url: Type.Optional(Type.String()) }, { additionalProperties: false, title: "FailedCheck" });
+export type FailedCheck = Static<typeof FailedCheck>;
+
+/**
+ * The checks on a change's head with where its failures are (plugin API 1.27): `failed` names each
+ * check that failed or was cut short, empty unless `summary` is `failure`. `conflicts` is true when the
+ * change conflicts with its base, which a forge that runs no checks on such a change (GitHub) must
+ * say, since its checks would then stay `none` or `pending` for good; absent when the forge did not ask.
+ */
+export const ChecksReport = Type.Object(
+  { summary: ChecksSummary, failed: Type.Array(FailedCheck), conflicts: Type.Optional(Type.Boolean()) },
+  { additionalProperties: false, title: "ChecksReport" },
+);
+export type ChecksReport = Static<typeof ChecksReport>;
+
 function effect<K extends string, P extends Record<string, TSchema>>(kind: K, props: P) {
   return Type.Object({ kind: Type.Literal(kind), ...props }, { additionalProperties: false });
 }
@@ -78,6 +94,8 @@ export interface Forge {
   /** every branch asked about, mapped to its newest change request (any state) or null */
   findChanges(branches: string[]): Promise<PluginResult<Record<string, ChangeRequest | null>>>;
   checks(id: number): Promise<PluginResult<ChecksSummary>>;
+  /** the checks with their failures' whereabouts (plugin API 1.27); a forge without it reports only `checks` */
+  checkReport?(id: number): Promise<PluginResult<ChecksReport>>;
   perform(effect: ForgeEffect, meta: EffectMeta): Promise<PluginResult<ForgeEffectOutcome>>;
 }
 
@@ -88,6 +106,10 @@ export interface ForgeFactory<S extends TSchema = TSchema> {
 
 export function validateChangeRequest(value: unknown): ValidationResult<ChangeRequest> {
   return check(ChangeRequest, value);
+}
+
+export function validateChecksReport(value: unknown): ValidationResult<ChecksReport> {
+  return check(ChecksReport, value);
 }
 
 export function validateForgeEffect(value: unknown): ValidationResult<ForgeEffect> {

@@ -1,10 +1,6 @@
-# Shared steps — shipped in the sdlc pack; a repo copy under .agents/workflows/shared/ replaces it. A workflow brings them in with `use: base-update`.
-# Brings the story branch up to date with its base after the work, tests the merged tree, and takes
-# the light path when only the base moved.
-# The `test` step runs the config's `checks.test` (default bun test); the light path's test steps copy it (`like: test`).
-# Exits: `tested` (the full path's test passed), `broken` (a test failed: implement's work, which then
-# takes the full path), `ship` (the light path is done: open the PR), `redescribe` (pr.md's merge
-# danger changed).
+# Use after the work, before publishing. Exits: `tested`, `failed` (a test failed: back to the
+# work, which then takes the full path), `merged` (the light path is through: open the PR at
+# `open-pr`), `redescribe` (the merge danger pr.md describes changed).
 description: Update the story branch from its base, test the merged tree, take the light path when only the base moved.
 start: update
 steps:
@@ -23,7 +19,7 @@ steps:
       conflict: resolve
   resolve:
     by: builder
-    do: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase."
+    do: "Merge the base into the story branch in this worktree, in the mode the skill picks from your inputs; never rebase."
     with: { skills: [norn-merge] }
     reads: [spec, handoff, base_side]
     outcomes:
@@ -34,14 +30,14 @@ steps:
     by: shell
     do: "{checks.test}"
     limits: { timeout: 15m }
-    outcomes: { pass: { exit: tested }, fail: { exit: broken } }
+    outcomes: { pass: { exit: tested }, fail: { exit: failed } }
   # the light path's tests run the same command
   test-merge:
     like: test
-    outcomes: { pass: { exit: ship }, fail: { exit: broken } }
+    outcomes: { pass: { exit: merged }, fail: { exit: failed } }
   test-resolution:
     like: test
-    outcomes: { pass: resolution-review, fail: { exit: broken } }
+    outcomes: { pass: resolution-review, fail: { exit: failed } }
   # reviews only what the resolver changed (each merge's remerge-diff), never the whole story again
   resolution-review:
     by: reviewer
@@ -53,7 +49,7 @@ steps:
     reads: [spec, resolution]
     outcomes:
       approve:
-        exit: ship
+        exit: merged
         means: "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger"
       redescribe:
         exit: redescribe

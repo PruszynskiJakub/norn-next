@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { type BriefInputs, type KernelReceipt, type ReceiptData, renderBrief, type UnitJournal } from "@norn/kernel";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { SDLC_PACK } from "@norn/pack-sdlc";
 import { parse } from "yaml";
-import { REPO_ROOT } from "../../../../test/support/repo-root.ts";
 import { materializeInputs, readBackDocs, readStoryDoc, renderInputFrom } from "../../src/index.ts";
 import { standing } from "../../src/input-history.ts";
 import { has, harness, type Harnessed, record, tickUntil, trackerItem } from "./support.ts";
@@ -189,18 +186,12 @@ function listedInputs(text: string, step: string): string[] {
   return (s?.reads ?? s?.inputs ?? []).filter((i): i is string => typeof i === "string");
 }
 
-/** The steps a pack or repo workflow sends to merge a base or story-branch commit, and the inputs each lists in its file. */
+/** The steps the pack's workflows (and this repo's release, through catch-up) send to merge a base commit, and the inputs each lists in its file. */
 function resolverInputs(): { where: string; inputs: string[] }[] {
   const of = (where: string, text: string, step: string) => ({ where: `${where}#${step}`, inputs: listedInputs(text, step) });
-  const repo = (file: string) => readFileSync(join(REPO_ROOT, ".agents", "workflows", file), "utf8");
   return [
-    of("pack shared/sync.yaml", SDLC_PACK.shared["sync.yaml"] ?? "", "sync-resolve"),
-    of("pack refinement.yaml", SDLC_PACK.workflows["refinement.yaml"] ?? "", "sync-resolve"),
+    of("pack shared/catch-up.yaml", SDLC_PACK.shared["catch-up.yaml"] ?? "", "sync-resolve"),
     of("pack shared/base-update.yaml", SDLC_PACK.shared["base-update.yaml"] ?? "", "resolve"),
-    of("repo shared/sync.yaml", repo("shared/sync.yaml"), "sync-resolve"),
-    of("repo refinement.yaml", repo("refinement.yaml"), "sync-resolve"),
-    of("repo release.yaml", repo("release.yaml"), "resolve"),
-    of("repo shared/base-update.yaml", repo("shared/base-update.yaml"), "resolve"),
   ];
 }
 
@@ -223,10 +214,7 @@ describe("each step sent to merge the base, as its workflow file lists its input
     const h = await started();
     await sliced(h);
     const slice = withReceipts(await sliceStarted(h, "lt-1/01"), integrateConflict);
-    const steps = [
-      { where: "pack slice.yaml#merge", text: SDLC_PACK.workflows["slice.yaml"] ?? "" },
-      { where: "repo slice.yaml#merge", text: readFileSync(join(REPO_ROOT, ".agents", "workflows", "slice.yaml"), "utf8") },
-    ];
+    const steps = [{ where: "pack slice.yaml#merge", text: SDLC_PACK.workflows["slice.yaml"] ?? "" }];
     for (const { where, text } of steps) {
       const inputs = listedInputs(text, "merge");
       const made = await materializeInputs(h.env, slice, briefWith(inputs));

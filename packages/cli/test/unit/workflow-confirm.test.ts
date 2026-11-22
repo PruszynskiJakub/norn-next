@@ -6,6 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { SDLC_PACK } from "@norn/pack-sdlc";
 import { confirmedWorkflowPath } from "@norn/runtime";
+import { parse, stringify } from "yaml";
 import { configPaths, ExitCode, machineDir, machineId, runCli } from "../../src/index.ts";
 import { COMMON, HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
 import { AGENT_STEP, configured, receiptsOf, seedUnit, UNIT } from "./units.ts";
@@ -23,11 +24,30 @@ const repoWith = (files: Record<string, string>) =>
 const workflowsCheck = async (m: ReturnType<typeof repoWith>) =>
   (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; ok: boolean; warning?: string; do_instead?: string }>).find((c) => c.name === "workflows");
 
-/** The pack's file with its first review run by a builder: a repo copy that lets its review write the code. */
+type Steps = Record<string, Record<string, unknown>>;
+/**
+ * The pack's file with its review run by a builder: a repo copy that lets its review write the code.
+ * The review comes from the shared build file, so the copy writes the build steps in itself.
+ */
 const widened = (file: string): string => {
-  const text = SDLC_PACK.workflows[file] as string;
-  if (!text.includes("    by: reviewer\n")) throw new Error(`${file} has no reviewer to widen`);
-  return text.replace("    by: reviewer\n", "    by: builder\n");
+  const doc = parse(SDLC_PACK.workflows[file] as string) as { start: string; steps: Steps };
+  const build = parse(SDLC_PACK.shared["build.yaml"] as string) as { start: string; steps: Steps };
+  const use = doc.steps.build as { outcomes: { reviewed: string } } | undefined;
+  if (!use) throw new Error(`${file} has no build to widen`);
+  const enter = (r: unknown): unknown => (r === "build" ? build.start : typeof r === "object" && r !== null && (r as { to?: unknown }).to === "build" ? { ...r, to: build.start } : r);
+  const steps: Steps = {};
+  for (const [name, step] of Object.entries(doc.steps)) {
+    if (name !== "build") {
+      steps[name] = { ...step, outcomes: Object.fromEntries(Object.entries((step.outcomes ?? {}) as Record<string, unknown>).map(([o, r]) => [o, enter(r)])) };
+      continue;
+    }
+    for (const [inner, s] of Object.entries(build.steps)) steps[inner] = structuredClone(s);
+  }
+  const review = steps.review as { by: string; outcomes: { approve: Record<string, unknown> } };
+  review.by = "builder";
+  const { exit: _exit, ...approve } = review.outcomes.approve;
+  review.outcomes.approve = { ...approve, to: use.outcomes.reviewed };
+  return stringify({ ...doc, start: doc.start === "build" ? build.start : doc.start, steps });
 };
 const HELD_QUICK = "workflow quick is held for the person's confirmation (step review: by reviewer → builder); new rounds run the pack's revision, not the repo's file: a person runs norn workflow confirm quick";
 

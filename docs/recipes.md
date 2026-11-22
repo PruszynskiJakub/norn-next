@@ -47,7 +47,7 @@ A rejection sends the unit back by the gate's `reject` route with your reason in
 
 ## Start a story's next round
 
-**You see:** a round ended without a change to merge. A triage or reproduce round posted its recommendation, a refinement round agreed the plan, or a delivery round ended stuck with `replan`.
+**You see:** a round ended without a change to merge. A triage round ended with the outcome it recommends (`refinement`, `quick`, `reproduce`, `fix` or `close`), a reproduce round posted its findings, a refinement round agreed the plan, or a delivery round ended stuck with `replan`.
 
 ```sh
 norn story round gh-17 --workflow refinement
@@ -88,7 +88,7 @@ Read `norn story view <story>` and fix the cause where it lies: a broken check c
 
 ```sh
 norn run rerun gh-18/02
-norn run rerun gh-18/02 --step implement --reset test.fail --reason "test command fixed"
+norn run rerun gh-18/02 --step implement --reset check.fail --reason "test command fixed"
 ```
 
 The unit keeps the workflow it pinned: `--step` names one of its steps and `--reset` one of its counters (both are refused otherwise, naming the ones it has). The next tick takes the story up again and the unit enters the step as a new attempt. When a slice stuck, its story usually ended stuck at its `slices` step too: rerun the slice first, then the story at that step (`norn run rerun gh-18 --step slices`), so the story waits for the slice instead of seeing it stuck again. To start over on another workflow, start a new round instead ([Start a story's next round](#start-a-storys-next-round)).
@@ -181,18 +181,29 @@ A unit pins its workflow when it starts, so your edit applies to stories that st
 
 ### Share steps between workflows
 
-Steps that several workflows run the same way (the CI wait, the base update, opening the PR) go in a shared file, `.agents/workflows/shared/<name>.yaml`, which holds `start`, `steps` and an optional `description`. A route inside it names one of its own steps, `$done` or `$stuck`, or leaves through a named exit, `{ exit: <name> }`. A workflow brings it in with a step that holds only `use: <name>` and the routes for its exits:
+Steps that several workflows run the same way (the build loop, the base update, publishing the PR, landing it) go in a shared file, `.agents/workflows/shared/<name>.yaml`, which holds `start`, `steps` and an optional `description`. A route inside it names one of its own steps, `$done` or `$stuck`, or leaves through a named exit, `{ exit: <name> }`. A workflow brings it in with a step that holds only `use: <name>` and the routes for its exits:
 
 ```yaml
-  ship:
-    use: ship
+  publish:
+    use: publish
     outcomes:
-      ci-failed: { to: implement, max: 3 }
-      rejected:  implement
-      stale:     update
+      passed: land
+      failed: { to: build, max: 3 }
+      stale:  base-update
 ```
 
-The shared steps keep their own names, so the brief and the record show `open-pr` and `ci`, never `ship`.
+The shared steps keep their own names, so the brief and the record show `describe`, `open-pr` and `checks`, never `publish`. A route to the use step enters the file at its `start`; a route may also name one of its steps, as a base update's light path names `open-pr` to skip `describe`. Name the use step after its file (`publish: { use: publish }`), so a route to it reads as the file it enters. The pack ships `catch-up` (merge the base before the work starts; exit `synced`), `diagnose` (the reproduce step that `reproduce` and `fix` share; exits `reproduced`, `cannot_reproduce`), `build` (implement, the `check` step running `{checks.test}`, and the review; exit `reviewed`, and every rework of a quick, fix or story round goes through it before the base update), `base-update` (merge the base after the work and test the merged tree; exits `tested`, `failed`, `merged` for the light path, `redescribe`), `publish` (describe, open the draft PR, wait for its checks; exits `passed`, `failed`, `stale`) and `land` (the person's `ready`, then the merge; exits `rejected`, `stale`, `unpushed`).
+
+### Wait for a pull request's checks
+
+`by: forge.await-checks` waits for the checks on the story's change, polled every tick, so nothing blocks while CI runs. It answers `pass` when every check passed, `fail` when one failed, naming each failed check and its link in the next agent's `last_check` and under Rework (never a log), and `stale` when the change conflicts with its base, since GitHub runs no checks on such a pull request. A forge with no checks (`none`) passes at once; a change that shows no check within `appear` (5m) passes as a repo without CI, and checks still pending after `settle` (30m) fail:
+
+```yaml
+  checks:
+    by: forge.await-checks
+    with: { appear: 10m, settle: 1h }
+    outcomes: { pass: ready, fail: { to: implement, max: 3 }, stale: update }
+```
 
 ### Copy a step with `like:`
 

@@ -1,14 +1,12 @@
 /**
  * The GitHub tracker and forge over a fake `gh` on PATH (fixtures/fake-gh): labels defined at init
- * and by doctor, items created and taken in, a story's PR opened, retitled, waited on and merged,
- * and the shipped CI checks, every norn call a subprocess of the binary from source.
+ * and by doctor, items created and taken in, a story's PR opened, its checks waited on, retitled,
+ * waited on and merged, every norn call a subprocess of the binary from source.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { nodeExec } from "@norn/host-node";
-import { parse } from "yaml";
-import { callsOf, editGh, fakeGh, type GhPr, type GhState, ghCalls, ghState, LOGIN, openPr, pushes, visibleBody, WEB } from "./fake-gh.ts";
+import { callsOf, editGh, fakeGh, type GhPr, ghCalls, ghState, LOGIN, openPr, pushes, visibleBody, WEB } from "./fake-gh.ts";
 import { agentNotes, type NornOut, norn, setUp, sh, status, TEST_PLUGIN, tickUntil, type UnitShown, unitOf, type World, world, writeWorkflow } from "./world.ts";
 
 const SLOW = 180_000;
@@ -251,7 +249,7 @@ describe("intake from GitHub issues", () => {
   });
 });
 
-const SHIP = readFileSync(join(import.meta.dir, "..", "..", "..", "pack-sdlc", "assets", "workflows", "shared", "ship.yaml"), "utf8");
+const LAND = readFileSync(join(import.meta.dir, "..", "..", "..", "pack-sdlc", "assets", "workflows", "shared", "land.yaml"), "utf8");
 const FLOW = [
   "name: flow",
   "start: build",
@@ -259,17 +257,23 @@ const FLOW = [
   "  build:",
   "    agent: Build the thing.",
   "    inputs: [last_check]",
-  "    outcomes: { done: ship }",
-  "  ship:",
-  "    use: ship",
-  "    outcomes: { ci-failed: build, rejected: build, stale: build }",
+  "    outcomes: { done: open-pr }",
+  "  open-pr:",
+  "    open-pr:",
+  "    outcomes: { done: checks }",
+  "  checks:",
+  "    await-checks:",
+  "    outcomes: { pass: land, fail: { to: build, max: 3 }, stale: { to: build, max: 3 } }",
+  "  land:",
+  "    use: land",
+  "    outcomes: { rejected: build, stale: build, unpushed: open-pr }",
   "",
 ].join("\n");
 
-/** The repo's flow workflow with the pack's shared ship steps beside it, as a repo copies them. */
+/** The repo's flow workflow with the pack's shared land steps beside it, as a repo copies them. */
 async function writeFlow(w: World): Promise<void> {
   mkdirSync(join(w.root, ".agents", "workflows", "shared"), { recursive: true });
-  writeFileSync(join(w.root, ".agents", "workflows", "shared", "ship.yaml"), SHIP);
+  writeFileSync(join(w.root, ".agents", "workflows", "shared", "land.yaml"), LAND);
   await writeWorkflow(w, "flow", FLOW);
 }
 
@@ -313,7 +317,7 @@ describe("a story's pull request on GitHub", () => {
       s.newPr = { checks: "failure" };
     });
 
-    await tickUntil(w, rules, (u) => u?.step === "ci", 90_000, KEY);
+    await tickUntil(w, rules, (u) => u?.step === "checks", 90_000, KEY);
     pushesBeforePr = pushes(w).filter((l) => l.startsWith(`refs/heads/${BRANCH} `)).length;
     await tickUntil(w, rules, (u) => u?.step === "build", 90_000, KEY);
     // the rework's CI goes green
@@ -400,8 +404,9 @@ describe("a story's pull request on GitHub", () => {
     expect(visibleBody(atReady.pr?.body ?? "")).toBe(`Closes ${WEB}/issues/1\n\nDelivered by norn (story ${KEY}).`);
   });
 
-  test("a red CI sends the story back to build with the failing check's URL in its brief, and its rework is pushed through open-pr again", () => {
-    expect(reworkBrief).toContain(`${WEB}/actions/runs/1/job/7`);
+  test("a red check sends the story back to build with the failed check's name and URL in its brief, and its rework is pushed through open-pr again", () => {
+    expect(reworkBrief).toContain(`- test: ${WEB}/actions/runs/1/job/7`);
+    expect(reworkBrief).not.toContain("job/6");
     expect(atReady.pushes).toBe(2);
   });
 
@@ -557,111 +562,3 @@ describe("a story's pull request merged into a branch other than its base", () =
   });
 });
 
-const REPO_ROOT = join(import.meta.dir, "..", "..", "..", "..");
-/** A file of this repo the CI scripts are read from; one that moved names itself rather than failing on a bare read error. */
-function repoFile(...parts: string[]): string {
-  const file = join(REPO_ROOT, ...parts);
-  if (!existsSync(file)) throw new Error(`the CI script tests read ${parts.join("/")} from this repo, and it is gone: point them at where it moved`);
-  return file;
-}
-/** A workflow's `ci` script, read from the file as the workflow loader reads it: `do:` under `by: shell`, or the older `check:`. */
-function ciScript(file: string): string {
-  const ci = (parse(readFileSync(file, "utf8")) as { steps: { ci: { do?: string; check?: string } } }).steps.ci;
-  const script = ci.do ?? ci.check;
-  if (script === undefined) throw new Error(`${file}: the ci step has neither do: nor check:`);
-  return script;
-}
-
-interface ScriptRun {
-  code: number;
-  stdout: string;
-  calls: string[][];
-}
-
-/**
- * The CI wait scripts run as the check runner runs them, in the story's checkout on its branch with
- * the fake gh on PATH, one scripted PR state per case.
- */
-describe("the CI check scripts over the fake gh", () => {
-  let w: World;
-  const runs: Record<string, ScriptRun> = {};
-
-  async function run(name: string, file: string, pr: Partial<GhPr>, opts: { path?: string; fail?: GhState["fail"] } = {}): Promise<void> {
-    editGh(w, (s) => {
-      s.fail = opts.fail ?? {};
-      s.prs = [{ number: 2, head: BRANCH, base: "main", title: "t", body: "", draft: true, state: "OPEN", mergeable: "MERGEABLE", checks: "none", run: null, ...pr }];
-    });
-    const before = ghCalls(w).length;
-    const r = await nodeExec(["/bin/sh", "-c", ciScript(file)], { cwd: w.root, env: { ...w.env, ...(opts.path !== undefined && { PATH: opts.path }) }, timeoutMs: 60_000 });
-    runs[name] = { code: r.code, stdout: r.stdout + r.stderr, calls: ghCalls(w).slice(before) };
-  }
-
-  beforeAll(async () => {
-    w = await world("work");
-    fakeGh(w);
-    mkdirSync(join(w.root, ".agents", "scripts"), { recursive: true });
-    writeFileSync(join(w.root, ".agents", "scripts", "ci-failures.sh"), readFileSync(repoFile(".agents", "scripts", "ci-failures.sh"), "utf8"));
-    await sh(w.root, "git", "checkout", "-q", "-b", BRANCH);
-    await sh(w.root, "git", "push", "-q", "origin", BRANCH);
-
-    const ship = repoFile("packages", "pack-sdlc", "assets", "workflows", "shared", "ship.yaml");
-    const ci = repoFile(".agents", "workflows", "shared", "ci.yaml");
-    const empty = join(w.dir, "empty-bin");
-    mkdirSync(empty);
-    await run("ship green", ship, { checks: "success" });
-    await run("ship red", ship, { checks: "failure" });
-    await run("ship none", ship, { checks: "none" });
-    await run("ship conflicting", ship, { checks: "success", mergeable: "CONFLICTING" });
-    await run("ship unknown", ship, { checks: "success", mergeable: ["UNKNOWN", "MERGEABLE"] });
-    await run("ship came to conflict", ship, { checks: "none", mergeable: ["MERGEABLE", "CONFLICTING"] });
-    await run("ship no gh", ship, { checks: "failure" }, { path: empty });
-    await run("ship no GitHub remote", ship, { checks: "failure" }, { fail: { "repo view": { code: 1, stderr: "none of the git remotes configured for this repository point to a known GitHub host" } } });
-    await run("ci green", ci, { run: "success" });
-    await run("ci red", ci, { run: "failure" });
-    await run("ci no run", ci, { run: null });
-    await run("ci conflicting", ci, { run: "success", mergeable: "CONFLICTING" });
-    await run("ci unknown", ci, { run: "success", mergeable: ["UNKNOWN", "MERGEABLE"] });
-    await run("ci came to conflict", ci, { run: null, mergeable: ["MERGEABLE", "CONFLICTING"] });
-  }, SLOW);
-
-  const mergeableAsks = (r: ScriptRun | undefined) => (r?.calls ?? []).filter((c) => c.join(" ").includes("--json mergeable")).length;
-
-  test("the pack's ship ci: green passes, red fails naming the failed check's URL, no checks passes", () => {
-    expect(runs["ship green"]?.code).toBe(0);
-    expect(runs["ship red"]?.code).toBe(1);
-    expect(runs["ship red"]?.stdout).toContain(`- test (id 7): ${WEB}/actions/runs/1/job/7`);
-    expect(runs["ship none"]?.code).toBe(0);
-    expect(runs["ship none"]?.stdout).toContain("nothing to wait for");
-  });
-
-  test("the pack's ship ci: a conflicting PR is stale (exit 3), UNKNOWN is asked again, and a PR that came to conflict while waiting is stale", () => {
-    expect(runs["ship conflicting"]?.code).toBe(3);
-    expect(runs["ship unknown"]?.code).toBe(0);
-    expect(mergeableAsks(runs["ship unknown"])).toBe(2);
-    expect(runs["ship came to conflict"]?.code).toBe(3);
-  });
-
-  test("the pack's ship ci passes with no gh and with no GitHub remote", () => {
-    expect(runs["ship no gh"]?.code).toBe(0);
-    expect(runs["ship no gh"]?.stdout).toContain("gh not found");
-    expect(runs["ship no GitHub remote"]?.code).toBe(0);
-    expect(runs["ship no GitHub remote"]?.stdout).toContain("no GitHub remote");
-  });
-
-  test("this repo's ci: green passes, red fails naming the failed jobs and never the log, no run in 5 minutes fails", () => {
-    expect(runs["ci green"]?.code).toBe(0);
-    expect(runs["ci red"]?.code).toBe(1);
-    expect(runs["ci red"]?.stdout).toContain(`CI run 9002 failed: ${WEB}/actions/runs/9002`);
-    expect(runs["ci red"]?.stdout).toContain("- job 7: test");
-    expect((runs["ci red"]?.calls ?? []).filter((c) => c.includes("--log") || c.includes("--log-failed"))).toEqual([]);
-    expect(runs["ci no run"]?.code).toBe(1);
-    expect(runs["ci no run"]?.stdout).toContain("after 5m");
-  });
-
-  test("this repo's ci: a conflicting PR is stale (exit 3), UNKNOWN is asked again, and a PR that came to conflict while waiting is stale", () => {
-    expect(runs["ci conflicting"]?.code).toBe(3);
-    expect(runs["ci unknown"]?.code).toBe(0);
-    expect(mergeableAsks(runs["ci unknown"])).toBe(2);
-    expect(runs["ci came to conflict"]?.code).toBe(3);
-  });
-});

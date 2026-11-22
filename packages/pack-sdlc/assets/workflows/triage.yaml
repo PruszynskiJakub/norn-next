@@ -1,11 +1,7 @@
-# Triage workflow — shipped in the sdlc pack; a repo copy under .agents/workflows/ replaces it.
-# An unattended agent checks the issue still holds on the base and posts its findings and one
-# recommendation as an issue comment, the one place the recommendation lives (the outcome is plain
-# `done`). That ends the round ($done): the person reads the comment and starts the story's next
-# round (`norn story round <story> --workflow refinement|quick|reproduce`), or closes the issue.
-# Triage changes no file and opens no PR, so it has no base sync.
+# The first round of a new issue. Next round: the one its outcome names (`norn story round <story>
+# --workflow refinement|quick|reproduce|fix`); after close, a person closes the issue.
 name: triage
-description: Check an issue still holds, add its context, and recommend what comes next (refinement, quick, reproduce) or closing it.
+description: Check an issue still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it.
 start: explore
 steps:
   explore:
@@ -16,11 +12,23 @@ steps:
       `norn:priority:low|medium|high|extreme`; a label missing on the remote is named in the comment
       for a person to create. That comment and those labels are the only remote writes this step allows,
       an exception to the brief's rule on remote writes; never remove a label, the intake label `norn` included. Change no file, spec.md included,
-      but the handoff. The recommendation lives only in that comment:
-      report `norn done done --note "<recommendation>: <reason>"`.
+      but the handoff. Report the outcome the comment recommends, with its reason as the note:
+      `norn done <recommendation> --note "<reason>"`.
     with: { skills: [norn-triage] }
     reads: [spec, handoff]
     outcomes:
-      done:
+      refinement:
         to: $done
-        means: "the ## Triage comment is posted, with one recommendation (refinement, quick, reproduce or close) and its reason, and the kind, risk and priority labels that could be set are on the issue"
+        means: "the ## Triage comment and the labels that could be set are posted; it needs a spec and a plan agreed with a person before anyone builds it"
+      quick:
+        to: $done
+        means: "the ## Triage comment and the labels that could be set are posted; a small change with no open design question"
+      reproduce:
+        to: $done
+        means: "the ## Triage comment and the labels that could be set are posted; a bug whose cause is confirmed before anyone decides how to fix it"
+      fix:
+        to: $done
+        means: "the ## Triage comment and the labels that could be set are posted; a bug to reproduce and fix in one round, its fix small and settled"
+      close:
+        to: $done
+        means: "the ## Triage comment and the labels that could be set are posted; it no longer applies, is a duplicate or out of scope, for a person to close"

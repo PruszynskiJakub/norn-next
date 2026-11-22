@@ -1,0 +1,26 @@
+# Use for a bug report before anyone fixes it. Exits: `reproduced` (a loop goes red on the bug, its
+# cause confirmed), `cannot_reproduce` (it did not occur); the findings are posted either way.
+description: Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.
+start: reproduce
+steps:
+  reproduce:
+    by: investigator
+    do: >-
+      The issue is mirrored in spec.md; read its comments too. First follow the report as a user, through
+      the real interface (the UI, the command, the request), and record what you saw. Then build a loop
+      that goes red on that exact symptom, minimise it and confirm the cause. You are told not to fix:
+      change no file, spec.md included, but the handoff.
+      Post the findings as an issue comment that starts with `## Reproduce` (`## Reproduce (updated)` on a rerun):
+      the loop command, the minimised repro, what it prints, the confirmed cause (`file:line`, or the ranked
+      hypotheses left) and the seam for a regression test. That one comment is the only remote write this
+      step allows, an exception to the brief's rule on remote writes; never edit the issue, label, assign or close.
+      Write the same under Notes in the handoff (the next agent reads the handoff, never this session); a long loop output goes in a file outside the repository, named there.
+    with: { skills: [norn-diagnose] }
+    reads: [spec, handoff]
+    outcomes:
+      reproduced:
+        exit: reproduced
+        means: "the bug was observed as a user and a loop goes red on it; loop, repro, cause and seam posted and in the handoff"
+      cannot_reproduce:
+        exit: cannot_reproduce
+        means: "followed the report faithfully and the bug did not occur, nor in any loop tried; what was tried posted and in the handoff"

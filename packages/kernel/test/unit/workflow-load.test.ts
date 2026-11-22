@@ -36,83 +36,93 @@ const SYNC_CONFLICT = c(2, "sync.done", "sync.clean", "sync.resolved");
 /**
  * The counters the old engine derived for each shipped workflow, pinned so the kernel keeps its bounds. Only `sync.conflict`'s resets differ, by the edits,
  * and the edits' `unpushed` routes back to open-pr, which the old engine took with no edge and no
- * counter, each get a counter bounded as a stale one is.
+ * counter, share a counter bounded as a stale one is. The CI wait, publishing and landing come from
+ * shared files, so each exit's derived counter is named after its use step; the build loop's own
+ * check, `check`, is bounded inside its file as a slice's `test` was. Story declares no
+ * stale budget of its own: each of its stale routes is bounded at the default, as quick's are.
  */
 const OLD_COUNTERS: Record<string, { edges: Record<string, string>; counters: Record<string, { max: number; reset_on: string[] }> }> = {
   "quick.yaml": {
     edges: {
       "sync.conflict": "sync.conflict",
+      "check.fail": "check.fail",
       "update.conflict": "update.conflict",
-      "test.fail": "base-update.broken",
-      "test-merge.fail": "base-update.broken",
-      "test-resolution.fail": "base-update.broken",
+      "test.fail": "base-update.failed",
+      "test-merge.fail": "base-update.failed",
+      "test-resolution.fail": "base-update.failed",
       "resolution-review.changes_requested": "resolution-review.changes_requested",
       "review.changes_requested": "review.changes_requested",
-      "ci.fail": "ship.ci-failed",
-      "ci.stale": "ship.stale",
-      "ready.reject": "ship.rejected",
-      "ready.stale": "ship.stale",
-      "merge.stale": "ship.stale",
-      "ready.unpushed": "ready.unpushed",
-      "merge.unpushed": "merge.unpushed",
+      "checks.fail": "publish.failed",
+      "checks.stale": "publish.stale",
+      "ready.reject": "land.rejected",
+      "ready.stale": "land.stale",
+      "merge.stale": "land.stale",
+      "ready.unpushed": "land.unpushed",
+      "merge.unpushed": "land.unpushed",
     },
     counters: {
       "sync.conflict": SYNC_CONFLICT,
+      "check.fail": c(5),
       "update.conflict": UPDATE_CONFLICT,
       "resolution-review.changes_requested": c(2),
       "review.changes_requested": c(3),
-      "base-update.broken": c(5),
-      "ship.ci-failed": c(3),
-      "ship.stale": c(10),
-      "ship.rejected": c(2),
-      "ready.unpushed": c(10),
-      "merge.unpushed": c(10),
+      "base-update.failed": c(5),
+      "publish.failed": c(3),
+      "publish.stale": c(10),
+      "land.rejected": c(2),
+      "land.stale": c(10),
+      "land.unpushed": c(10),
     },
   },
   "refinement.yaml": { edges: { "sync.conflict": "sync.conflict" }, counters: { "sync.conflict": SYNC_CONFLICT } },
   "reproduce.yaml": { edges: {}, counters: {} },
   "slice.yaml": {
-    edges: { "test.fail": "test.fail", "review.changes_requested": "review.changes_requested", "integrate.conflict": "integrate.conflict" },
-    counters: { "test.fail": c(5), "integrate.conflict": c(2, "integrate.done"), "review.changes_requested": c(3) },
+    edges: { "check.fail": "check.fail", "review.changes_requested": "review.changes_requested", "integrate.conflict": "integrate.conflict" },
+    counters: { "check.fail": c(5), "integrate.conflict": c(2, "integrate.done"), "review.changes_requested": c(3) },
   },
   "story.yaml": {
     edges: {
       "sync.conflict": "sync.conflict",
       "approve-slices.reject": "approve-slices.reject",
+      "check.fail": "check.fail",
       "update.conflict": "update.conflict",
-      "test.fail": "base-update.broken",
-      "test-merge.fail": "base-update.broken",
-      "test-resolution.fail": "base-update.broken",
+      "test.fail": "base-update.failed",
+      "test-merge.fail": "base-update.failed",
+      "test-resolution.fail": "base-update.failed",
       "resolution-review.changes_requested": "resolution-review.changes_requested",
       "qa.fail": "qa_loop",
       "human-qa.reject": "qa_loop",
-      "human-qa.stale": "stale_loop",
+      "human-qa.stale": "human-qa.stale",
       "review.changes_requested": "review.changes_requested",
-      "ci.fail": "ship.ci-failed",
-      "ci.stale": "stale_loop",
-      "ready.reject": "ship.rejected",
-      "ready.stale": "stale_loop",
-      "merge.stale": "stale_loop",
-      "ready.unpushed": "ready.unpushed",
-      "merge.unpushed": "merge.unpushed",
+      "checks.fail": "publish.failed",
+      "checks.stale": "publish.stale",
+      "ready.reject": "land.rejected",
+      "ready.stale": "land.stale",
+      "merge.stale": "land.stale",
+      "ready.unpushed": "land.unpushed",
+      "merge.unpushed": "land.unpushed",
     },
     counters: {
       qa_loop: c(2),
-      stale_loop: c(10),
+      "human-qa.stale": c(10),
       "sync.conflict": SYNC_CONFLICT,
       "approve-slices.reject": c(3),
+      "check.fail": c(5),
       "update.conflict": UPDATE_CONFLICT,
       "resolution-review.changes_requested": c(2),
       "review.changes_requested": c(3),
-      "base-update.broken": c(5),
-      "ship.ci-failed": c(3),
-      "ship.rejected": c(2),
-      "ready.unpushed": c(10),
-      "merge.unpushed": c(10),
+      "base-update.failed": c(5),
+      "publish.failed": c(3),
+      "publish.stale": c(10),
+      "land.rejected": c(2),
+      "land.stale": c(10),
+      "land.unpushed": c(10),
     },
   },
   "triage.yaml": { edges: {}, counters: {} },
 };
+// fix had no old counterpart: past its reproduce step, which loops on nothing, it is bounded as quick is
+OLD_COUNTERS["fix.yaml"] = OLD_COUNTERS["quick.yaml"] as (typeof OLD_COUNTERS)[string];
 
 describe("the shipped workflows", () => {
   const edited = shipped();
@@ -143,20 +153,20 @@ describe("the shipped workflows", () => {
 
   test("an unrouted outcome inside a shared file is refused, naming the file", () => {
     const shared = structuredClone(edited.shared) as Record<string, { steps: Record<string, { outcomes: Record<string, unknown> }> }>;
-    delete shared.ship?.steps.merge?.outcomes.merged;
+    delete shared.land?.steps.merge?.outcomes.merged;
     const errors = errorsOf(loadWorkflow(edited.workflows["quick.yaml"], opts({ sharedFiles: shared })));
-    expect(errors.map((e) => e.shared)).toEqual(["ship"]);
-    expect(errors[0]?.message).toBe("shared/ship.yaml: step 'merge' can end with 'merged' but routes it nowhere");
+    expect(errors.map((e) => e.shared)).toEqual(["land"]);
+    expect(errors[0]?.message).toBe("shared/land.yaml: step 'merge' can end with 'merged' but routes it nowhere");
   });
 
   test("a story workflow's graph: use steps brought in, entered at their file's start, exits routed", () => {
     const w = loaded(loadWorkflow(edited.workflows["story.yaml"], opts({ sharedFiles: edited.shared })));
     expect(w.graph.start).toBe("sync");
-    expect(w.graph.steps["sync-base"]).toBeUndefined();
+    expect(w.graph.steps["catch-up"]).toBeUndefined();
     expect(w.graph.steps.sync?.routes.done).toEqual({ to: "slice" });
     expect(w.graph.steps.merge).toMatchObject({ kind: "await-merge", runner: { type: "plugin", mode: "wait" }, outcomes: ["merged", "unpushed"], signals: [{ name: "stale" }, { name: "unpushed" }] });
     expect(w.graph.steps["test-merge"]?.check).toEqual({ command: "{checks.test}", timeout_ms: 15 * 60_000, exits: {} });
-    expect(w.graph.steps.ci?.outcomes).toEqual(["pass", "fail", "stale"]);
+    expect(w.graph.steps.checks).toMatchObject({ kind: "await-checks", runner: { type: "plugin", mode: "wait" }, outcomes: ["pass", "fail", "stale"] });
     expect(w.graph.steps["approve-slices"]?.outcomes).toEqual(["approve", "reject"]);
     expect(w.graph.steps["human-qa"]).toMatchObject({ outcomes: ["approve", "reject"], signals: [{ name: "stale" }] });
     expect(w.graph.steps.qa?.agent).toMatchObject({ criteria: true, hand_back: { fail: "findings" }, nudges: CONFIG.maxNudges, deadline_ms: CONFIG.deadlineMs });

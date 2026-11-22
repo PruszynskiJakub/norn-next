@@ -7,21 +7,22 @@ norn is built with norn. This file is the person's side: how a change gets propo
 1. **Everything is an issue.** Every change to a file in the repo starts as a GitHub issue labelled `norn`. It stays unassigned in the backlog; whoever runs norn on it assigns it to themselves when work should begin, because intake cuts the story branch from the base at that moment.
 2. **norn takes it in.** The next tick turns the assigned issue into story `gh-N`: a branch `norn/gh-N`, a worktree, and the workflow its `norn:wf:<name>` label names.
 3. **The workflow runs.** Agents do the unattended steps; `norn status` shows what needs you. You answer questions (`norn story answer`), decide gates (`norn story approve`, `norn story reject --reason`) and start the steps manual mode holds (`norn run start`).
-4. **A person merges.** Every delivery workflow (`quick`, `story`, `release`) ends waiting for its PR to merge. You merge it (squash). The PR holds only the code; the spec, the handoffs and norn's run data stay out of the branch ([Concepts](docs/concepts.md#the-agents-worktree)). The merge ends the story: norn closes the issue and removes the worktrees.
+4. **A person merges.** Every delivery workflow (`quick`, `fix`, `story`, `release`) ends waiting for its PR to merge. You merge it (squash). The PR holds only the code; the spec, the handoffs and norn's run data stay out of the branch ([Concepts](docs/concepts.md#the-agents-worktree)). The merge ends the story: norn closes the issue and removes the worktrees.
 
 To drop a story instead, `norn story close gh-N` closes the issue and stops its runs.
 
 ## Workflows
 
-Picked by the issue label `norn:wf:<name>`. The shipped ones are in `packages/pack-sdlc/assets/workflows/`; this repo's own, with its check commands and its CI wait, are in `.agents/workflows/` and replace the pack's of the same name.
+Picked by the issue label `norn:wf:<name>`. The shipped ones are in `packages/pack-sdlc/assets/workflows/`; this repo's test command is `checks.test` in `.agents/norn.yaml`, and its own files in `.agents/workflows/` (`release` and its triage, and `shared/diagnose.yaml`, the reproduce step its reproduce and fix rounds share) replace the pack's of the same name.
 
 | Label | Workflow | For |
 |---|---|---|
-| `norn:wf:triage` | triage | Check the issue, recommend `refinement`, `quick`, `reproduce` or closing it, as an issue comment. |
+| `norn:wf:triage` | triage | Check the issue, recommend `refinement`, `quick`, `reproduce`, `fix` or closing it, as an issue comment; the round ends with that recommendation as its outcome. |
 | `norn:wf:reproduce` | reproduce | Bugs: reproduce read-only, confirm the cause and the seam for a regression test. |
-| `norn:wf:refinement` | refinement | Spec and plan with you: sync → refine → clarify → plan. No code, no PR. |
-| `norn:wf:story` | story | A planned feature: sync → slices → test → QA → PR → CI. Each slice: implement → test → review → integrate. |
-| `norn:wf:quick` | quick | Refactors, docs, chores, small changes, a reproduced bug's fix: sync → implement → test → review → PR → CI. |
+| `norn:wf:fix` | fix | A bug whose fix looks small and settled: catch-up → reproduce → build (implement → check → review) → base update → PR → CI. A bug that will not reproduce ends the round. |
+| `norn:wf:refinement` | refinement | Spec and plan with you: catch-up → refine → clarify → plan. No code, no PR. |
+| `norn:wf:story` | story | A planned feature: catch-up → slices → base update → QA → PR → CI. Each slice: build (implement → check → review) → integrate; a rework is built, then base-updated. |
+| `norn:wf:quick` | quick | Refactors, docs, chores, small changes, a reproduced bug's fix: catch-up → build (implement → check → review) → base update → PR → CI. |
 | `norn:wf:release` | release | Changelog, version bump → PR, wait for its CI. Started by `/release-start`. |
 
 ## Labels
@@ -73,4 +74,4 @@ The CI process check passes a PR only if it comes from a story branch `norn/gh-N
 - `main` protected: no direct or force push, required checks `process` and CI's `unit`, `integration (shard 1/4)` to `(shard 4/4)` and `package`, branches required to be up to date before merging (so a release's tag never holds a commit its changelog misses), no admin bypass.
 - Squash merges only, with the PR title and description as the commit message; branches deleted on merge.
 - "Allow auto-merge" on: Dependabot patch and minor PRs merge automatically; majors wait for a person.
-- Labels: `norn`, `norn:wf:{triage,reproduce,refinement,story,quick,release}`, `friction`, `bypass`, `idea`, `bug`, `enhancement`.
+- Labels: `norn`, `norn:wf:{triage,reproduce,fix,refinement,story,quick,release}`, `friction`, `bypass`, `idea`, `bug`, `enhancement`.

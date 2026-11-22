@@ -28,6 +28,7 @@ export const STEP_KINDS: Record<string, StepKindInfo> = {
   integrate: kind("integrate", ["done", "conflict"], "effect", NONE, "vcs"),
   "open-pr": { ...kind("open-pr", ["done"], "effect", NONE, "forge"), reads: [{ name: "pr_body", fallback: "the body file an earlier pass left, else norn's footer alone" }] },
   push: kind("push", ["done"], "effect", NONE, "vcs"),
+  "await-checks": kind("await-checks", ["pass", "fail", "stale"], "wait", Type.Object({ appear: Type.Optional(Type.String()), settle: Type.Optional(Type.String()) }, { additionalProperties: false }), "forge"),
   "await-merge": { ...kind("await-merge", ["merged", "unpushed"], "wait", NONE, "forge"), effects: ["forge-write"] },
 };
 

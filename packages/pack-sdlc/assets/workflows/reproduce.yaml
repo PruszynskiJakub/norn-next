@@ -1,33 +1,10 @@
-# Reproduce workflow — shipped in the sdlc pack; a repo copy under .agents/workflows/ replaces it.
-# Select it with the issue label norn:wf:reproduce, or after triage with `norn story round <story> --workflow reproduce`.
-# An unattended agent follows the report through the real interface, builds a loop that goes red on
-# the symptom, minimises it, confirms the cause and names the seam for a regression test. It posts
-# all of that as an issue comment and changes no code. Every outcome ends the round ($done): the fix
-# is the story's next round, `norn story round <story> --workflow quick`, whose implement turns the red
-# loop into a failing test first, or `--workflow refinement` when the fix needs a design.
-# Reproduce changes no code and opens no PR, so it has no base sync.
+# For a bug whose cause a person wants before anyone fixes it; label it norn:wf:reproduce, or start it
+# after triage. Next round: `fix` or `quick` (implement turns the red loop into a failing test first),
+# or `refinement`.
 name: reproduce
 description: Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.
-start: reproduce
+start: diagnose
 steps:
-  reproduce:
-    by: investigator
-    do: >-
-      The issue is mirrored in spec.md; read its comments too. First follow the report as a user, through
-      the real interface (the UI, the command, the request), and record what you saw. Then build a loop
-      that goes red on that exact symptom, minimise it and confirm the cause. You are told not to fix:
-      change no file, spec.md included, but the handoff.
-      Post the findings as an issue comment that starts with `## Reproduce` (`## Reproduce (updated)` on a rerun):
-      the loop command, the minimised repro, what it prints, the confirmed cause (`file:line`, or the ranked
-      hypotheses left) and the seam for a regression test. That one comment is the only remote write this
-      step allows, an exception to the brief's rule on remote writes; never edit the issue, label, assign or close.
-      Write the same under Notes in the handoff (the next agent reads the handoff, never this session); a long loop output goes in a file outside the repository, named there.
-    with: { skills: [norn-diagnose] }
-    reads: [spec, handoff]
-    outcomes:
-      reproduced:
-        to: $done
-        means: "the bug was observed as a user and a loop goes red on it; loop, repro, cause and seam posted and in the handoff"
-      cannot_reproduce:
-        to: $done
-        means: "followed the report faithfully and the bug did not occur, nor in any loop tried; what was tried posted and in the handoff"
+  diagnose:
+    use: diagnose
+    outcomes: { reproduced: $done, cannot_reproduce: $done }

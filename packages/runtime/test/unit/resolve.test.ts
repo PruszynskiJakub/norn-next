@@ -46,7 +46,7 @@ describe("resolveSlots", () => {
     const r = resolveSlots(ctx, PLUGINS, config());
     if (!r.ok) throw new Error(r.failure.message);
     expect([r.value.tracker.keyPrefix, r.value.forge.name, r.value.vcs.name]).toEqual(["lt", "none", "git"]);
-    expect(Object.keys(r.value.stepKinds).sort()).toEqual(["await-merge", "integrate", "open-pr", "push", "update-branch", "verify-base"]);
+    expect(Object.keys(r.value.stepKinds).sort()).toEqual(["await-checks", "await-merge", "integrate", "open-pr", "push", "update-branch", "verify-base"]);
   });
 
   test("a name no plugin provides is a refusal naming it", () => {
@@ -76,6 +76,7 @@ describe("resolveSlots", () => {
       push: "vcs",
       "verify-base": "vcs",
       "open-pr": "forge",
+      "await-checks": "forge",
       "await-merge": "forge",
       preview: "vercel",
     });
