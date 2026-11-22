@@ -132,6 +132,12 @@ export function noneForge(ctx: HostContext): Forge {
       if (!rec.ok) return rec;
       return rec.value === null ? fail("not_found", `forge none: no change ${id}`, false) : ok("none");
     },
+    // no code host runs checks, so there is never a failure to locate
+    checkReport: async (id) => {
+      const rec = await readRecord(ctx, id);
+      if (!rec.ok) return rec;
+      return rec.value === null ? fail("not_found", `forge none: no change ${id}`, false) : ok({ summary: "none", failed: [] });
+    },
     perform: async (effect, meta) => {
       const v = validateForgeEffect(effect);
       if (!v.ok) return fail("invalid", `forge none: ${v.errors.map((x) => `${x.path || "/"} ${x.message}`).join("; ")}`, false);

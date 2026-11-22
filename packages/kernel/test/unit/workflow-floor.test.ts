@@ -85,6 +85,6 @@ describe("the floor: a person stands before every effect they cannot take back",
     }
     const story = refusals(loadWorkflow(workflows["story.yaml"], opts({ stepKinds: STEP_KINDS, sharedFiles: shared, floor: { delegated: ["ready"] } })));
     expect(story.map((e) => e.path)).toEqual(["/steps/merge"]);
-    expect(story[0]?.message).toStartWith("shared/ship.yaml: step merge (forge.await-merge) writes to the forge");
+    expect(story[0]?.message).toStartWith("shared/land.yaml: step merge (forge.await-merge) writes to the forge");
   });
 });

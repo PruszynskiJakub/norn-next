@@ -123,6 +123,11 @@ export interface StepKindInput<C = Record<string, unknown>> {
    * every effect the kind asks a provider for, so a run the host repeats after a crash replays it.
    */
   receipt_id?: string;
+  /**
+   * When the step's run started (plugin API 1.27): a `wait` kind is polled with the same input every
+   * tick and keeps nothing between polls, so this is how it bounds how long it waits for something.
+   */
+  started_at?: string;
 }
 
 export interface StepKindBase {
@@ -180,6 +185,7 @@ export type KindEffect = (typeof KIND_EFFECTS)[number];
  */
 export const SLOT_KIND_EFFECTS: Readonly<Record<string, readonly KindEffect[]>> = Object.freeze({
   "forge.await-merge": ["forge-write"],
+  "forge.await-checks": [],
   "forge.open-pr": [],
   "vcs.update-branch": [],
   "vcs.integrate": [],

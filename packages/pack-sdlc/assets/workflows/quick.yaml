@@ -2,12 +2,12 @@
 # For refactors, docs, chores, other small changes and the fix of a bug a reproduce round confirmed.
 # A story workflow without `slices`: every step works in the story worktree. Bring the story up
 # to date with its base, implement, bring it up to date again, check, review, describe, open the
-# draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a person at
+# draft PR (or rewrite the body of the open one), wait for its checks, and wait for a person at
 # ready, then wait at merge until the person merges the PR.
 # A story waiting at ready or merge goes back through update when the base moved under it in a way
 # that conflicts (`signals: { vcs.stale: { when: conflict } }`).
 # Steps shared with other workflows come from `shared/` (`use:`): the test command is the config's
-# `checks.test`; change the CI wait in `shared/ship.yaml`.
+# `checks.test`.
 name: quick
 description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
 start: sync
@@ -37,8 +37,8 @@ steps:
     outcomes:
       tested: review
       broken: implement
-      ship: ship
-      redescribe: describe
+      ship: open-pr
+      redescribe: publish
   review:
     by: reviewer
     do: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
@@ -46,30 +46,27 @@ steps:
     reads: [spec, diff, findings?]
     outcomes:
       approve:
-        to: describe
+        to: publish
         means: "the change does what the story asks and nothing else, no blocking findings"
       changes_requested:
         to: implement
         means: "blocking findings, handed back as findings"
         produces: [findings]
-  describe:
-    by: writer
-    do: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
-    with: { skills: [norn-pr] }
-    reads: [spec, diff, handoff]
-    # open-pr reads it; norn done refuses the report while pr.md is missing or empty
-    produces: [{ name: pr_body, file: pr.md }]
+  # describe, open-pr and checks (shared/publish.yaml); a failed check's whereabouts become last_check
+  # for implement, whose rework goes back through open-pr to the new head
+  publish:
+    use: publish
     outcomes:
-      done:
-        to: ship
-        means: "pr.md describes the branch as it is now: summary, evidence, merge danger"
-  # open-pr, ci, ready and merge (shared/ship.yaml)
-  ship:
-    use: ship
+      passed: land
+      failed: { to: implement, max: 3 }
+      stale: update
+  # ready and merge (shared/land.yaml)
+  land:
+    use: land
     outcomes:
-      ci-failed: { to: implement, max: 3 }
       rejected: implement
       stale: update
+      unpushed: open-pr
 # `norn story update-branch` re-enters update, not sync (the default would be the first update step); a base move
 # without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once per
 # base move (no push, no CI): red goes back through update like a conflict

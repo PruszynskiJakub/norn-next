@@ -53,5 +53,9 @@ export function forgeWorld(config?: GithubConfig): ForgeWorld {
       const p = at(id);
       if (p) p.checks = summary;
     },
+    setConflicts: async (id, on) => {
+      const p = at(id);
+      if (p) p.mergeable = on ? "CONFLICTING" : "MERGEABLE";
+    },
   };
 }

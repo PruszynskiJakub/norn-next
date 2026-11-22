@@ -14,6 +14,7 @@ export interface MemoryForgeOptions {
 export function memoryForge(opts: MemoryForgeOptions): ForgeWorld {
   const changes: ChangeRequest[] = [];
   const checks = new Map<number, ChecksSummary>();
+  const conflicting = new Set<number>();
   const receipts = new Map<string, number>();
   let failing = false;
   const down = <T>(): PluginResult<T> => fail("unavailable", "memory forge: down");
@@ -34,6 +35,12 @@ export function memoryForge(opts: MemoryForgeOptions): ForgeWorld {
       return ok(out);
     },
     checks: async (id) => (failing ? down() : ok(checks.get(id) ?? "none")),
+    checkReport: async (id) => {
+      if (failing) return down();
+      if (!byId(id)) return fail("not_found", `memory forge: no change ${id}`);
+      const summary = checks.get(id) ?? "none";
+      return ok({ summary, failed: summary === "failure" ? [{ name: "test", url: `memory://changes/${id}/checks/test` }] : [], conflicts: conflicting.has(id) });
+    },
     perform: async (effect, meta) => {
       if (failing) return down();
       if (!validateForgeEffect(effect).ok) return fail("invalid", "memory forge: malformed effect");
@@ -70,6 +77,10 @@ export function memoryForge(opts: MemoryForgeOptions): ForgeWorld {
     },
     setChecks: async (id, summary) => {
       checks.set(id, summary);
+    },
+    setConflicts: async (id, on) => {
+      if (on) conflicting.add(id);
+      else conflicting.delete(id);
     },
   };
 }

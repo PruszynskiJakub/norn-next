@@ -96,19 +96,21 @@ A step is written with thirteen keys, and the set never grows: what an actor nee
 | `description`, `use`, `like` | a note; `use: <file>` brings in `shared/<file>.yaml`; `like: <step>` copies a step of the same file, each key it writes replacing the copied value whole |
 
 ```yaml
-ci:
+test:
   by: shell
-  do: ./scripts/wait-for-ci.sh
-  with: { exits: { 3: stale } }
-  limits: { timeout: 30m }
-  outcomes: { pass: ready, fail: { exit: ci-failed }, stale: { exit: stale } }
+  do: "{checks.test}"
+  limits: { timeout: 15m }
+  outcomes: { pass: review, fail: implement }
+checks:
+  by: forge.await-checks
+  outcomes: { pass: ready, fail: { exit: failed }, stale: { exit: stale } }
 merge:
   by: forge.await-merge
   outcomes: { merged: $done }
   on: { vcs.stale: { exit: stale }, vcs.unpushed: open-pr }
 ```
 
-A step kind's namespace is the slot it works over, `vcs.` (`update-branch`, `integrate`, `push`, `verify-base`) or `forge.` (`open-pr`, `await-merge`), so a workflow moves between providers unchanged; a kind over no slot is named after its plugin (`vercel.preview`), and `norn.each`, which runs the story's slices through `kernel.slice_workflow`, is the core's. A signal is named the same way (`vcs.stale`, `norn.timeout`). Each actor takes only its own keys, and a key of the older form in a step written with `by:` is refused with where it is written now (`skills` under `with:`, `inputs` as `reads:`, `timeout` under `limits:`, `writes: docs` as `allow: [docs:write]`). An agent role picks no executor: the machine's `bind:` does ([Executors and runners](#executors-and-runners)); a step that must name one, or a `model`, in the workflow keeps the older form. The roles are the pack's: the shipped pack registers `builder`, `reviewer`, `qa`, `investigator` and `writer`, each with its purpose and the capabilities it may be granted, and a `supervisor`, which no step names.
+A step kind's namespace is the slot it works over, `vcs.` (`update-branch`, `integrate`, `push`, `verify-base`) or `forge.` (`open-pr`, `await-checks`, `await-merge`), so a workflow moves between providers unchanged; a kind over no slot is named after its plugin (`vercel.preview`), and `norn.each`, which runs the story's slices through `kernel.slice_workflow`, is the core's. A signal is named the same way (`vcs.stale`, `norn.timeout`). Each actor takes only its own keys, and a key of the older form in a step written with `by:` is refused with where it is written now (`skills` under `with:`, `inputs` as `reads:`, `timeout` under `limits:`, `writes: docs` as `allow: [docs:write]`). An agent role picks no executor: the machine's `bind:` does ([Executors and runners](#executors-and-runners)); a step that must name one, or a `model`, in the workflow keeps the older form. The roles are the pack's: the shipped pack registers `builder`, `reviewer`, `qa`, `investigator` and `writer`, each with its purpose and the capabilities it may be granted, and a `supervisor`, which no step names.
 
 A workflow sets the stale signal's settings once, and names the step `norn story update-branch` re-enters:
 
@@ -141,7 +143,7 @@ workflow story is held for your confirmation (person step ready removed); new ro
 
 ## Signals
 
-A person step or a wait step kind (`forge.await-merge`) routes signals under `on:`, beside its `outcomes:`. Each entry takes the route shape of `outcomes:` (a step name, `$done`, `$stuck`, or `{to | exit, max, counter}`), plus the signal's own parameters. The edge is `<step>.<signal>`, so `counter:`, `reset_on` and `norn run rerun --reset` name it as they name an outcome's. A route back is bounded by `kernel.counters.stale` (10) unless it sets `max:`.
+A person step or a wait step kind (`forge.await-checks`, `forge.await-merge`) routes signals under `on:`, beside its `outcomes:`. Each entry takes the route shape of `outcomes:` (a step name, `$done`, `$stuck`, or `{to | exit, max, counter}`), plus the signal's own parameters. The edge is `<step>.<signal>`, so `counter:`, `reset_on` and `norn run rerun --reset` name it as they name an outcome's. A route back is bounded by `kernel.counters.stale` (10) unless it sets `max:`.
 
 | Signal | Source | Parameters | Fires when | Occurrence id |
 |---|---|---|---|---|
@@ -254,7 +256,7 @@ describe:
   by: writer
   do: "Write the PR body to pr.md in the spec folder."
   produces: [{ name: pr_body, file: pr.md }]
-  outcomes: { done: ship }
+  outcomes: { done: open-pr }
 ```
 
 - `file` is relative to the story's spec folder, `.agents/specs/<story>/`; a path that may leave it (absolute, with `..`, a backslash or a drive letter) is refused, and so is a file norn writes there itself: `.gitignore`, `spec.md`, or one under `handoffs/` or `slices/`.

@@ -238,6 +238,20 @@ describe("forge reads", () => {
     expect(failureOf(await forge.checks(1)).code).toBe("auth");
   });
 
+  test("checkReport names each failed check with its run's link, and asks mergeability only while the checks are unsettled", async () => {
+    const { forge, gh, exec } = rig();
+    gh.prs.push({ number: 7, head: "gh-1-a", base: "main", title: "t", body: "", draft: true, state: "OPEN", checks: "failure", mergeable: "CONFLICTING" });
+    const report = (id: number) => (forge.checkReport ? forge.checkReport(id) : Promise.reject(new Error("no checkReport")));
+    expect(valueOf(await report(7))).toEqual({ summary: "failure", failed: [{ name: "test", url: "https://github.com/acme/app/actions/runs/1/job/7" }] });
+    expect(exec.calls.some((c) => c.argv.includes("mergeable"))).toBe(false);
+    const p = gh.prs[0] as (typeof gh.prs)[number];
+    p.checks = "pending";
+    expect(valueOf(await report(7))).toEqual({ summary: "pending", failed: [], conflicts: true });
+    // UNKNOWN is GitHub still computing: the report says nothing rather than guess
+    p.mergeable = "UNKNOWN";
+    expect(valueOf(await report(7))).toEqual({ summary: "pending", failed: [] });
+  });
+
   test("findChanges asks about at most a query's worth of branches per call, and each branch once", async () => {
     const { forge, exec } = rig();
     const branches = Array.from({ length: BRANCHES_PER_QUERY + 3 }, (_, i) => `gh-${i + 1}-b`);

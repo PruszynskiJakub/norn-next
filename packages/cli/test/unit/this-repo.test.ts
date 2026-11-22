@@ -143,35 +143,33 @@ describe("this repo's workflows, as norn loads them", () => {
     expect(steps("quick").implement?.agent).toMatch(/`bun run test`[^.]*after each change/);
   });
 
-  test("quick and story wait for the PR's CI after open-pr, send a red run back to implement and a conflicting PR to update", () => {
+  test("quick and story wait for the PR's checks after open-pr, send a failed check back to implement and a conflicting PR to update", () => {
     for (const wf of ["quick", "story"]) {
       const s = steps(wf);
-      expect({ wf, openPr: s["open-pr"]?.outcomes }).toEqual({ wf, openPr: { done: "ci" } });
-      expect({ wf, ci: s.ci?.outcomes }).toEqual({ wf, ci: { pass: "ready", fail: { to: "implement", counter: "ship.failed" }, stale: { to: "update", counter: "stale_loop" } } });
-      expect({ wf, bound: repo[wf]?.counters?.["ship.failed"] }).toEqual({ wf, bound: { max: 3 } });
+      expect({ wf, openPr: s["open-pr"]?.outcomes }).toEqual({ wf, openPr: { done: "checks" } });
+      expect({ wf, checks: s.checks?.outcomes }).toEqual({ wf, checks: { pass: "ready", fail: { to: "implement", counter: "publish.failed" }, stale: { to: "update", counter: "stale_loop" } } });
+      expect({ wf, bound: repo[wf]?.counters?.["publish.failed"] }).toEqual({ wf, bound: { max: 3 } });
     }
   });
 
-  test("quick, story and release run the same ci script, which waits with gh run watch, written once in shared/ci.yaml", () => {
-    const ci = (wf: string) => steps(wf).ci?.check;
-    expect(ci("quick")).toContain("gh run watch");
-    expect([ci("story"), ci("release")]).toEqual([ci("quick"), ci("quick")]);
+  test("quick, story and release wait for the PR's checks with the forge's await-checks, and no workflow file runs gh or a script of its own", () => {
+    for (const wf of ["quick", "story", "release"]) expect({ wf, kind: Object.keys(steps(wf).checks ?? {}) }).toEqual({ wf, kind: expect.arrayContaining(["await-checks"]) });
     const files = [...yamlIn(WORKFLOWS), ...yamlIn(join(WORKFLOWS, "shared")).map((f) => `shared/${f}`)];
-    expect(files.filter((f) => readFileSync(join(REPO, WORKFLOWS, f), "utf8").includes("gh run watch"))).toEqual(["shared/ci.yaml"]);
+    expect(files.filter((f) => /\bgh (pr|run|api)\b|\.agents\/scripts\//.test(readFileSync(join(REPO, WORKFLOWS, f), "utf8")))).toEqual([]);
   });
 
-  test("release goes prepare → open-pr → ci → ready → merge, a red CI goes $stuck, and a base commit or a conflicting PR makes it stale", () => {
+  test("release goes prepare → open-pr → checks → ready → merge, a failed check goes $stuck, and a base commit or a conflicting PR makes it stale", () => {
     const w = repo.release as Written;
     expect(w.start).toBe("prepare");
-    expect(Object.keys(w.steps).sort()).toEqual(["ci", "merge", "open-pr", "prepare", "ready", "resolve", "update"]);
+    expect(Object.keys(w.steps).sort()).toEqual(["checks", "merge", "open-pr", "prepare", "ready", "resolve", "update"]);
     expect(w.steps.prepare?.skills).toEqual(["release"]);
     expect(w.steps.prepare?.outcomes).toEqual({ done: "open-pr" });
-    expect(w.steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
-    expect(w.steps.ci?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: { to: "update", counter: "stale_loop" } });
+    expect(w.steps["open-pr"]?.outcomes).toEqual({ done: "checks" });
+    expect(w.steps.checks?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: { to: "update", counter: "stale_loop" } });
     // a signal is routed under `on:`, never among the outcomes a person or a step kind reports
-    expect(w.steps.ready?.outcomes).toEqual({ approve: "merge", reject: { to: "prepare", counter: "ready.reject" } });
+    expect(w.steps.ready?.outcomes).toEqual({ approve: "merge", reject: { to: "prepare", counter: "land.rejected" } });
     expect(w.steps.ready?.on).toEqual({ stale: { to: "update", counter: "stale_loop" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
-    expect(w.counters?.["ready.reject"]).toEqual({ max: 2 });
+    expect(w.counters?.["land.rejected"]).toEqual({ max: 2 });
     expect(w.steps.merge?.outcomes).toEqual({ merged: "$done" });
     expect(w.steps.merge?.on).toEqual({ stale: { to: "update", counter: "stale_loop" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
     expect(w.base).toEqual({ stale: "behind" });

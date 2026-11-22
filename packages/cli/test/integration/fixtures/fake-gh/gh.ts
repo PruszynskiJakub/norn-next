@@ -302,8 +302,13 @@ function answer(): Answer {
     if (!p) return noPr(n);
     if (p.checks === "none") return err(`no checks reported on the '${p.head}' branch`);
     const code = p.checks === "pending" ? 8 : p.checks === "failure" ? 1 : 0;
-    if (flag("--json") === "bucket") return { code, stdout: JSON.stringify([{ bucket: "pass" }, { bucket: { success: "pass", pending: "pending", failure: "fail" }[p.checks] }]) };
-    if (flag("--json") !== undefined) return unknown();
+    const rows = [
+      { name: "lint", bucket: "pass", link: `${web}/actions/runs/1/job/6` },
+      { name: "test", bucket: { success: "pass", pending: "pending", failure: "fail" }[p.checks], link: `${web}/actions/runs/1/job/7` },
+    ];
+    const fields = flag("--json");
+    if (fields === "bucket" || fields === "name,bucket,link") return { code, stdout: JSON.stringify(rows.map((r) => pick(r, fields))) };
+    if (fields !== undefined) return unknown();
     // --watch waits the checks out; here they are already settled, or stay pending as scripted
     return { code, stdout: `lint\tpass\t10s\t${web}/actions/runs/1/job/6\ntest\t${p.checks === "failure" ? "fail" : p.checks === "pending" ? "pending" : "pass"}\t1m\t${web}/actions/runs/1/job/7\n` };
   }

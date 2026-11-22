@@ -4,7 +4,7 @@
  * receipt id, a merge done by a person is seen, and a failing provider changes nothing.
  */
 import { describe, expect } from "bun:test";
-import { type ChangeRequest, type ChecksSummary, type Forge, type ForgeEffect, type ForgeEffectOutcome, validateChangeRequest, validateForgeEffectOutcome } from "@norn/plugin-api";
+import { type ChangeRequest, type ChecksSummary, type Forge, type ForgeEffect, type ForgeEffectOutcome, validateChangeRequest, validateChecksReport, validateForgeEffectOutcome } from "@norn/plugin-api";
 import { type ContractOptions, contractTest, expectValid, failureOf, valueOf } from "./contract.ts";
 import { receiptId } from "./tracker-contract.ts";
 
@@ -18,6 +18,8 @@ export interface ForgeWorld {
   close?(id: number): Promise<void>;
   /** the checks the provider reports for change `id`'s head from now on */
   setChecks?(id: number, summary: Exclude<ChecksSummary, "none">): Promise<void>;
+  /** whether change `id` conflicts with its base from now on */
+  setConflicts?(id: number, on: boolean): Promise<void>;
 }
 
 export interface ForgeContractOptions extends ContractOptions<ForgeContractTest> {
@@ -38,6 +40,7 @@ export type ForgeContractTest =
   | "a merge by a person is seen, with its merge commit"
   | "a close by a person is seen"
   | "checks: none, then what the provider reports"
+  | "checkReport: the summary checks gives, each failed check named, a conflict with the base said while the checks are unsettled"
   | "an effect on a missing change is a not_found failure"
   | "a forge without changes refuses every effect as invalid"
   | "a failing provider answers every call with a failure and opens nothing";
@@ -162,6 +165,34 @@ export function forgeContract(name: string, makeWorld: () => ForgeWorld | Promis
       }
     });
 
+    tc("checkReport: the summary checks gives, each failed check named, a conflict with the base said while the checks are unsettled", async () => {
+      const { world, fg, open } = await made();
+      if (!fg.checkReport) return;
+      const report = async (id: number) => {
+        const r = valueOf(await (fg.checkReport as NonNullable<Forge["checkReport"]>)(id));
+        expectValid("checks report", validateChecksReport(r));
+        expect(r.summary).toBe(valueOf(await fg.checks(id)));
+        return r;
+      };
+      const { change } = await open("gh-1-add-login", 15);
+      expect(await report(change.id)).toMatchObject({ summary: "none", failed: [] });
+      if (!fg.capabilities.checks) return;
+      for (const summary of ["pending", "success"] as const) {
+        await need("setChecks", world.setChecks)(change.id, summary);
+        expect((await report(change.id)).failed).toEqual([]);
+      }
+      await need("setChecks", world.setChecks)(change.id, "failure");
+      const failed = (await report(change.id)).failed;
+      expect(failed.length).toBeGreaterThan(0);
+      for (const f of failed) expect(f.name.length).toBeGreaterThan(0);
+      await need("setChecks", world.setChecks)(change.id, "pending");
+      await need("setConflicts", world.setConflicts)(change.id, true);
+      expect((await report(change.id)).conflicts).toBe(true);
+      await need("setConflicts", world.setConflicts)(change.id, false);
+      expect((await report(change.id)).conflicts).not.toBe(true);
+      failureOf(await fg.checkReport(999));
+    });
+
     tc("an effect on a missing change is a not_found failure", async () => {
       const { fg } = await made();
       for (const [n, e] of ([{ kind: "update", id: 999, title: "x" }, { kind: "ready", id: 999 }] as ForgeEffect[]).entries())
@@ -188,6 +219,7 @@ export function forgeContract(name: string, makeWorld: () => ForgeWorld | Promis
       world.failing(true);
       failureOf(await fg.findChanges(["gh-1-add-login"]));
       failureOf(await fg.checks(change.id));
+      if (fg.checkReport) failureOf(await fg.checkReport(change.id));
       failureOf(await fg.perform({ kind: "open", head: "lt-2-lost", base: "main", title: "lost", body: "", draft: true }, { receipt_id: receiptId(300) }));
       failureOf(await fg.perform({ kind: "update", id: change.id, title: "lost" }, { receipt_id: receiptId(301) }));
       failureOf(await fg.perform({ kind: "ready", id: change.id }, { receipt_id: receiptId(302) }));

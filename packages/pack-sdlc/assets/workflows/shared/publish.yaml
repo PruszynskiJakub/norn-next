@@ -1,0 +1,29 @@
+# Shared steps — shipped in the sdlc pack; a repo copy under .agents/workflows/shared/ replaces it. A workflow brings them in with `use: publish`.
+# Writes the PR body, opens the draft PR (or rewrites the body of the open one) and waits for its
+# checks. A workflow's light path, which needs no new body, routes straight to `open-pr`.
+# Exits: `passed` (every check passed, or the change has none), `failed` (a check failed, or stayed
+# pending; where its failures are becomes last_check), `stale` (the change conflicts with its base, so
+# no checks run on it: the workflow sends it back through its base update).
+description: Write the PR body, open the draft PR, wait for its checks.
+start: describe
+steps:
+  describe:
+    by: writer
+    do: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
+    with: { skills: [norn-pr] }
+    reads: [spec, diff, handoff, record]
+    # open-pr reads it; norn done refuses the report while pr.md is missing or empty
+    produces: [{ name: pr_body, file: pr.md }]
+    outcomes:
+      done:
+        to: open-pr
+        means: "pr.md describes the branch as it is now: summary, evidence, merge danger"
+  open-pr:
+    by: forge.open-pr
+    outcomes: { done: checks }
+  # polled every tick, so the tick is not blocked: a forge without checks passes at once, a change
+  # with no check after 5m (with: { appear }) passes as a repo without CI, and checks still pending
+  # after 30m (with: { settle }) fail
+  checks:
+    by: forge.await-checks
+    outcomes: { pass: { exit: passed }, fail: { exit: failed }, stale: { exit: stale } }

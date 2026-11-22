@@ -181,18 +181,29 @@ A unit pins its workflow when it starts, so your edit applies to stories that st
 
 ### Share steps between workflows
 
-Steps that several workflows run the same way (the CI wait, the base update, opening the PR) go in a shared file, `.agents/workflows/shared/<name>.yaml`, which holds `start`, `steps` and an optional `description`. A route inside it names one of its own steps, `$done` or `$stuck`, or leaves through a named exit, `{ exit: <name> }`. A workflow brings it in with a step that holds only `use: <name>` and the routes for its exits:
+Steps that several workflows run the same way (the base update, publishing the PR, landing it) go in a shared file, `.agents/workflows/shared/<name>.yaml`, which holds `start`, `steps` and an optional `description`. A route inside it names one of its own steps, `$done` or `$stuck`, or leaves through a named exit, `{ exit: <name> }`. A workflow brings it in with a step that holds only `use: <name>` and the routes for its exits:
 
 ```yaml
-  ship:
-    use: ship
+  publish:
+    use: publish
     outcomes:
-      ci-failed: { to: implement, max: 3 }
-      rejected:  implement
-      stale:     update
+      passed: land
+      failed: { to: implement, max: 3 }
+      stale:  update
 ```
 
-The shared steps keep their own names, so the brief and the record show `open-pr` and `ci`, never `ship`.
+The shared steps keep their own names, so the brief and the record show `describe`, `open-pr` and `checks`, never `publish`. A route to the use step enters the file at its `start`; a route may also name one of its steps, as a base update's light path names `open-pr` to skip `describe`. The pack ships `sync`, `base-update`, `publish` (describe, open the draft PR, wait for its checks; exits `passed`, `failed`, `stale`) and `land` (the person's `ready`, then the merge; exits `rejected`, `stale`, `unpushed`).
+
+### Wait for a pull request's checks
+
+`by: forge.await-checks` waits for the checks on the story's change, polled every tick, so nothing blocks while CI runs. It answers `pass` when every check passed, `fail` when one failed, naming each failed check and its link in the next agent's `last_check` and under Rework (never a log), and `stale` when the change conflicts with its base, since GitHub runs no checks on such a pull request. A forge with no checks (`none`) passes at once; a change that shows no check within `appear` (5m) passes as a repo without CI, and checks still pending after `settle` (30m) fail:
+
+```yaml
+  checks:
+    by: forge.await-checks
+    with: { appear: 10m, settle: 1h }
+    outcomes: { pass: ready, fail: { to: implement, max: 3 }, stale: update }
+```
 
 ### Copy a step with `like:`
 

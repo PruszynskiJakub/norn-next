@@ -23,6 +23,7 @@ import { baseRefOf, cutFrom } from "./branches.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 import { readStepRun } from "./step-runs.ts";
+import { AWAIT_CHECKS, checksText } from "./steps-forge/await-checks.ts";
 import { baseSideOf, recordOf, type Resolved, resolutionOf, roundOf, standing, storyUnits } from "./input-history.ts";
 import { HANDOFFS_DIR, handoffArtifact, listStoryDocs, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
 
@@ -249,7 +250,7 @@ function handoffTemplate(unit: string): string {
 function findingsReceipt(record: UnitJournal, reworkFrom: number | undefined): KernelReceipt | undefined {
   if (reworkFrom !== undefined) {
     const r = record.receipts.find((x) => x.seq === reworkFrom);
-    return r && r.data.kind !== "check.finished" ? r : undefined;
+    return r && !isCheck(r) ? r : undefined;
   }
   const round = roundOf(record);
   const at = round.findLastIndex((x) => carriesFindings(record, x));
@@ -275,9 +276,12 @@ function settles(record: UnitJournal, found: KernelReceipt, later: KernelReceipt
   return d.kind === "run.reported" && d.verb === "done" && d.step === found.data.step && !handsBackFindings(record, d.step, d.outcome);
 }
 
+/** A check's receipt: a check step's, or the change's checks settling, which `last_check` reads alike. */
+const isCheck = (r: KernelReceipt): boolean => r.data.kind === "check.finished" || (r.data.kind === "step.finished" && r.data.step_kind === AWAIT_CHECKS);
+
 function noFindingsNote(record: UnitJournal, brief: BriefInputs): string {
   const by = brief.rework_from !== undefined ? record.receipts.find((x) => x.seq === brief.rework_from) : undefined;
-  if (by?.data.kind !== "check.finished") return "no findings sent this work back";
+  if (!by || !isCheck(by)) return "no findings sent this work back";
   const where = brief.inputs.includes("last_check") ? "under Rework and in `last_check`" : "under Rework";
   return `the check \`${by.data.step ?? "check"}\` sent the work back, with no findings: its output is ${where}`;
 }
@@ -321,7 +325,8 @@ function findingsText(r: KernelReceipt): string | null {
 }
 
 async function lastCheckText(env: RuntimeEnv, record: UnitJournal): Promise<string | null> {
-  const r = record.receipts.findLast((x) => x.data.kind === "check.finished");
+  const r = record.receipts.findLast(isCheck);
+  if (r?.data.kind === "step.finished") return checksText(r.data.step ?? r.data.step_kind, r.data.outcome, r.data.detail) ?? `Check \`${r.data.step ?? r.data.step_kind}\` ended \`${r.data.outcome}\`.`;
   if (!r || r.data.kind !== "check.finished") return null;
   const d = r.data;
   const head = `Check \`${d.step ?? "check"}\` exited ${d.exit} (\`${d.outcome}\`).`;

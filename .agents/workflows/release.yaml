@@ -1,12 +1,12 @@
 # Release workflow — repo-local, for the story a person starts with /release-start
 # (label norn:wf:release). A story workflow without `slices`: every step works in
 # the story worktree. Prepare the release (changelog from the commits on the base since the last
-# tag, proposed version, version bumps, pr.md), open the draft PR, wait for the PR's CI (tests incl.
+# tag, proposed version, version bumps, pr.md), open the draft PR, wait for the PR's checks (tests incl.
 # the stale-schema test, typecheck, npm package and a binary built and smoke-tested) and wait for a
 # person at `ready`, who judges the version and the changelog there; the person merges the PR, and
 # CI smokes every binary on its own OS, tags and publishes on that merge.
 # Any commit on the base makes the changelog incomplete (vcs.stale when: behind): a release
-# waiting at `ready` or `merge` goes back through update and prepare. A red CI means the base is
+# waiting at `ready` or `merge` goes back through update and prepare. A red check means the base is
 # broken: the story goes $stuck; fix the base in its own story, then send the release back through
 # the base update: `norn run rerun gh-N --step update`.
 name: release
@@ -45,33 +45,21 @@ steps:
       done:
         to: update
         means: "base merged into the story branch, conflicts resolved and committed"
+  # prepare writes pr.md, so the release opens its PR without the pack's describe (shared/publish.yaml,
+  # whose every step must be reachable): open-pr and the wait for the PR's checks are its own.
   # release.yml smokes every binary on its own OS after the merge, before it pushes the tag; a red
-  # CI means the base is broken
-  ship:
-    use: ci
-    outcomes: { passed: ready, failed: $stuck, stale: { to: update, counter: stale_loop } }
-  ready:
-    by: person
-    do: >-
-      Read the draft release PR: the proposed version and its reason, and the new CHANGELOG.md section.
-      Approve to wait for the merge (a person merges the PR; CI then tags and publishes), or
-      reject with the version or changelog changes you want.
-    outcomes:
-      approve: merge
-      reject:  prepare
-    on:
-      vcs.stale: { to: update, counter: stale_loop }
-      # the story branch holds commits its PR lacks: push them through open-pr before a person merges
-      vcs.unpushed: open-pr
-  # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
-  # move it counts as stale (vcs.stale) sends it back through update by itself
-  merge:
-    by: forge.await-merge
-    outcomes:
-      merged: $done
-    on:
-      vcs.stale: { to: update, counter: stale_loop }
-      vcs.unpushed: open-pr
+  # check means the base is broken
+  open-pr:
+    by: forge.open-pr
+    outcomes: { done: checks }
+  checks:
+    by: forge.await-checks
+    outcomes: { pass: land, fail: $stuck, stale: { to: update, counter: stale_loop } }
+  # ready, where the person judges the version and the changelog pr.md names, and the merge, after
+  # which CI tags and publishes (the pack's shared/land.yaml)
+  land:
+    use: land
+    outcomes: { rejected: prepare, stale: { to: update, counter: stale_loop }, unpushed: open-pr }
 counters:
   # a stale re-entry is progress from outside (a commit landed on the base), bounded by those commits
   stale_loop: { max: 10 }

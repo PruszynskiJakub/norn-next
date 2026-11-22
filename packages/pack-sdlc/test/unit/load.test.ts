@@ -16,7 +16,7 @@ const load = (file: string) => loadWorkflow(parse(SDLC_PACK.workflows[file] as s
 
 describe("the sdlc pack's workflows", () => {
   test("the real plugins provide every step kind the pack names", () => {
-    expect(Object.keys(STEP_KINDS).sort()).toEqual(["await-merge", "integrate", "open-pr", "push", "update-branch", "verify-base"]);
+    expect(Object.keys(STEP_KINDS).sort()).toEqual(["await-checks", "await-merge", "integrate", "open-pr", "push", "update-branch", "verify-base"]);
   });
 
   test.each(Object.keys(SDLC_PACK.workflows))("%s loads with no errors", (file) => {
@@ -52,16 +52,16 @@ describe("the sdlc pack's workflows", () => {
       return r.ok ? [] : r.errors.map((e) => e.message);
     };
     expect(errors("quick.yaml")).toEqual([
-      "shared/ship.yaml: step 'open-pr' (open-pr) reads `pr_body`, but no step produces it on the path sync.done → implement.done → update.clean → test-merge.pass → open-pr: give a step on that path produces: pr_body",
+      "shared/publish.yaml: step 'open-pr' (open-pr) reads `pr_body`, but no step produces it on the path sync.done → implement.done → update.clean → test-merge.pass → open-pr: give a step on that path produces: pr_body",
     ]);
     expect(errors("story.yaml")).toEqual([
-      "shared/ship.yaml: step 'open-pr' (open-pr) reads `pr_body`, but no step produces it on the path sync.done → slice.done → approve-slices.approve → slices.done → update.clean → test-merge.pass → open-pr: give a step on that path produces: pr_body",
+      "shared/publish.yaml: step 'open-pr' (open-pr) reads `pr_body`, but no step produces it on the path sync.done → slice.done → approve-slices.approve → slices.done → update.clean → test-merge.pass → open-pr: give a step on that path produces: pr_body",
     ]);
   });
 
-  test("without the routes the loader needs, the shipped ship.yaml fails: the edits are what make it load", () => {
-    const shared = { ...SHARED, ship: parse(SDLC_PACK.shared["ship.yaml"] as string) };
-    const merge = shared.ship.steps.merge;
+  test("without the routes the loader needs, the shipped land.yaml fails: the edits are what make it load", () => {
+    const shared = { ...SHARED, land: parse(SDLC_PACK.shared["land.yaml"] as string) };
+    const merge = shared.land.steps.merge;
     merge.outcomes = { stale: { exit: "stale" } };
     const r = loadWorkflow(parse(SDLC_PACK.workflows["quick.yaml"] as string), { stepKinds: STEP_KINDS, sharedFiles: shared, config: DEFAULT_KERNEL_CONFIG });
     expect(r.ok).toBe(false);

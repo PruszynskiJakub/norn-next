@@ -233,7 +233,8 @@ describe("revisions pinned before produces and reads", () => {
     };
     for (const file of ["quick.yaml", "story.yaml"]) {
       const now = loaded(loadWorkflow(workflows[file], opts({ stepKinds: STEP_KINDS, sharedFiles: shared, inputs })));
-      const before = loaded(loadWorkflow(strip(workflows[file]), opts({ stepKinds: STEP_KINDS, sharedFiles: shared, inputs })));
+      // describe is a step of shared/publish.yaml, so its declaration goes from there
+      const before = loaded(loadWorkflow(strip(workflows[file]), opts({ stepKinds: STEP_KINDS, sharedFiles: { ...shared, publish: strip(shared.publish) }, inputs })));
       expect(now.graph.steps.describe?.agent?.produces).toEqual({ pr_body: { file: "pr.md", on: ["done"] } });
       const less = structuredClone(now.graph);
       delete less.steps.describe?.agent?.produces;

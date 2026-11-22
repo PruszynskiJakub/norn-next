@@ -167,12 +167,14 @@ describe("forge none: failures", () => {
     expect(failureOf(await forge.findChanges(["lt-1-login"]))).toMatchObject({ code: "unavailable", retryable: true });
   });
 
-  test("checks are none for a change, not_found for a missing one", async () => {
+  test("checks and the checks report are none for a change, not_found for a missing one", async () => {
     const { repo, forge } = setup();
     repo.branch("lt-1-login");
     const { change } = valueOf(await forge.perform(openLogin, { receipt_id: "r1" }));
     expect(valueOf(await forge.checks(change.id))).toBe("none");
     expect(failureOf(await forge.checks(42)).code).toBe("not_found");
+    expect(valueOf(await (forge.checkReport?.(change.id) ?? Promise.reject(new Error("no checkReport"))))).toEqual({ summary: "none", failed: [] });
+    expect(failureOf(await (forge.checkReport?.(42) ?? Promise.reject(new Error("no checkReport")))).code).toBe("not_found");
   });
 });
 

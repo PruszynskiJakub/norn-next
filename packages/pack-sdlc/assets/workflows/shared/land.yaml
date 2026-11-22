@@ -1,0 +1,27 @@
+# Shared steps — shipped in the sdlc pack; a repo copy under .agents/workflows/shared/ replaces it. A workflow brings them in with `use: land`.
+# A person reads the draft PR at ready, then merges it; the merge ends the story.
+# Exits: `rejected` (the person wants changes), `stale` (the base moved under the story in a way that
+# conflicts: the workflow sends it back through its base update), `unpushed` (the story branch holds
+# commits its PR lacks: the workflow pushes them through open-pr before a person merges).
+description: Wait for a person at ready, then for the PR's merge.
+start: ready
+steps:
+  ready:
+    by: person
+    do: "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change."
+    outcomes:
+      approve: merge
+      reject:  { exit: rejected }
+    on:
+      vcs.stale:    { exit: stale }
+      vcs.unpushed: { exit: unpushed }
+  # a story past ready waits here for a person to merge its PR, marked ready for review first (a forge
+  # merges no draft); the merge ends the story, and a base move it counts as stale (the workflow's
+  # vcs.stale settings) leaves through `stale` by itself
+  merge:
+    by: forge.await-merge
+    outcomes:
+      merged: $done
+    on:
+      vcs.stale:    { exit: stale }
+      vcs.unpushed: { exit: unpushed }

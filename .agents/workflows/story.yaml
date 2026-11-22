@@ -1,7 +1,7 @@
-# Story workflow — repo-local copy of the shipped one, with this repo's check commands and its
-# ci.yml wait, its common steps taken from this repo's shared/ files. Delivers a story a refinement
+# Story workflow — repo-local copy of the shipped one, with this repo's check commands, its common
+# steps taken from shared/ files. Delivers a story a refinement
 # round planned: sync, cut slices against the current base, approve them, run the slices, update, check, QA the whole story once, describe, open the draft PR,
-# wait for its CI, wait for a person at ready, then at merge for the PR's merge. The local check runs the unit tier and the type
+# wait for its checks, wait for a person at ready, then at merge for the PR's merge. The local check runs the unit tier and the type
 # check; CI runs the integration tier sharded. Story-level rework is reviewed before it is
 # checked again.
 # QA reports a verdict per acceptance criterion (produces: [criteria]) and may only report the outcome
@@ -44,7 +44,7 @@ steps:
     outcomes: { done: update, stuck: $stuck }
   base-update:
     use: base-update
-    outcomes: { tested: qa, failed: implement, merged: open-pr, redescribe: describe }
+    outcomes: { tested: qa, failed: implement, merged: open-pr, redescribe: publish }
   qa:
     by: qa
     do: "The criteria are spec.md's frontmatter `criteria`; an id `<nn>.<id>` is criterion `<id>` of slice file `<nn>-*.md`, which says what it means."
@@ -54,7 +54,7 @@ steps:
     produces: [criteria]
     outcomes:
       pass:
-        to: describe
+        to: publish
         verdict: pass
         means: "every acceptance criterion of the story and its slices observed with evidence"
       fail:
@@ -75,13 +75,13 @@ steps:
     by: person
     do: "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed."
     outcomes:
-      approve: describe
+      approve: publish
       reject:  { to: implement, counter: qa_loop }
     on:
       vcs.stale: { to: update, counter: stale_loop }
   implement:
     by: builder
-    do: "Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in CI, which the `ci` check waits for, so do not run them before handing back."
+    do: "Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in CI, which the `checks` step waits for, so do not run them before handing back."
     with: { skills: [norn-implement] }
     reads: [spec, handoff, last_check, findings?]
     outcomes:
@@ -103,21 +103,11 @@ steps:
         to: implement
         means: "blocking findings, handed back as findings"
         produces: [findings]
-  describe:
-    by: writer
-    do: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
-    with: { skills: [norn-pr] }
-    reads: [spec, diff, record]
-    # open-pr reads it; norn done refuses the report while pr.md is missing or empty
-    produces: [{ name: pr_body, file: pr.md }]
-    outcomes:
-      done:
-        to: open-pr
-        means: "pr.md describes the branch as it is now: summary, evidence, merge danger"
-  # a red run's failures become last_check for implement, whose rework goes back through open-pr to the new head
-  ship:
-    use: ci
-    outcomes: { passed: ready, failed: { to: implement, max: 3 }, stale: { to: update, counter: stale_loop } }
+  # describe, open-pr and the wait for the PR's checks (the pack's shared/publish.yaml); a failed
+  # check's whereabouts become last_check for implement, whose rework goes back through open-pr to the new head
+  publish:
+    use: publish
+    outcomes: { passed: land, failed: { to: implement, max: 3 }, stale: { to: update, counter: stale_loop } }
   land:
     use: land
     outcomes: { rejected: implement, stale: { to: update, counter: stale_loop }, unpushed: open-pr }

@@ -40,6 +40,8 @@ export interface FakePr {
   mergeSha?: string;
   mergedAt?: string;
   checks?: Exclude<ChecksSummary, "none">;
+  /** what `--json mergeable` answers; MERGEABLE when unset */
+  mergeable?: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
 }
 
 export interface FakeGh {
@@ -121,6 +123,7 @@ export function fakeGh(login = LOGIN): FakeGh {
     baseRefName: p.base,
     mergedAt: p.mergedAt ?? null,
     mergeCommit: p.mergeSha ? { oid: p.mergeSha } : null,
+    mergeable: p.mergeable ?? "MERGEABLE",
   });
   const newestFirst = <T extends { number: number }>(rows: T[]) => [...rows].sort((x, y) => y.number - x.number);
   const limit = (argv: string[]) => Number(flag(argv, "--limit") ?? 30);
@@ -223,12 +226,14 @@ export function fakeGh(login = LOGIN): FakeGh {
       return { stderr: `✓ Pull request ${REPO}#${p.number} (${p.title}) is marked as "ready for review"\n` };
     }
     if (cmd === "pr checks") {
-      if (flag(argv, "--json") !== "bucket") return undefined;
+      const fields = flag(argv, "--json");
+      if (fields !== "bucket" && fields !== "name,bucket,link") return undefined;
       const p = prAt(n);
       if (!p) return noPr(n ?? "");
       if (!p.checks) return err(`no checks reported on the '${p.head}' branch`);
       const buckets = { success: ["pass", "skipping"], pending: ["pass", "pending"], failure: ["pass", "fail"] }[p.checks];
-      return { code: p.checks === "pending" ? 8 : p.checks === "failure" ? 1 : 0, stdout: JSON.stringify(buckets.map((bucket) => ({ bucket }))) };
+      const rows = buckets.map((bucket, i) => ({ name: ["lint", "test"][i], bucket, link: `${WEB}/actions/runs/1/job/${6 + i}` }));
+      return { code: p.checks === "pending" ? 8 : p.checks === "failure" ? 1 : 0, stdout: JSON.stringify(rows.map((r) => pick(r, fields))) };
     }
     if (cmd === "api graphql") {
       const fs = values(argv, "-f");

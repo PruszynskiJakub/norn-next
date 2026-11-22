@@ -10,7 +10,8 @@ import wfSliceYaml from "../assets/workflows/slice.yaml" with { type: "text" };
 import wfStoryYaml from "../assets/workflows/story.yaml" with { type: "text" };
 import wfTriageYaml from "../assets/workflows/triage.yaml" with { type: "text" };
 import sharedBaseUpdateYaml from "../assets/workflows/shared/base-update.yaml" with { type: "text" };
-import sharedShipYaml from "../assets/workflows/shared/ship.yaml" with { type: "text" };
+import sharedLandYaml from "../assets/workflows/shared/land.yaml" with { type: "text" };
+import sharedPublishYaml from "../assets/workflows/shared/publish.yaml" with { type: "text" };
 import sharedSyncYaml from "../assets/workflows/shared/sync.yaml" with { type: "text" };
 
 /** workflow file name to its YAML text */
@@ -26,6 +27,7 @@ export const WORKFLOWS: Record<string, string> = {
 /** shared file name to its YAML text */
 export const SHARED: Record<string, string> = {
   "base-update.yaml": sharedBaseUpdateYaml,
-  "ship.yaml": sharedShipYaml,
+  "land.yaml": sharedLandYaml,
+  "publish.yaml": sharedPublishYaml,
   "sync.yaml": sharedSyncYaml,
 };

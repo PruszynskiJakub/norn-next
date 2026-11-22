@@ -278,6 +278,8 @@ export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: Step
   return {
     probe: kind("probe", "effect", ["done", "conflict"], [{ name: "notes", fallback: "probes without notes" }]),
     "await-thing": kind("await-thing", "wait", ["ready"]),
+    // named as the forge's kind, so last_check and the rework text read its settled outcome
+    "await-checks": kind("await-checks", "wait", ["pass", "fail", "stale"]),
     // named as the vcs plugin's kind, so the inputs that read the base update's receipts find it
     "update-branch": kind("update-branch", "effect", ["done", "conflict", "resolved"]),
     integrate: kind("integrate", "effect", ["done", "conflict"]),
@@ -416,6 +418,19 @@ export const WORKFLOWS: Record<string, string> = {
     "  build:",
     "    agent: Build the thing.",
     "    outcomes: { done: ready }",
+    "",
+  ].join("\n"),
+  "awaited.yaml": [
+    "name: awaited",
+    "start: checks",
+    "steps:",
+    "  checks:",
+    "    await-checks: null",
+    "    outcomes: { pass: $done, fail: { to: rework, max: 3 }, stale: $stuck }",
+    "  rework:",
+    "    agent: Fix what the checks found.",
+    "    inputs: [last_check]",
+    "    outcomes: { done: checks }",
     "",
   ].join("\n"),
   "resolving.yaml": [

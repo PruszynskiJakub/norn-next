@@ -1,7 +1,7 @@
 # Quick workflow — repo-local copy of the shipped one (label norn:wf:quick), with this repo's
-# check commands and its ci.yml wait, its common steps taken from this repo's shared/ files. For refactors, docs, chores, other small changes and the fix of
+# check commands, its common steps taken from shared/ files. For refactors, docs, chores, other small changes and the fix of
 # a bug `reproduce` confirmed. A story workflow without `slices`: every step works in the story
-# worktree. Sync, implement, update, check, review, describe, open the draft PR, wait for its CI, and
+# worktree. Sync, implement, update, check, review, describe, open the draft PR, wait for its checks, and
 # wait for a person at ready, then at merge until the person merges the PR. The local check runs the unit tier and the
 # type check; CI runs the integration tier sharded.
 name: quick
@@ -23,7 +23,7 @@ steps:
       changing any code, then fix the cause.
       Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
       Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (norn runs its agent with NORN_UNIT set) and a dev build run there would act on its claim and on its run state (state.json, receipts) in the checkout's machine dir.
-      Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in CI, which the `ci` check waits for, so do not run them before handing back.
+      Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in CI, which the `checks` step waits for, so do not run them before handing back.
     with: { skills: [norn-implement] }
     reads: [spec, handoff, last_check, findings?]
     outcomes:
@@ -32,7 +32,7 @@ steps:
         means: "the change is made; each behaviour change and rework point has a passing test"
   base-update:
     use: base-update
-    outcomes: { tested: review, failed: implement, merged: open-pr, redescribe: describe }
+    outcomes: { tested: review, failed: implement, merged: open-pr, redescribe: publish }
   review:
     by: reviewer
     do: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
@@ -40,27 +40,17 @@ steps:
     reads: [spec, diff, findings?]
     outcomes:
       approve:
-        to: describe
+        to: publish
         means: "the change does what the story asks and nothing else, no blocking findings"
       changes_requested:
         to: implement
         means: "blocking findings, handed back as findings"
         produces: [findings]
-  describe:
-    by: writer
-    do: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
-    with: { skills: [norn-pr] }
-    reads: [spec, diff, handoff]
-    # open-pr reads it; norn done refuses the report while pr.md is missing or empty
-    produces: [{ name: pr_body, file: pr.md }]
-    outcomes:
-      done:
-        to: open-pr
-        means: "pr.md describes the branch as it is now: summary, evidence, merge danger"
-  # a red run's failures become last_check for implement, whose rework goes back through open-pr to the new head
-  ship:
-    use: ci
-    outcomes: { passed: ready, failed: { to: implement, max: 3 }, stale: { to: update, counter: stale_loop } }
+  # describe, open-pr and the wait for the PR's checks (the pack's shared/publish.yaml); a failed
+  # check's whereabouts become last_check for implement, whose rework goes back through open-pr to the new head
+  publish:
+    use: publish
+    outcomes: { passed: land, failed: { to: implement, max: 3 }, stale: { to: update, counter: stale_loop } }
   land:
     use: land
     outcomes: { rejected: implement, stale: { to: update, counter: stale_loop }, unpushed: open-pr }

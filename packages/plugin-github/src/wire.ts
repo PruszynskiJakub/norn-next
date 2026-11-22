@@ -93,6 +93,12 @@ export const GhPrs = Type.Array(GhPr);
 
 export const GhChecks = Type.Array(Type.Object({ bucket: Type.String() }));
 
+/** `gh pr checks --json name,bucket,link`: each check with where its run is. */
+export const GhCheckRows = Type.Array(Type.Object({ name: Type.String(), bucket: Type.String(), link: Nullable(Type.String()) }));
+
+/** `gh pr view --json mergeable`: MERGEABLE, CONFLICTING, or UNKNOWN while GitHub computes it. */
+export const GhMergeable = Type.Object({ mergeable: Type.String() });
+
 export const GhPrsByBranch = Type.Object({
   data: Type.Object({
     repository: Type.Union([Type.Record(Type.String(), Type.Union([Type.Object({ nodes: GhPrs }), Type.Null()])), Type.Null()]),

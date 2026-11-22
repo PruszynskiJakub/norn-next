@@ -25,7 +25,7 @@ const quickAgent: AgentScript = (step, visit, run) => {
 };
 
 describe("a local tracker item through the quick workflow", () => {
-  test("intake, sync, implement, update, test, review, describe, open-pr, ci, ready, merge, done", async () => {
+  test("intake, sync, implement, update, test, review, describe, open-pr, checks, ready, merge, done", async () => {
     const t = await team();
     const m = await machine(t, { name: "a", script: quickAgent });
     const made = await m.env.slots.tracker.perform({ kind: "create", title: "Add the feature", body: "Add it.", labels: ["norn"], assignee: "me" }, { receipt_id: "create-1" });

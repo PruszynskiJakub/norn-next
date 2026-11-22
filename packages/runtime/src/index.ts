@@ -62,6 +62,7 @@ export { VERIFY_BASE_KIND, vcsSignalSources } from "./signal-vcs.ts";
 export { gatherSignals, waitingVisit, type WaitingVisit } from "./signals.ts";
 export { DEFAULT_TRACE_RETAIN_MS, pruneTraces, removeUnitLogs, TRACE_PRUNE_PER_TICK } from "./retention.ts";
 export { createRuntime, createRuntimeEnv } from "./runtime.ts";
+export { awaitChecks, checksText } from "./steps-forge/await-checks.ts";
 export { awaitMerge } from "./steps-forge/await-merge.ts";
 export { openPr } from "./steps-forge/open-pr.ts";
 export { stepsForgePlugin } from "./steps-forge/plugin.ts";
