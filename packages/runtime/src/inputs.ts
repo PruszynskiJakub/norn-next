@@ -25,7 +25,7 @@ import { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 import { readStepRun } from "./step-runs.ts";
 import { AWAIT_CHECKS, checksText } from "./steps-forge/await-checks.ts";
 import { baseSideOf, recordOf, type Resolved, resolutionOf, roundOf, standing, storyUnits } from "./input-history.ts";
-import { HANDOFFS_DIR, handoffArtifact, listStoryDocs, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
+import { HANDOFFS_DIR, handoffArtifact, listStoryDocs, readStoryDoc, removeStoryDoc, writeStoryDoc } from "./story-docs.ts";
 
 const AGENTS_DIR = ".agents";
 /** the folder of each story's documents in a worktree: `.agents/specs/<story>/` */
@@ -236,7 +236,36 @@ export async function readBackDocs(env: RuntimeEnv, unit: string, worktree = wor
     }
     back.push(d.name);
   }
+  await dropRemovedSlices(env, unit, worktree);
   return back;
+}
+
+/**
+ * Remove from the story's documents each slice file norn placed in the story's worktree that is gone
+ * from it now: a re-slice renames or drops files, and a stale copy kept beside the new plan would give
+ * two slices one number. Only a file whose base copy is there was placed by norn, so a document this
+ * worktree never held is left alone, and only the story's own worktree holds the whole plan.
+ */
+async function dropRemovedSlices(env: RuntimeEnv, unit: string, worktree: string): Promise<void> {
+  if (parseUnitId(unit)?.slice !== null) return;
+  const bases = doc(SLICES, unit, SLICES).base;
+  let names: string[];
+  try {
+    names = (await env.ctx.files.list(`${worktree}/${bases}`)).filter((n) => n.endsWith(".md"));
+  } catch {
+    return;
+  }
+  for (const n of names) {
+    const d = sliceDoc(unit, `${SLICES}/${n}`);
+    if ((await readFile(env, `${worktree}/${d.file}`)) !== null) continue;
+    const removed = await removeStoryDoc(env, unit, d.artifact);
+    if (!removed.ok) continue;
+    try {
+      await env.ctx.files.remove(`${worktree}/${d.base}`);
+    } catch {
+      // the document is gone; a base left behind only asks to remove it once more
+    }
+  }
 }
 
 function handoffTemplate(unit: string): string {

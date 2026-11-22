@@ -53,6 +53,21 @@ export async function writeStoryDoc(env: RuntimeEnv, unit: string, path: string,
   }
 }
 
+/** Remove the document; removing one that is not there is not an error. */
+export async function removeStoryDoc(env: RuntimeEnv, unit: string, path: string): Promise<PluginResult<null>> {
+  const story = storyOf(unit);
+  const artifacts = env.slots.store.artifacts;
+  if (artifacts) return artifacts.remove(story, path);
+  const clean = normalizeArtifactPath(path);
+  if (clean === null) return fail("invalid", `${JSON.stringify(path)} cannot name a story document`, false);
+  try {
+    await env.ctx.files.remove(fallbackPath(env, story, clean));
+    return ok(null);
+  } catch (e) {
+    return fail("unavailable", `removing ${clean} of ${story}: ${message(e)}`);
+  }
+}
+
 /** The story's documents in `folder` (`slices`), as paths under it, sorted; one level only. */
 export async function listStoryDocs(env: RuntimeEnv, unit: string, folder: string): Promise<PluginResult<string[]>> {
   const story = storyOf(unit);
