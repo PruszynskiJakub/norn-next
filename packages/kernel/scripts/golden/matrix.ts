@@ -127,7 +127,7 @@ export const MATRIX: Scenario[] = [
     SLICE(),
     (w) => {
       seed(w, "gh-60", { workflow: "slice", step: "implement", claim: claim(w, "gh-60", { holder: "machine-b" }) });
-      seed(w, "gh-61", { workflow: "slice", step: "test", claim: claim(w, "gh-61", { holder: "machine-b", expires_at: earlier(w, 5) }) });
+      seed(w, "gh-61", { workflow: "slice", step: "check", claim: claim(w, "gh-61", { holder: "machine-b", expires_at: earlier(w, 5) }) });
       seed(w, "gh-62", { workflow: "slice", step: "review", claim: null });
       seed(w, "gh-63", { workflow: "slice", step: "implement", claim: claim(w, "gh-63", { expires_at: earlier(w, 1) }) });
     },
@@ -166,10 +166,10 @@ export const MATRIX: Scenario[] = [
     (w) => {
       seed(w, "gh-70", { workflow: "slice", step: "implement" });
       w.unit("gh-70").corrupt = "receipt 4 (01JD...): /data/outcome must be string";
-      seed(w, "gh-71", { workflow: "slice", step: "test", state: { ended: "corrupt", ended_reason: "run state v3: /step must match pattern" } });
-      seed(w, "gh-72", { workflow: "slice", step: "test" });
-      const files = shippedFiles("slice") as { slice: { steps: { test: { timeout: string } } } };
-      files.slice.steps.test.timeout = "5m";
+      seed(w, "gh-71", { workflow: "slice", step: "check", state: { ended: "corrupt", ended_reason: "run state v3: /step must match pattern" } });
+      seed(w, "gh-72", { workflow: "slice", step: "check" });
+      const files = shippedFiles("slice") as { slice: { steps: { check: { timeout: string } } } };
+      files.slice.steps.check.timeout = "5m";
       const older = loadWorkflow(files.slice, { stepKinds: STEP_KINDS, sharedFiles: {}, config: config() });
       if (!older.ok) throw new Error("the older slice workflow fails to load");
       adjust(w, "gh-72", (s) => ({ ...s, workflow: older.workflow.pinned }));
@@ -197,7 +197,7 @@ export const MATRIX: Scenario[] = [
       seed(w, "gh-83", { workflow: "slice", step: "implement", run: {} });
       w.unit("gh-83").session = session("working");
       w.story("gh-83").change = { id: 7, url: "https://forge.example/pr/7", state: "merged", draft: false, head_branch: "gh-83-x", base_branch: "main", head_sha: "c7", merge_sha: "m7", merged_at: w.iso(), title: "Story 83" };
-      seed(w, "gh-84", { workflow: "slice", step: "test", run: { executor: "check" }, item: item(84, "Story 84", { open: false }) });
+      seed(w, "gh-84", { workflow: "slice", step: "check", run: { executor: "check" }, item: item(84, "Story 84", { open: false }) });
       w.unit("gh-84").step_run = { kind: "check", running: true };
       seed(w, "gh-85", { workflow: "slice", step: "implement", run: {}, item: item(85, "Story 85", { open: false }) });
       w.unit("gh-85").session = session("ended");
@@ -562,8 +562,8 @@ export const MATRIX: Scenario[] = [
     "A person's move to a step: a unit stuck on a spent counter goes back to implement with the counter reset and its agent starts the tick after; a rerun of a step whose agent is still at work stops the run first, the order recorded, then applies the move with that order; a move on a unit that ended done, and one to a step the pinned workflow lacks, are refused onto the record.",
     SLICE(),
     (w) => {
-      seed(w, "gh-210", { workflow: "slice", step: "test", state: { counters: { "test.fail": 5, "integrate.conflict": 0, "review.changes_requested": 0 }, ended: "stuck", ended_reason: "counter test.fail ran out (5/5) at test.fail", exhausted: "test.fail" } });
-      w.append("gh-210", { kind: "step.moved", to: "implement", reset: ["test.fail"], by: "person", step: "test", attempt: 1 });
+      seed(w, "gh-210", { workflow: "slice", step: "check", state: { counters: { "check.fail": 5, "integrate.conflict": 0, "review.changes_requested": 0 }, ended: "stuck", ended_reason: "counter check.fail ran out (5/5) at check.fail", exhausted: "check.fail" } });
+      w.append("gh-210", { kind: "step.moved", to: "implement", reset: ["check.fail"], by: "person", step: "check", attempt: 1 });
       seed(w, "gh-211", { workflow: "slice", step: "implement", run: {} });
       w.unit("gh-211").session = session("working");
       w.append("gh-211", { kind: "step.moved", to: "implement", by: "person", reason: "the agent misread the slice", step: "implement", attempt: 1 });
@@ -584,11 +584,11 @@ export const MATRIX: Scenario[] = [
       const w = world({ files: shippedFiles("slice"), config: config({ mode: "manual" }) });
       seed(w, "gh-196", { workflow: "slice", step: "implement" });
       w.manual.add("gh-196");
-      seed(w, "gh-197", { workflow: "slice", step: "test", run: { executor: "check" } });
+      seed(w, "gh-197", { workflow: "slice", step: "check", run: { executor: "check" } });
       w.unit("gh-197").step_run = { kind: "check", running: true };
       w.tick();
       w.append("gh-196", { kind: "run.requested", by: "person", step: "implement", attempt: 1 });
-      w.append("gh-197", { kind: "run.requested", by: "person", step: "test", attempt: 1 });
+      w.append("gh-197", { kind: "run.requested", by: "person", step: "check", attempt: 1 });
       w.tick();
       w.tick();
       const fired = new Set(w.ticks.flatMap((t) => t.decisions.map((d) => d.rule)));
