@@ -254,6 +254,16 @@ function publishedLine(evidence: ReportEvidence | undefined): string {
   return `Published evidence, to cite as \`evidence:<name>\`: ${evidence.files.map((f) => code(f.name)).join(", ")}`;
 }
 
+/**
+ * The evidence the story's latest criteria report kept, across all its units; undefined when that
+ * report kept none, so an earlier, superseded QA run's files are never what a pull request shows.
+ */
+export function latestReportEvidence(units: readonly UnitJournal[]): ReportEvidence | undefined {
+  let latest: KernelReceipt | undefined;
+  for (const u of units) for (const r of u.receipts) if (r.data.kind === "run.reported" && r.data.criteria && (!latest || r.at >= latest.at)) latest = r;
+  return latest?.data.kind === "run.reported" ? latest.data.evidence : undefined;
+}
+
 /** The story's record: each unit's outcomes, gate rulings and criteria reports with their evidence. */
 export async function recordOf(env: RuntimeEnv, record: UnitJournal): Promise<Resolved> {
   const story = parseUnitId(record.unit)?.story ?? record.unit;

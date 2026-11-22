@@ -5,14 +5,14 @@
  */
 import type { KeptFile } from "@norn/plugin-api";
 import { parseUnitId } from "@norn/plugin-api";
-import { type KeptEvidenceFile, REPORT_TYPES, type ReportEvidence } from "@norn/schema";
+import { evidenceRef as storyEvidenceRef, type KeptEvidenceFile, REPORT_TYPES, type ReportEvidence } from "@norn/schema";
 import type { RuntimeEnv } from "./env.ts";
 import { compressEvidence } from "./evidence-compress.ts";
 import { EVIDENCE_COPIES_DIR, OUT_DIR, worktreeOf } from "./inputs.ts";
 
-/** The ref a story's evidence commits are kept on: norn's own, never a branch. */
-export function evidenceRef(unit: string): string {
-  return `refs/norn/evidence/${parseUnitId(unit)?.story ?? unit}`;
+/** The ref a unit's story keeps its evidence commits on: norn's own, never a branch. */
+function evidenceRef(unit: string): string {
+  return storyEvidenceRef(parseUnitId(unit)?.story ?? unit);
 }
 
 /** Where the agent writes its evidence, relative to the worktree. */

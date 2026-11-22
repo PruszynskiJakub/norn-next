@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { JSON_DIR, renderSchema } from "../../scripts/emit.ts";
 import {
+  evidenceRef,
   HEADS_REF_PREFIX,
   headsRef,
   PUBLISHED_SCHEMAS,
@@ -109,6 +110,10 @@ describe("refs", () => {
   test("the heads ref sits beside the other norn ref prefixes", () => {
     expect(headsRef("gh-7")).toBe("refs/norn/heads/gh-7");
     expect(HEADS_REF_PREFIX).toBe("refs/norn/heads/");
+  });
+
+  test("a story's evidence ref is a norn ref, never a branch", () => {
+    expect(evidenceRef("gh-7")).toBe("refs/norn/evidence/gh-7");
   });
 });
 

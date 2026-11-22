@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { memoryHost } from "@norn/conformance";
+import type { ReceiptData } from "@norn/kernel";
 import { fail, ok, parseJson } from "@norn/plugin-api";
+import { deriveUlid } from "@norn/schema";
 import { Type } from "@sinclair/typebox";
 import { acquireTickLock, createRuntime, readStoryDoc, reportRun, tickLockPath, tracePath, writeStoryDoc } from "../../src/index.ts";
-import { type Harnessed, has, harness, MINUTE, type Report, record, rulesOf, session, START, tickUntil, trackerItem } from "./support.ts";
+import { type Harnessed, type HarnessOptions, has, harness, MINUTE, type Report, record, rulesOf, session, START, tickUntil, trackerItem } from "./support.ts";
 
 const lastRules = (reports: Report[]) => reports.map(rulesOf);
 
@@ -71,6 +73,48 @@ describe("a story from intake to done", () => {
     expect(intents.at(-1)).toBeUndefined();
     expect([probe.slots.vcs?.name, probe.slots.forge?.name, probe.slots.tracker?.name]).toEqual(["fake", "fake", "fake"]);
     expect(h.stepCalls.filter((c) => c.kind === "await-thing")).toHaveLength(3);
+  });
+});
+
+describe("the evidence a step kind reads", () => {
+  const A = "a".repeat(40);
+  const B = "b".repeat(40);
+  const qa = (step: string, evidence?: { commit: string; files: { name: string; kept: string }[] }): ReceiptData => ({
+    kind: "run.reported",
+    step,
+    attempt: 1,
+    run_id: `r-${step}`,
+    verb: "done",
+    outcome: "pass",
+    criteria: [{ id: "AC1", verdict: "pass", evidence: "ran it" }],
+    ...(evidence && { evidence }),
+  });
+  /** the probe's evidence after the given QA reports, appended in order to slice units of lt-1, a minute apart */
+  async function probed(reports: [string, ReceiptData][], opts: Partial<HarnessOptions> = {}) {
+    const h = harness({ workflow: "stepped", ...opts });
+    h.items.push(trackerItem(1));
+    let n = 0;
+    for (const [unit, data] of reports) {
+      h.clock.advance(MINUTE);
+      const r = await h.env.slots.store.appendReceipt(unit, { id: deriveUlid("01JD5H00000000000000000000", n++), data });
+      if (!r.ok) throw new Error(r.failure.message);
+    }
+    await tickUntil(h, has("step.finished"));
+    return (h.stepCalls.find((c) => c.kind === "probe")?.input as { evidence?: unknown }).evidence;
+  }
+
+  test("is what the story's latest criteria report kept, across its units", async () => {
+    const kept = { commit: B, files: [{ name: "AC2.png", kept: "AC2.webp" }] };
+    expect(await probed([["lt-1/01", qa("qa", { commit: A, files: [{ name: "AC1.md", kept: "AC1.md" }] })], ["lt-1/02", qa("qa", kept)]])).toEqual(kept);
+  });
+
+  test("a superseded QA run's evidence is never handed on: a latest report that kept none hands none", async () => {
+    expect(await probed([["lt-1/01", qa("qa", { commit: A, files: [{ name: "AC1.md", kept: "AC1.md" }] })], ["lt-1/02", qa("qa")]])).toBeUndefined();
+  });
+
+  test("none with evidence.publish false", async () => {
+    const h = [["lt-1/01", qa("qa", { commit: A, files: [{ name: "AC1.md", kept: "AC1.md" }] })]] as [string, ReceiptData][];
+    expect(await probed(h, { evidencePublish: false })).toBeUndefined();
   });
 });
 

@@ -5,11 +5,14 @@
  * workflow's light path (a base update when only the base moved) reaches open-pr again without
  * describe, on a change an earlier pass already described, whose body file the worktree still holds.
  * The branch is pushed first (when the vcs pushes at all), after taking in what a person pushed to it,
- * so the change shows the head this step saw.
+ * so the change shows the head this step saw. Each `evidence:<name>` link of the body is pointed at the
+ * forge's URL of that file in the commit the story's latest criteria report kept, and the evidence ref
+ * is pushed before the forge effect, so no body ever links to a commit the remote lacks.
  */
-import { fail, type ForgeEffect, type HostContext, ok, parseStoryKey, type PluginResult, type StepKindDefinition, type StepKindInput, type StepKindOutcome, type Vcs } from "@norn/plugin-api";
-import { PR_BODY_FILE, SPECS_DIR } from "@norn/schema";
+import { fail, type Forge, type ForgeEffect, type HostContext, ok, parseStoryKey, type PluginResult, type StepKindDefinition, type StepKindInput, type StepKindOutcome, type Vcs } from "@norn/plugin-api";
+import { evidenceRef, PR_BODY_FILE, SPECS_DIR } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
+import { type EvidenceLink, evidenceLinks, resolveEvidenceLinks } from "./evidence-links.ts";
 
 export const OpenPrConfig = Type.Object(
   {
@@ -97,6 +100,32 @@ async function takeRemote(vcs: Vcs, branch: string, head: string | null): Promis
   return ok(merged.value.head);
 }
 
+const linkKey = (link: EvidenceLink): string => `${link.form}:${link.name}`;
+
+/**
+ * The forge URL of each evidence link of `text` that names a file the story's latest criteria report
+ * kept, keyed by `linkKey`; empty when nothing can be published: no evidence, a forge that serves no
+ * raw URLs, a vcs that pushes no ref, or an evidence commit this repo lacks (the story was taken to
+ * another machine), each of which leaves the links as text rather than failing the step.
+ */
+async function evidenceUrls(input: StepKindInput<OpenPrConfig>, forge: Forge, vcs: Vcs | undefined, text: string): Promise<PluginResult<Map<string, string>>> {
+  const urls = new Map<string, string>();
+  const evidence = input.evidence;
+  const links = evidenceLinks(text);
+  if (!evidence || links.length === 0 || !forge.capabilities.raw_urls || !forge.fileUrl || !vcs?.pushRef || !vcs.capabilities.push) return ok(urls);
+  const local = await vcs.head(evidence.commit);
+  if (!local.ok) return local;
+  if (local.value === null) return ok(urls);
+  for (const link of links) {
+    const file = evidence.files.find((f) => f.name === link.name);
+    if (!file || urls.has(linkKey(link))) continue;
+    const url = await forge.fileUrl(evidence.commit, file.kept, link.form);
+    if (!url.ok) return url;
+    if (url.value !== null) urls.set(linkKey(link), url.value);
+  }
+  return ok(urls);
+}
+
 async function run(input: StepKindInput<OpenPrConfig>, ctx: HostContext): Promise<PluginResult<StepKindOutcome>> {
   const forge = input.slots?.forge;
   if (!forge) return fail("invalid", "open-pr: the repo has no forge configured", false);
@@ -123,7 +152,16 @@ async function run(input: StepKindInput<OpenPrConfig>, ctx: HostContext): Promis
       if (!pushed.ok) return pushed;
     }
   }
-  const text = await bodyText(ctx, input);
+  const written = await bodyText(ctx, input);
+  const urls = await evidenceUrls(input, forge, vcs, written);
+  if (!urls.ok) return urls;
+  // the ref goes up before any body links to it; a failed push is retried, since nothing changed on the forge
+  if (urls.value.size > 0 && vcs?.pushRef) {
+    const ref = evidenceRef(input.story);
+    const up = await vcs.pushRef(ref);
+    if (!up.ok) return fail(up.failure.code, `open-pr: pushing the evidence ref ${ref} failed, so no change was opened or updated: ${up.failure.message}`, true);
+  }
+  const text = resolveEvidenceLinks(written, (link) => urls.value.get(linkKey(link)) ?? null);
   const item = await storyItem(input);
   const title = item.title ?? heading(text) ?? input.story;
   const body = composeBody(text, input.story, item.url);
