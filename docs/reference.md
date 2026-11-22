@@ -243,9 +243,19 @@ A report is a registered type with one place in the run folder's `out/`, which t
 |---|---|---|
 | `criteria` | `$NORN_OUT/criteria.json` | a JSON array with one verdict per acceptance criterion (`pass` with `evidence`, `fail` with `repro`, `person` with `how`, `unverified` with `reason` and `how`), covering exactly the unit's frontmatter `criteria` |
 | `findings` | `$NORN_OUT/findings.json` | `{"findings": [...]}` or the array alone, each with a `title` and a `severity` (`blocking`, `major`, `minor`, `nit`), and where it can `file`, `line`, `criterion`, `detail` and `repro` |
-| `evidence` | `$NORN_OUT/evidence/` | the files a criteria verdict's `evidence` names; norn keeps the report that names them, not the files |
+| `evidence` | `$NORN_OUT/evidence/` | the files a criteria verdict's `evidence` names; a QA report keeps them on the remote ([Evidence](#evidence)) |
 
 The brief lists every report and file the step produces under Outputs, each with where it goes, what it holds and the outcomes that need it, beside the handoff, which every agent step keeps whether or not its workflow lists it. `norn done --criteria <file>` and `--findings <file>` still read a report from elsewhere, in place of its file in `$NORN_OUT`.
+
+### Evidence
+
+When an agent's QA report goes through `norn done`, norn keeps the files in `$NORN_OUT/evidence/` as a commit on `refs/norn/evidence/<story>`, a ref of its own and never a branch, so they never touch the story branch, its diff or the base. `forge.open-pr` pushes that ref with the branch and links each file from the pull request body at that commit: a screenshot shows inline, any other file opens on the forge. A report with no evidence files keeps nothing, and a refused report keeps nothing.
+
+- **Compression.** An image is scaled to at most 1600 px wide, its aspect kept, and re-encoded as WebP at quality 80, and the WebP is kept only when it is smaller. A GIF, an image the codec cannot read and any other file is kept as it was. A file still over 10 MB once compressed is not kept, and `norn done` names it. The files in `$NORN_OUT/evidence/` stay as the agent wrote them.
+- **Who sees it.** The evidence is as visible as the repo: everyone who can see the repo sees it, and nobody else. Redact secrets before reporting.
+- **Turning it off.** `evidence.publish: false` in any config file keeps nothing and pushes nothing, and the body names the files as text. A forge that cannot link a commit's files, such as forge-none, never publishes.
+- **CI.** The ref is not a branch, so a CI that runs on branches and pull requests starts no run for it; a repo whose CI runs on every pushed ref starts a run for it.
+- **Deleting.** norn never deletes the ref, so merged pull requests keep their evidence. Delete it by hand with `git push origin :refs/norn/evidence/<story>`.
 
 ### Produced files
 
@@ -775,6 +785,8 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `evidence.publish` | boolean | `true` |
 
 Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner`, `runners.person`, `runners.agent`, `runners.none` take the keys of the plugin they name; that plugin checks them.
+
+`evidence.publish` keeps an agent QA report's evidence on `refs/norn/evidence/<story>` of the remote and links it from the pull request body, so it is as visible as the repo; `false` keeps nothing and pushes nothing, and forge-none never publishes ([Evidence](#evidence)).
 
 ### Shipped workflows
 
