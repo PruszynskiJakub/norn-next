@@ -14,7 +14,7 @@ export const REPO_WORKFLOWS_DIR = ".agents/workflows";
 export interface RepoWorkflows {
   /** workflow file name (`story.yaml`) to its text */
   workflows: Record<string, string>;
-  /** shared file name (`sync.yaml`) to its text */
+  /** shared file name (`catch-up.yaml`) to its text */
   shared: Record<string, string>;
 }
 

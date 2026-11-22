@@ -1,8 +1,6 @@
-# Shared steps — shipped in the sdlc pack; a repo copy under .agents/workflows/shared/ replaces it. A workflow brings them in with `use: land`.
-# A person reads the draft PR at ready, then merges it; the merge ends the story.
-# Exits: `rejected` (the person wants changes), `stale` (the base moved under the story in a way that
-# conflicts: the workflow sends it back through its base update), `unpushed` (the story branch holds
-# commits its PR lacks: the workflow pushes them through open-pr before a person merges).
+# Use once the draft PR is open and its checks passed. Exits: `rejected` (the person wants changes),
+# `stale` (the base moved under it in a way that conflicts), `unpushed` (the branch holds commits its
+# PR lacks: push them through `open-pr`).
 description: Wait for a person at ready, then for the PR's merge.
 start: ready
 steps:

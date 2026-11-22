@@ -50,7 +50,7 @@ describe("norn-pack-sdlc", () => {
 
   test("ships the six workflows, the four shared files and every bundled skill with its SKILL.md", () => {
     expect(Object.keys(SDLC_PACK.workflows).sort()).toEqual(["quick.yaml", "refinement.yaml", "reproduce.yaml", "slice.yaml", "story.yaml", "triage.yaml"]);
-    expect(Object.keys(SDLC_PACK.shared).sort()).toEqual(["base-update.yaml", "land.yaml", "publish.yaml", "sync.yaml"]);
+    expect(Object.keys(SDLC_PACK.shared).sort()).toEqual(["base-update.yaml", "catch-up.yaml", "land.yaml", "publish.yaml"]);
     for (const [skill, files] of Object.entries(SDLC_PACK.skills)) expect({ skill, has: typeof files["SKILL.md"] }).toEqual({ skill, has: "string" });
   });
 });

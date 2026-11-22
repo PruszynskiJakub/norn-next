@@ -1,5 +1,5 @@
-# Brings the story branch up to date with its base before any work starts, so the work begins from
-# the current base and the update after it merges only what moved meanwhile. Leaves at `synced`.
+# Use before any work, so it starts from the current base and the base update after it merges only
+# what moved meanwhile.
 description: Merge the base into the story branch before the work starts, resolving conflicts.
 start: sync
 steps:
@@ -9,7 +9,7 @@ steps:
     outcomes: { done: { exit: synced }, conflict: sync-resolve, clean: { exit: synced }, resolved: { exit: synced } }
   sync-resolve:
     by: builder
-    do: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase."
+    do: "Merge the base into the story branch in this worktree, in the mode the skill picks from your inputs; never rebase."
     with: { skills: [norn-merge] }
     reads: [spec, handoff, base_side]
     outcomes:

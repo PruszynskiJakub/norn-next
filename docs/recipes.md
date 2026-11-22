@@ -189,10 +189,10 @@ Steps that several workflows run the same way (the base update, publishing the P
     outcomes:
       passed: land
       failed: { to: implement, max: 3 }
-      stale:  update
+      stale:  base-update
 ```
 
-The shared steps keep their own names, so the brief and the record show `describe`, `open-pr` and `checks`, never `publish`. A route to the use step enters the file at its `start`; a route may also name one of its steps, as a base update's light path names `open-pr` to skip `describe`. The pack ships `sync`, `base-update`, `publish` (describe, open the draft PR, wait for its checks; exits `passed`, `failed`, `stale`) and `land` (the person's `ready`, then the merge; exits `rejected`, `stale`, `unpushed`).
+The shared steps keep their own names, so the brief and the record show `describe`, `open-pr` and `checks`, never `publish`. A route to the use step enters the file at its `start`; a route may also name one of its steps, as a base update's light path names `open-pr` to skip `describe`. Name the use step after its file (`publish: { use: publish }`), so a route to it reads as the file it enters. The pack ships `catch-up` (merge the base before the work starts; exit `synced`), `base-update` (merge the base after the work and test the merged tree; exits `tested`, `failed`, `merged` for the light path, `redescribe`), `publish` (describe, open the draft PR, wait for its checks; exits `passed`, `failed`, `stale`) and `land` (the person's `ready`, then the merge; exits `rejected`, `stale`, `unpushed`).
 
 ### Wait for a pull request's checks
 

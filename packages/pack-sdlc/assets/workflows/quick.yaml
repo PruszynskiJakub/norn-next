@@ -1,20 +1,11 @@
-# Quick workflow — shipped in the sdlc pack; a repo copy under .agents/workflows/ replaces it.
-# For refactors, docs, chores, other small changes and the fix of a bug a reproduce round confirmed.
-# A story workflow without `slices`: every step works in the story worktree. Bring the story up
-# to date with its base, implement, bring it up to date again, check, review, describe, open the
-# draft PR (or rewrite the body of the open one), wait for its checks, and wait for a person at
-# ready, then wait at merge until the person merges the PR.
-# A story waiting at ready or merge goes back through update when the base moved under it in a way
-# that conflicts (`signals: { vcs.stale: { when: conflict } }`).
-# Steps shared with other workflows come from `shared/` (`use:`): the test command is the config's
-# `checks.test`.
+# For refactors, docs, chores and other small changes, and the fix of a bug a reproduce round
+# confirmed. A merged PR ends the story.
 name: quick
 description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
-start: sync
+start: catch-up
 steps:
-  # the sync, its conflict resolution (shared/sync.yaml); the step is `sync`, the use step only brings it in
-  sync-base:
-    use: sync
+  catch-up:
+    use: catch-up
     outcomes: { synced: implement }
   implement:
     by: builder
@@ -29,15 +20,14 @@ steps:
     reads: [spec, handoff, last_check, findings?]
     outcomes:
       done:
-        to: update
+        to: base-update
         means: "the change is made; each behaviour change and rework point has a passing test"
-  # update, resolve, test and the light path's steps (shared/base-update.yaml)
   base-update:
     use: base-update
     outcomes:
       tested: review
-      broken: implement
-      ship: open-pr
+      failed: implement
+      merged: open-pr
       redescribe: publish
   review:
     by: reviewer
@@ -52,23 +42,21 @@ steps:
         to: implement
         means: "blocking findings, handed back as findings"
         produces: [findings]
-  # describe, open-pr and checks (shared/publish.yaml); a failed check's whereabouts become last_check
-  # for implement, whose rework goes back through open-pr to the new head
+  # a failed check's rework goes back through open-pr to the new head
   publish:
     use: publish
     outcomes:
       passed: land
       failed: { to: implement, max: 3 }
-      stale: update
-  # ready and merge (shared/land.yaml)
+      stale: base-update
   land:
     use: land
     outcomes:
       rejected: implement
-      stale: update
+      stale: base-update
       unpushed: open-pr
-# `norn story update-branch` re-enters update, not sync (the default would be the first update step); a base move
-# without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once per
-# base move (no push, no CI): red goes back through update like a conflict
+# `norn story update-branch` enters the base update, not catch-up (the first update-branch step); a base
+# move without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once
+# per base move (no push, no CI): red goes back through the base update like a conflict
 signals: { vcs.stale: { when: conflict, verify: test } }
-entries: { update-branch: update }
+entries: { update-branch: base-update }

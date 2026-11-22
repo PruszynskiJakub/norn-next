@@ -37,16 +37,17 @@ const SYNC_CONFLICT = c(2, "sync.done", "sync.clean", "sync.resolved");
  * The counters the old engine derived for each shipped workflow, pinned so the kernel keeps its bounds. Only `sync.conflict`'s resets differ, by the edits,
  * and the edits' `unpushed` routes back to open-pr, which the old engine took with no edge and no
  * counter, share a counter bounded as a stale one is. The CI wait, publishing and landing come from
- * two shared files, so each exit's derived counter is named after its use step.
+ * two shared files, so each exit's derived counter is named after its use step. Story declares no
+ * stale budget of its own: each of its stale routes is bounded at the default, as quick's are.
  */
 const OLD_COUNTERS: Record<string, { edges: Record<string, string>; counters: Record<string, { max: number; reset_on: string[] }> }> = {
   "quick.yaml": {
     edges: {
       "sync.conflict": "sync.conflict",
       "update.conflict": "update.conflict",
-      "test.fail": "base-update.broken",
-      "test-merge.fail": "base-update.broken",
-      "test-resolution.fail": "base-update.broken",
+      "test.fail": "base-update.failed",
+      "test-merge.fail": "base-update.failed",
+      "test-resolution.fail": "base-update.failed",
       "resolution-review.changes_requested": "resolution-review.changes_requested",
       "review.changes_requested": "review.changes_requested",
       "checks.fail": "publish.failed",
@@ -62,7 +63,7 @@ const OLD_COUNTERS: Record<string, { edges: Record<string, string>; counters: Re
       "update.conflict": UPDATE_CONFLICT,
       "resolution-review.changes_requested": c(2),
       "review.changes_requested": c(3),
-      "base-update.broken": c(5),
+      "base-update.failed": c(5),
       "publish.failed": c(3),
       "publish.stale": c(10),
       "land.rejected": c(2),
@@ -81,33 +82,35 @@ const OLD_COUNTERS: Record<string, { edges: Record<string, string>; counters: Re
       "sync.conflict": "sync.conflict",
       "approve-slices.reject": "approve-slices.reject",
       "update.conflict": "update.conflict",
-      "test.fail": "base-update.broken",
-      "test-merge.fail": "base-update.broken",
-      "test-resolution.fail": "base-update.broken",
+      "test.fail": "base-update.failed",
+      "test-merge.fail": "base-update.failed",
+      "test-resolution.fail": "base-update.failed",
       "resolution-review.changes_requested": "resolution-review.changes_requested",
       "qa.fail": "qa_loop",
       "human-qa.reject": "qa_loop",
-      "human-qa.stale": "stale_loop",
+      "human-qa.stale": "human-qa.stale",
       "review.changes_requested": "review.changes_requested",
       "checks.fail": "publish.failed",
-      "checks.stale": "stale_loop",
+      "checks.stale": "publish.stale",
       "ready.reject": "land.rejected",
-      "ready.stale": "stale_loop",
-      "merge.stale": "stale_loop",
+      "ready.stale": "land.stale",
+      "merge.stale": "land.stale",
       "ready.unpushed": "land.unpushed",
       "merge.unpushed": "land.unpushed",
     },
     counters: {
       qa_loop: c(2),
-      stale_loop: c(10),
+      "human-qa.stale": c(10),
       "sync.conflict": SYNC_CONFLICT,
       "approve-slices.reject": c(3),
       "update.conflict": UPDATE_CONFLICT,
       "resolution-review.changes_requested": c(2),
       "review.changes_requested": c(3),
-      "base-update.broken": c(5),
+      "base-update.failed": c(5),
       "publish.failed": c(3),
+      "publish.stale": c(10),
       "land.rejected": c(2),
+      "land.stale": c(10),
       "land.unpushed": c(10),
     },
   },
@@ -152,7 +155,7 @@ describe("the shipped workflows", () => {
   test("a story workflow's graph: use steps brought in, entered at their file's start, exits routed", () => {
     const w = loaded(loadWorkflow(edited.workflows["story.yaml"], opts({ sharedFiles: edited.shared })));
     expect(w.graph.start).toBe("sync");
-    expect(w.graph.steps["sync-base"]).toBeUndefined();
+    expect(w.graph.steps["catch-up"]).toBeUndefined();
     expect(w.graph.steps.sync?.routes.done).toEqual({ to: "slice" });
     expect(w.graph.steps.merge).toMatchObject({ kind: "await-merge", runner: { type: "plugin", mode: "wait" }, outcomes: ["merged", "unpushed"], signals: [{ name: "stale" }, { name: "unpushed" }] });
     expect(w.graph.steps["test-merge"]?.check).toEqual({ command: "{checks.test}", timeout_ms: 15 * 60_000, exits: {} });

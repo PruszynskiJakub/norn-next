@@ -1,24 +1,11 @@
-# Story workflow — shipped in the sdlc pack; a repo copy under .agents/workflows/ replaces it.
-# Delivers a story whose spec and plan a refinement round agreed: bring the story up to date with its
-# base, cut slices from the plan against that base, approve them, run the slices, bring the story up
-# to date again, verify the whole story once (QA over every slice's criteria), describe it, open the
-# draft PR (or rewrite the body of the open one), wait for its checks, wait for a person at ready,
-# then wait at merge until a person merges the PR.
-# Rework found by the story-level test, QA, the PR's checks or a person is done in the story worktree and reviewed
-# before it is checked again.
-# QA reports a verdict per acceptance criterion (produces: [criteria]) and may only report the outcome
-# matching its worst verdict; `unverified` (could not check here) goes to a person at human-qa.
-# A story waiting at human-qa, ready or merge goes back through update when the base moved
-# under it in a way that conflicts (vcs.stale under signals:; `when: behind` re-updates on any base commit).
-# Steps shared with other workflows come from `shared/` (`use:`): the test command is the config's
-# `checks.test`.
+# For a story a refinement round planned; start it with `norn story round <story> --workflow story`.
+# A merged PR ends the story.
 name: story
 description: Slice a planned story against the current base, run the slices, verify the story, open the draft PR, wait for CI.
-start: sync
+start: catch-up
 steps:
-  # the sync, its conflict resolution (shared/sync.yaml); the step is `sync`, the use step only brings it in
-  sync-base:
-    use: sync
+  catch-up:
+    use: catch-up
     outcomes: { synced: slice }
   slice:
     by: writer
@@ -45,14 +32,13 @@ steps:
   slices:
     by: norn.each
     reads: [slices]
-    outcomes: { done: update, stuck: $stuck }
-  # update, resolve, test and the light path's steps (shared/base-update.yaml)
+    outcomes: { done: base-update, stuck: $stuck }
   base-update:
     use: base-update
     outcomes:
       tested: qa
-      broken: implement
-      ship: open-pr
+      failed: implement
+      merged: open-pr
       redescribe: publish
   qa:
     by: qa
@@ -87,7 +73,7 @@ steps:
       approve: publish
       reject:  { to: implement, counter: qa_loop }
     on:
-      vcs.stale: { to: update, counter: stale_loop }
+      vcs.stale: base-update
   implement:
     by: builder
     do: "Rework the story in its worktree: the failing check, QA repro, failed PR check or person's rejection the inputs name. Each rework point gets a test that fails before the code changes."
@@ -112,28 +98,24 @@ steps:
         to: implement
         means: "blocking findings, handed back as findings"
         produces: [findings]
-  # describe, open-pr and checks (shared/publish.yaml); a failed check's whereabouts become last_check
-  # for implement, whose rework goes back through open-pr to the new head
+  # a failed check's rework goes back through open-pr to the new head
   publish:
     use: publish
     outcomes:
       passed: land
       failed: { to: implement, max: 3 }
-      stale: { to: update, counter: stale_loop }
-  # ready and merge (shared/land.yaml)
+      stale: base-update
   land:
     use: land
     outcomes:
       rejected: implement
-      stale: { to: update, counter: stale_loop }
+      stale: base-update
       unpushed: open-pr
 counters:
   # QA's fail and the person's reject at human-qa share one budget
   qa_loop: { max: 2 }
-  # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
-  stale_loop: { max: 10 }
-# `norn story update-branch` re-enters update, not sync (the default would be the first update step); a base move
-# without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once per
-# base move (no push, no CI): red goes back through update like a conflict
+# `norn story update-branch` enters the base update, not catch-up (the first update-branch step); a base
+# move without a conflict under a story waiting at human-qa, ready or merge runs `test` on the merged
+# tree, once per base move (no push, no CI): red goes back through the base update like a conflict
 signals: { vcs.stale: { when: conflict, verify: test } }
-entries: { update-branch: update }
+entries: { update-branch: base-update }

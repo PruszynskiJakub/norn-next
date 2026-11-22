@@ -194,11 +194,8 @@ function resolverInputs(): { where: string; inputs: string[] }[] {
   const of = (where: string, text: string, step: string) => ({ where: `${where}#${step}`, inputs: listedInputs(text, step) });
   const repo = (file: string) => readFileSync(join(REPO_ROOT, ".agents", "workflows", file), "utf8");
   return [
-    of("pack shared/sync.yaml", SDLC_PACK.shared["sync.yaml"] ?? "", "sync-resolve"),
-    of("pack refinement.yaml", SDLC_PACK.workflows["refinement.yaml"] ?? "", "sync-resolve"),
+    of("pack shared/catch-up.yaml", SDLC_PACK.shared["catch-up.yaml"] ?? "", "sync-resolve"),
     of("pack shared/base-update.yaml", SDLC_PACK.shared["base-update.yaml"] ?? "", "resolve"),
-    of("repo shared/sync.yaml", repo("shared/sync.yaml"), "sync-resolve"),
-    of("repo refinement.yaml", repo("refinement.yaml"), "sync-resolve"),
     of("repo release.yaml", repo("release.yaml"), "resolve"),
     of("repo shared/base-update.yaml", repo("shared/base-update.yaml"), "resolve"),
   ];

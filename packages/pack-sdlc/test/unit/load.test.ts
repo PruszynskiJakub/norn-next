@@ -67,3 +67,79 @@ describe("the sdlc pack's workflows", () => {
     expect(r.ok).toBe(false);
   });
 });
+
+type Doc = { start: string; steps: Record<string, Record<string, unknown>>; counters?: Record<string, unknown> };
+const written = (file: string) => parse(SDLC_PACK.workflows[file] as string) as Doc;
+const sharedDoc = (name: string) => parse(SDLC_PACK.shared[`${name}.yaml`] as string) as Doc;
+
+/** The exits a shared file leaves by, in file order. */
+function exitsOf(name: string): string[] {
+  const out: string[] = [];
+  for (const step of Object.values(sharedDoc(name).steps))
+    for (const block of ["outcomes", "on"])
+      for (const route of Object.values((step[block] ?? {}) as Record<string, unknown>))
+        if (typeof route === "object" && route !== null && "exit" in route && !out.includes(String(route.exit))) out.push(String(route.exit));
+  return out;
+}
+
+describe("how the pack's workflows bring in their shared files", () => {
+  const files = Object.keys(SDLC_PACK.workflows);
+  const uses = (file: string) => Object.entries(written(file).steps).filter(([, s]) => "use" in s) as Array<[string, { use: string }]>;
+
+  test("a use step is named after the shared file it brings in, so a route to it reads as the file it enters", () => {
+    const misnamed = files.flatMap((file) => uses(file).filter(([step, s]) => step !== s.use).map(([step, s]) => `${file}: ${step} uses ${s.use}`));
+    expect(misnamed).toEqual([]);
+  });
+
+  test("no exit of a shared file shares its name with a use step of the workflow that routes it", () => {
+    const clashing = files.flatMap((file) => {
+      const names = uses(file).map(([step]) => step);
+      return uses(file).flatMap(([step, s]) => exitsOf(s.use).filter((e) => names.includes(e)).map((e) => `${file}: ${step}.${e}`));
+    });
+    expect(clashing).toEqual([]);
+  });
+
+  test("the base is caught up by the shared catch-up file, which leaves at synced, in every workflow that changes the branch", () => {
+    expect(Object.keys(SDLC_PACK.shared).sort()).toEqual(["base-update.yaml", "catch-up.yaml", "land.yaml", "publish.yaml"]);
+    expect(exitsOf("catch-up")).toEqual(["synced"]);
+    for (const file of ["refinement.yaml", "quick.yaml", "story.yaml"]) {
+      const doc = written(file);
+      expect({ file, start: doc.start, step: doc.steps["catch-up"] }).toEqual({ file, start: "catch-up", step: expect.objectContaining({ use: "catch-up" }) });
+      // only the shared files merge the base: no workflow writes an update-branch step of its own
+      expect({ file, own: Object.entries(doc.steps).filter(([, s]) => s.by === "vcs.update-branch").map(([n]) => n) }).toEqual({ file, own: [] });
+    }
+  });
+
+  test("the base update leaves at tested, failed, merged or redescribe", () => {
+    expect(exitsOf("base-update").sort()).toEqual(["failed", "merged", "redescribe", "tested"]);
+  });
+
+  test("the resolver that merges the base is told the same before the work and after it", () => {
+    const r = load("story.yaml");
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    const before = r.workflow.graph.steps["sync-resolve"]?.agent?.instructions;
+    expect(before).toBeString();
+    expect(r.workflow.graph.steps.resolve?.agent?.instructions).toBe(before as string);
+  });
+
+  test("story and quick declare no counter the kernel derives anyway: their stale routes are bounded alike", () => {
+    for (const file of ["quick.yaml", "story.yaml"]) expect({ file, counters: Object.keys(written(file).counters ?? {}) }).toEqual({ file, counters: file === "story.yaml" ? ["qa_loop"] : [] });
+    const stale = (file: string) => {
+      const r = load(file);
+      if (!r.ok) throw new Error(JSON.stringify(r.errors));
+      return { publish: r.workflow.graph.counters["publish.stale"], land: r.workflow.graph.counters["land.stale"] };
+    };
+    expect(stale("story.yaml")).toEqual(stale("quick.yaml"));
+    expect(stale("quick.yaml").land).toEqual({ max: DEFAULT_KERNEL_CONFIG.counterDefaults.stale, reset_on: [] });
+  });
+
+  test("a workflow file's header says when to use it and what comes next, in a few lines, without restating the pack it ships in", () => {
+    const all = { ...Object.fromEntries(files.map((f) => [f, SDLC_PACK.workflows[f] as string])), ...Object.fromEntries(Object.entries(SDLC_PACK.shared).map(([f, t]) => [`shared/${f}`, t])) };
+    const long = Object.entries(all).flatMap(([file, text]) => {
+      const header = text.split("\n").findIndex((l) => !l.startsWith("#"));
+      return header > 4 || /shipped in the sdlc pack/i.test(text) ? [`${file}: ${header} header lines`] : [];
+    });
+    expect(long).toEqual([]);
+  });
+});
+

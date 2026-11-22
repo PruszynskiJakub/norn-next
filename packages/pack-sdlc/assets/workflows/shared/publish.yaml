@@ -1,9 +1,6 @@
-# Shared steps — shipped in the sdlc pack; a repo copy under .agents/workflows/shared/ replaces it. A workflow brings them in with `use: publish`.
-# Writes the PR body, opens the draft PR (or rewrites the body of the open one) and waits for its
-# checks. A workflow's light path, which needs no new body, routes straight to `open-pr`.
-# Exits: `passed` (every check passed, or the change has none), `failed` (a check failed, or stayed
-# pending; where its failures are becomes last_check), `stale` (the change conflicts with its base, so
-# no checks run on it: the workflow sends it back through its base update).
+# Use once the change is reviewed; a light path that needs no new body enters at `open-pr`. Exits:
+# `passed`, `failed` (a check failed or stayed pending; where its failures are becomes last_check),
+# `stale` (the change conflicts with its base, so no checks run on it).
 description: Write the PR body, open the draft PR, wait for its checks.
 start: describe
 steps:

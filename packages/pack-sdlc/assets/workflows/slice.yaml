@@ -1,7 +1,4 @@
-# Slice workflow — shipped in the sdlc pack; a repo copy under .agents/workflows/ replaces it.
-# Runs on a slice: build test-first, check, review, then integrate into the story branch.
-# A slice has no QA of its own: its criteria stay in its file and the story's qa checks them all, once.
-# The `test` step runs the config's `checks.test` (norn config set checks.test "<command>"; default bun test).
+# Runs on each slice a story workflow cuts; the story's qa checks the slice's criteria, once.
 name: slice
 description: Build one slice test-first, check and review it, and integrate it into the story branch.
 start: implement

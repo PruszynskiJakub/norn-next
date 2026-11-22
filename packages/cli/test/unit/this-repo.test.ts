@@ -147,7 +147,7 @@ describe("this repo's workflows, as norn loads them", () => {
     for (const wf of ["quick", "story"]) {
       const s = steps(wf);
       expect({ wf, openPr: s["open-pr"]?.outcomes }).toEqual({ wf, openPr: { done: "checks" } });
-      expect({ wf, checks: s.checks?.outcomes }).toEqual({ wf, checks: { pass: "ready", fail: { to: "implement", counter: "publish.failed" }, stale: { to: "update", counter: "stale_loop" } } });
+      expect({ wf, checks: s.checks?.outcomes }).toEqual({ wf, checks: { pass: "ready", fail: { to: "implement", counter: "publish.failed" }, stale: { to: "update", counter: "publish.stale" } } });
       expect({ wf, bound: repo[wf]?.counters?.["publish.failed"] }).toEqual({ wf, bound: { max: 3 } });
     }
   });
@@ -165,13 +165,13 @@ describe("this repo's workflows, as norn loads them", () => {
     expect(w.steps.prepare?.skills).toEqual(["release"]);
     expect(w.steps.prepare?.outcomes).toEqual({ done: "open-pr" });
     expect(w.steps["open-pr"]?.outcomes).toEqual({ done: "checks" });
-    expect(w.steps.checks?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: { to: "update", counter: "stale_loop" } });
+    expect(w.steps.checks?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: { to: "update", counter: "checks.stale" } });
     // a signal is routed under `on:`, never among the outcomes a person or a step kind reports
     expect(w.steps.ready?.outcomes).toEqual({ approve: "merge", reject: { to: "prepare", counter: "land.rejected" } });
-    expect(w.steps.ready?.on).toEqual({ stale: { to: "update", counter: "stale_loop" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
+    expect(w.steps.ready?.on).toEqual({ stale: { to: "update", counter: "land.stale" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
     expect(w.counters?.["land.rejected"]).toEqual({ max: 2 });
     expect(w.steps.merge?.outcomes).toEqual({ merged: "$done" });
-    expect(w.steps.merge?.on).toEqual({ stale: { to: "update", counter: "stale_loop" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
+    expect(w.steps.merge?.on).toEqual({ stale: { to: "update", counter: "land.stale" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
     expect(w.base).toEqual({ stale: "behind" });
   });
 

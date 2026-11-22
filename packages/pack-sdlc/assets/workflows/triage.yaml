@@ -1,9 +1,5 @@
-# Triage workflow — shipped in the sdlc pack; a repo copy under .agents/workflows/ replaces it.
-# An unattended agent checks the issue still holds on the base and posts its findings and one
-# recommendation as an issue comment, the one place the recommendation lives (the outcome is plain
-# `done`). That ends the round ($done): the person reads the comment and starts the story's next
-# round (`norn story round <story> --workflow refinement|quick|reproduce`), or closes the issue.
-# Triage changes no file and opens no PR, so it has no base sync.
+# The first round of a new issue. Next round: the one its comment recommends (`norn story round
+# <story> --workflow refinement|quick|reproduce`), or closing the issue.
 name: triage
 description: Check an issue still holds, add its context, and recommend what comes next (refinement, quick, reproduce) or closing it.
 start: explore

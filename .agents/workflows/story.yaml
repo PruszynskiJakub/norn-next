@@ -1,21 +1,12 @@
-# Story workflow — repo-local copy of the shipped one, with this repo's check commands, its common
-# steps taken from shared/ files. Delivers a story a refinement
-# round planned: sync, cut slices against the current base, approve them, run the slices, update, check, QA the whole story once, describe, open the draft PR,
-# wait for its checks, wait for a person at ready, then at merge for the PR's merge. The local check runs the unit tier and the type
-# check; CI runs the integration tier sharded. Story-level rework is reviewed before it is
-# checked again.
-# QA reports a verdict per acceptance criterion (produces: [criteria]) and may only report the outcome
-# matching its worst verdict.
-# A story waiting at human-qa, ready or merge goes back through update when the base moved under it in a way
-# that conflicts (vcs.stale under signals:).
+# The pack's story with this repo's checks: for a story a refinement round planned. A merged PR ends
+# the story.
 name: story
 description: Slice a planned story against the current base, run the slices, verify the story, open the draft PR, wait for CI.
 start: catch-up
 steps:
-  # brings the story branch up to date with its base before the slices are cut, so they are cut
-  # against the code they will change
+  # the slices are cut against the code they will change
   catch-up:
-    use: sync
+    use: catch-up
     outcomes: { synced: slice }
   slice:
     by: writer
@@ -41,7 +32,7 @@ steps:
     outcomes: { approve: slices, reject: { to: slice, max: 3 } }
   slices:
     by: norn.each
-    outcomes: { done: update, stuck: $stuck }
+    outcomes: { done: base-update, stuck: $stuck }
   base-update:
     use: base-update
     outcomes: { tested: qa, failed: implement, merged: open-pr, redescribe: publish }
@@ -78,7 +69,7 @@ steps:
       approve: publish
       reject:  { to: implement, counter: qa_loop }
     on:
-      vcs.stale: { to: update, counter: stale_loop }
+      vcs.stale: base-update
   implement:
     by: builder
     do: "Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in CI, which the `checks` step waits for, so do not run them before handing back."
@@ -103,21 +94,18 @@ steps:
         to: implement
         means: "blocking findings, handed back as findings"
         produces: [findings]
-  # describe, open-pr and the wait for the PR's checks (the pack's shared/publish.yaml); a failed
-  # check's whereabouts become last_check for implement, whose rework goes back through open-pr to the new head
+  # a failed check's rework goes back through open-pr to the new head
   publish:
     use: publish
-    outcomes: { passed: land, failed: { to: implement, max: 3 }, stale: { to: update, counter: stale_loop } }
+    outcomes: { passed: land, failed: { to: implement, max: 3 }, stale: base-update }
   land:
     use: land
-    outcomes: { rejected: implement, stale: { to: update, counter: stale_loop }, unpushed: open-pr }
+    outcomes: { rejected: implement, stale: base-update, unpushed: open-pr }
 counters:
   # QA's fail and the person's reject at human-qa share one budget
   qa_loop: { max: 2 }
-  # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
-  stale_loop: { max: 10 }
-# `norn story update-branch` re-enters update, not sync (the default would be the first update step); a base move
-# without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once per
-# base move (no push, no CI): red goes back through update like a conflict
+# `norn story update-branch` enters the base update, not catch-up (the first update-branch step); a base
+# move without a conflict under a story waiting at human-qa, ready or merge runs `test` on the merged
+# tree, once per base move (no push, no CI): red goes back through the base update like a conflict
 signals: { vcs.stale: { when: conflict, verify: test } }
-entries: { update-branch: update }
+entries: { update-branch: base-update }

@@ -1,9 +1,5 @@
-# Triage workflow — repo-local copy of the shipped one, norn's own default (config
-# `workflow`: triage), for stories and features; a bug starts in `reproduce` instead (label
-# norn:wf:reproduce). An unattended agent checks the issue still holds, posts its findings as an issue
-# comment (spec.md stays as intake wrote it): the recommendation lives only there, the outcome is plain
-# `done`. That ends the round ($done): the person starts the story's next round (`norn story round
-# <story> --workflow refinement|quick|reproduce`) or closes the issue. Agents never run it.
+# norn's own default round for a new issue; a bug starts in reproduce instead. Next round: the one its
+# comment recommends (`norn story round <story> --workflow refinement|quick|reproduce`), or closing it.
 name: triage
 description: Check an issue still holds, add its context, and recommend what comes next (refinement, quick, reproduce) or closing it.
 start: explore

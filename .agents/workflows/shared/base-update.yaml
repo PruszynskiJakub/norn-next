@@ -1,15 +1,15 @@
-# Merges the base into the story branch and checks the merged tree. The light path: when the story
-# holds only base merges and spec-folder bookkeeping (never spec.md) since its pull request last took
-# the branch (the remote story branch, which only the steps that publish the change move), a merge git
-# made alone (clean) or one a resolver finished (resolved) skips implement and the full review and
-# describe; anything else is done, the full path (so does a story with no open pull request, or whose
-# remote branch took commits a person pushed: those were never reviewed).
-# Exits: `tested` (the full path's check passed), `failed` (any check red: implement's work, which then
-# takes the full path), `merged` (the light path is through: open the PR), `redescribe` (the merge
-# danger pr.md describes changed).
+# The pack's base update with this repo's check commands. Exits: `tested`, `failed` (back to the
+# work, which then takes the full path), `merged` (the light path is through: open the PR at
+# `open-pr`), `redescribe` (the merge danger pr.md describes changed).
 description: Merge the base into the story branch, check the merged tree, and review a resolver's merge.
 start: update
 steps:
+  # the light path: when the story holds only base merges and spec-folder bookkeeping (never spec.md)
+  # since its pull request last took the branch (the remote story branch, which only the steps that
+  # publish the change move), a merge git made alone (clean) or one a resolver finished (resolved)
+  # skips implement and the full review and describe; anything else is done, the full path (so does a
+  # story with no open pull request, or whose remote branch took commits a person pushed: those were
+  # never reviewed)
   update:
     by: vcs.update-branch
     outcomes:
@@ -19,7 +19,7 @@ steps:
       conflict: resolve
   resolve:
     by: builder
-    do: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase."
+    do: "Merge the base into the story branch in this worktree, in the mode the skill picks from your inputs; never rebase."
     with: { skills: [norn-merge] }
     reads: [spec, handoff, base_side]
     outcomes:

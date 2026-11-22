@@ -1,26 +1,13 @@
-# Refinement workflow — shipped in the sdlc pack; a repo copy under .agents/workflows/ replaces it.
-# Brings the story up to date with its base, so the spec and plan are written against the current
-# code, then refines the spec, settles its open questions and plans it, all with a person (attended).
-# It cuts no slices and has no gate: starting the delivery round (`norn story round <story> --workflow
-# story|quick`) is the person's approval of the plan. To rework the plan, start a refinement round at
-# its plan step (`--workflow refinement --at plan`).
+# For a story that needs a spec and a plan before code. No gate: starting the next round (`norn story
+# round <story> --workflow story|quick`) approves the plan; `--workflow refinement --at plan` reworks it.
 name: refinement
 description: Agree a story's spec and plan with a person, against the current base; no code.
-start: sync
+start: catch-up
 steps:
-  sync:
-    by: vcs.update-branch
-    # a branch that already held its base (clean) or took it in after a resolve (resolved) goes on to refine too
-    outcomes: { done: refine, conflict: sync-resolve, clean: refine, resolved: refine }
-  sync-resolve:
-    by: builder
-    do: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase."
-    with: { skills: [norn-merge] }
-    reads: [spec, handoff, base_side]
-    outcomes:
-      done:
-        to: sync
-        means: "base merged into the story branch, conflicts resolved and committed"
+  # the spec and plan are written against the current base
+  catch-up:
+    use: catch-up
+    outcomes: { synced: refine }
   refine:
     by: writer
     do: "Write the spec into the body of spec.md; keep its frontmatter unchanged."

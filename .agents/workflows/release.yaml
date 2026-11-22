@@ -1,14 +1,6 @@
-# Release workflow — repo-local, for the story a person starts with /release-start
-# (label norn:wf:release). A story workflow without `slices`: every step works in
-# the story worktree. Prepare the release (changelog from the commits on the base since the last
-# tag, proposed version, version bumps, pr.md), open the draft PR, wait for the PR's checks (tests incl.
-# the stale-schema test, typecheck, npm package and a binary built and smoke-tested) and wait for a
-# person at `ready`, who judges the version and the changelog there; the person merges the PR, and
-# CI smokes every binary on its own OS, tags and publishes on that merge.
-# Any commit on the base makes the changelog incomplete (vcs.stale when: behind): a release
-# waiting at `ready` or `merge` goes back through update and prepare. A red check means the base is
-# broken: the story goes $stuck; fix the base in its own story, then send the release back through
-# the base update: `norn run rerun gh-N --step update`.
+# For the release story a person starts with /release-start (label norn:wf:release). The person
+# judges the version and changelog at ready and merges; CI tags and publishes on the merge. A red
+# check means the base is broken: fix it in its own story, then `norn run rerun gh-N --step update`.
 name: release
 description: Write the changelog and propose the version, open the draft PR, wait for its CI, and let a person judge it at ready.
 start: prepare
@@ -54,13 +46,10 @@ steps:
     outcomes: { done: checks }
   checks:
     by: forge.await-checks
-    outcomes: { pass: land, fail: $stuck, stale: { to: update, counter: stale_loop } }
-  # ready, where the person judges the version and the changelog pr.md names, and the merge, after
-  # which CI tags and publishes (the pack's shared/land.yaml)
+    outcomes: { pass: land, fail: $stuck, stale: update }
   land:
     use: land
-    outcomes: { rejected: prepare, stale: { to: update, counter: stale_loop }, unpushed: open-pr }
-counters:
-  # a stale re-entry is progress from outside (a commit landed on the base), bounded by those commits
-  stale_loop: { max: 10 }
+    outcomes: { rejected: prepare, stale: update, unpushed: open-pr }
+# any commit on the base makes the changelog incomplete, so a release waiting at ready or merge goes
+# back through update and prepare
 signals: { vcs.stale: { when: behind } }

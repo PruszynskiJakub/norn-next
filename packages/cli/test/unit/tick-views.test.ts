@@ -456,7 +456,7 @@ describe("rounds, slices and worktrees in the views", () => {
 describe("counters in status", () => {
   test("a unit shows each counter it has spent against its max, and stuck on a spent one names the rerun that resets it", async () => {
     const m = configured();
-    await seedUnit(m, { step: GATE_STEP, run: null, extra: { ended: "stuck", ended_reason: "qa_loop ran out", counters: { qa_loop: 2, stale_loop: 0 }, exhausted: "qa_loop" } });
+    await seedUnit(m, { step: GATE_STEP, run: null, extra: { ended: "stuck", ended_reason: "qa_loop ran out", counters: { qa_loop: 2, "land.stale": 0 }, exhausted: "qa_loop" } });
     const shown = json((await runCli(["status", "--json"], m.io)).stdout) as { stories: { units: Record<string, unknown>[] }[] };
     expect(shown.stories[0]?.units[0]).toMatchObject({ counters: { qa_loop: { value: 2, max: 2 } }, waiting: { next: `norn run rerun ${UNIT} --reset qa_loop` } });
     expect((shown.stories[0]?.units[0] as { counters: object }).counters).toEqual({ qa_loop: { value: 2, max: 2 } });
@@ -465,8 +465,8 @@ describe("counters in status", () => {
 
   test("a unit stuck for another reason names the plain rerun, its counters kept", async () => {
     const m = configured();
-    await seedUnit(m, { step: GATE_STEP, run: null, extra: { ended: "stuck", ended_reason: "the agent reported stuck", counters: { stale_loop: 1 } } });
+    await seedUnit(m, { step: GATE_STEP, run: null, extra: { ended: "stuck", ended_reason: "the agent reported stuck", counters: { "land.stale": 1 } } });
     const shown = json((await runCli(["status", "--json"], m.io)).stdout) as { stories: { units: Record<string, unknown>[] }[] };
-    expect(shown.stories[0]?.units[0]).toMatchObject({ counters: { stale_loop: { value: 1, max: 10 } }, waiting: { next: `norn run rerun ${UNIT}` } });
+    expect(shown.stories[0]?.units[0]).toMatchObject({ counters: { "land.stale": { value: 1, max: 10 } }, waiting: { next: `norn run rerun ${UNIT}` } });
   });
 });
