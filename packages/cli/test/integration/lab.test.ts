@@ -463,7 +463,7 @@ describe("norn lab serves its dashboard", () => {
           throw new Error(`the dashboard never showed ${what}; last: ${JSON.stringify(last?.lab)} ${JSON.stringify(last?.needs_you)}\n${said.join("")}`);
         };
         const press = async (name: string, text?: string): Promise<Pressed> => {
-          const res = await fetch(`${url}api/act/${name}`, { method: "POST", body: JSON.stringify({ text }) });
+          const res = await fetch(`${url}api/act/${name}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
           expect(res.status).toBe(200);
           return (await res.json()) as Pressed;
         };
@@ -607,7 +607,7 @@ async function served(l: Lab) {
     throw new Error(`the dashboard never showed ${what}; last: ${JSON.stringify(last?.lab)} ${JSON.stringify(last?.needs_you)}\n${said.join("")}`);
   };
   const press = async (name: string, text?: string): Promise<Broken> => {
-    const res = await fetch(`${url}api/act/${name}`, { method: "POST", body: JSON.stringify({ text }) });
+    const res = await fetch(`${url}api/act/${name}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
     const body = (await res.json()) as Broken;
     if (res.status !== 200) throw new Error(`${name} answered ${res.status}: ${JSON.stringify(body)}`);
     return body;

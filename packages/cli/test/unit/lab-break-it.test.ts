@@ -84,7 +84,7 @@ function lab(f: FakeLab = {}) {
       return runLabCommand(runner, name, command);
     },
   });
-  const post = (name: LabActionName) => handle(new Request(`http://127.0.0.1/api/act/${name}`, { method: "POST" }));
+  const post = (name: LabActionName) => handle(new Request(`http://127.0.0.1/api/act/${name}`, { method: "POST", headers: { "content-type": "application/json" } }));
   const press = async (name: LabActionName): Promise<LabActAnswer> => {
     const res = await post(name);
     if (res.status !== 200) throw new Error(`${name} answered ${res.status}: ${await res.text()}`);

@@ -133,6 +133,17 @@ describe("norn workflow show", () => {
     expect(away.exit).toBe(ExitCode.refused);
     expect(String(json(away.stdout).do_instead)).toContain("story");
   });
+
+  test("a name an object inherits (__proto__, constructor, toString) is refused as unknown, never read as a workflow", async () => {
+    for (const name of ["__proto__", "constructor", "toString", "hasOwnProperty"]) {
+      const shown = await runCli(["workflow", "show", name, "--json"], repo().io);
+      expect(shown.exit).toBe(ExitCode.refused);
+      expect(json(shown.stdout).code).toBe("unknown_workflow");
+      const away = await runCli(["workflow", "show", name, "--json"], outside().io);
+      expect(away.exit).toBe(ExitCode.refused);
+      expect(json(away.stdout).code).toBe("unknown_workflow");
+    }
+  });
 });
 
 describe("norn skill list", () => {

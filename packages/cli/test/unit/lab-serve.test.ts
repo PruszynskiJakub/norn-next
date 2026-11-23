@@ -42,3 +42,41 @@ describe("norn lab --port", () => {
     expect((await runCli(["lab", "--port", "8737", "--tty"], m.io)).exit).toBe(2);
   });
 });
+
+describe("norn lab while its first build runs", () => {
+  test("Reset pressed before the lab is built is refused with lab_not_ready, and starts no second build over the first", async () => {
+    let handler: ServeOptions["fetch"] | null = null;
+    let release: () => void = () => {};
+    const building = new Promise<void>((r) => {
+      release = r;
+    });
+    let entered: () => void = () => {};
+    const inBuild = new Promise<void>((r) => {
+      entered = r;
+    });
+    const m = machine({
+      env: { TMPDIR: "/tmp/t" },
+      script: async (argv) => {
+        if (argv[0] !== "rm") return undefined;
+        entered();
+        await building;
+        // the build fails after the press, so the command ends without a tick
+        return { code: 1, stderr: "the first build stops here" };
+      },
+    });
+    m.io.serve = (o: ServeOptions) => {
+      handler = o.fetch;
+      return { ok: true, value: { port: 8737, url: "http://127.0.0.1:8737/", stop: async () => {} } };
+    };
+    const ran = runCli(["lab"], m.io);
+    await inBuild;
+    const press = handler as ServeOptions["fetch"] | null;
+    if (press === null) throw new Error("the dashboard was not served");
+    const res = await press(new Request("http://127.0.0.1:8737/api/act/reset", { method: "POST", headers: { "content-type": "application/json", origin: "http://127.0.0.1:8737" }, body: "{}" }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "lab_not_ready" });
+    release();
+    await ran;
+    expect(m.exec.calls.filter((c) => c.argv[0] === "rm")).toHaveLength(1);
+  });
+});

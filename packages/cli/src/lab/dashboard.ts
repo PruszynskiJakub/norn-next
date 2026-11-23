@@ -295,13 +295,44 @@ async function typedOf(req: Request): Promise<string | undefined> {
   return body.ok ? body.value.text : undefined;
 }
 
+/** The names this machine's loopback answers to; a DNS-rebound page sends its own name as Host. */
+const LOOPBACK_NAMES: ReadonlySet<string> = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
+/** The request's Host as the browser sent it; a request built in process has only its URL. */
+const hostOf = (req: Request): string => req.headers.get("host") ?? new URL(req.url).host;
+
+function isLoopbackHost(host: string): boolean {
+  const name = host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : (host.split(":")[0] ?? "");
+  return LOOPBACK_NAMES.has(name.toLowerCase());
+}
+
+/**
+ * Why a button press came from another page, or null when it came from the dashboard's own. A browser
+ * sends Origin (and Sec-Fetch-Site) on every POST, so a foreign one is caught there; a request with
+ * neither is a shell's, the person's own.
+ */
+function foreignPress(req: Request, host: string): string | null {
+  const origin = req.headers.get("origin");
+  if (origin !== null && origin !== `http://${host}`) return `a button pressed from ${origin}, not from the dashboard at http://${host}`;
+  const site = req.headers.get("sec-fetch-site");
+  if (site !== null && site !== "same-origin" && site !== "none") return `a button pressed from a ${site} page, not from the dashboard`;
+  return null;
+}
+
+/** A JSON body is one a cross-origin page cannot send without a preflight, which is never granted. */
+const isJsonBody = (req: Request): boolean => (req.headers.get("content-type") ?? "").split(";")[0]?.trim().toLowerCase() === "application/json";
+
 /**
  * The dashboard's routes: `GET /` the page, `GET /api/state` what it shows, `POST /api/act/<name>`
- * a button, its body `{"text": ...}` when it needs what the person typed. Anything else is refused.
+ * a button, its body `{"text": ...}` when it needs what the person typed. Anything else is refused,
+ * and so is any request another page sends: the loopback binding keeps other machines out, not a
+ * page in the person's own browser.
  */
 export function labHandler(deps: LabHandlerDeps): (req: Request) => Promise<Response> {
   return async (req) => {
     const path = new URL(req.url).pathname;
+    const host = hostOf(req);
+    if (!isLoopbackHost(host)) return refusal(403, `the lab's dashboard answers only at 127.0.0.1, not at ${host}`, "open the URL norn lab printed", "foreign_host");
     try {
       if (path === "/" || path === "/index.html") {
         if (req.method !== "GET") return refusal(405, `${req.method} ${path} is not served`, `GET ${path}`, "method_not_allowed");
@@ -316,6 +347,9 @@ export function labHandler(deps: LabHandlerDeps): (req: Request) => Promise<Resp
         const name = act[1] as string;
         if (!isAction(name)) return refusal(404, `the lab has no button ${JSON.stringify(name)}`, `POST /api/act/<${LAB_ACTION_NAMES.join("|")}>`, "unknown_action");
         if (req.method !== "POST") return refusal(405, `${req.method} ${path} is not served`, `POST ${path}`, "method_not_allowed");
+        const foreign = foreignPress(req, host);
+        if (foreign !== null) return refusal(403, foreign, "press the button on the dashboard norn lab printed", "foreign_origin");
+        if (!isJsonBody(req)) return refusal(415, `a button's body is JSON, sent with content-type application/json`, `POST ${path} with content-type application/json`, "not_json");
         const typed = await typedOf(req);
         const input = ACTIONS[name].input;
         if (input !== null && (typed?.trim() ?? "") === "") return refusal(400, `${name} needs the ${input} you type`, `POST ${path} with {"text": "<${input}>"}`, "input_missing");

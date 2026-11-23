@@ -5,7 +5,7 @@
  * planned from the lab as it is now, and answers with the way out.
  */
 import { planBreak } from "./break-it.ts";
-import { CHILD_TIMEOUT_MS, labEnv, labMarkdown, type LabRun, openLab } from "./lab.ts";
+import { CHILD_TIMEOUT_MS, labEnv, labMarkdown, type LabRun, type LabView, openLab } from "./lab.ts";
 import { commandText, type LabActAnswer, type LabActionName, type LabCommand } from "./dashboard.ts";
 
 /** The longest output a button answers with: its tail, where a command says how it went. */
@@ -13,11 +13,15 @@ export const ACT_OUTPUT_MAX = 8000;
 
 const tail = (text: string): string => (text.length > ACT_OUTPUT_MAX ? `…${text.slice(-ACT_OUTPUT_MAX)}` : text);
 
+/** Reset: the lab removed and built again, and the lab as it now is. */
+export async function resetLab(lab: LabRun, name: LabActionName): Promise<{ answer: LabActAnswer; view: LabView }> {
+  const command: LabCommand = { kind: "reset" };
+  const view = await openLab(lab, { clean: true });
+  return { answer: { action: name, command: commandText(command), exit: 0, output: labMarkdown(view), way_out: null }, view };
+}
+
 export async function runLabCommand(lab: LabRun, name: LabActionName, command: LabCommand): Promise<LabActAnswer> {
-  if (command.kind === "reset") {
-    const view = await openLab(lab, { clean: true });
-    return { action: name, command: commandText(command), exit: 0, output: labMarkdown(view), way_out: null };
-  }
+  if (command.kind === "reset") return (await resetLab(lab, name)).answer;
   const env = labEnv(lab.paths);
   const plan = command.kind === "break" ? await planBreak({ ...lab, env }, command.name, command.key) : null;
   const shown = plan?.line ?? commandText(command);

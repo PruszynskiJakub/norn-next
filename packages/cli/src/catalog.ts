@@ -151,15 +151,18 @@ function said(text: string | undefined): { when: string | null; description: str
 
 const fileText = (files: Readonly<Record<string, string>>, name: string): string | undefined => Object.entries(files).find(([f]) => workflowNameOf(f) === name)?.[1];
 
+/** A name a person typed, looked up as a key of its own: `constructor` or `__proto__` names no workflow. */
+const own = <T>(record: Readonly<Record<string, T>>, name: string): T | undefined => (Object.hasOwn(record, name) ? record[name] : undefined);
+
 /** One workflow as the list shows it. */
 export function workflowEntry(c: RepoCatalog, name: string): WorkflowListEntry {
   const file = repoFileOf(c.repoWorkflows, name, "workflow");
   const packText = fileText(c.pack.workflows, name);
   const source = file === null ? "pack" : packText === undefined ? "repo" : "replaces-pack";
   const entry: WorkflowListEntry = { name, ...said(file === null ? packText : fileText(c.repoWorkflows.workflows, name)), source, state: "ok", file };
-  const held = c.held[name];
+  const held = own(c.held, name);
   if (held) return { ...entry, state: "held", changes: held.changes, confirm: `norn workflow confirm ${name}` };
-  const load = c.workflows[name];
+  const load = own(c.workflows, name);
   if (load?.ok) return entry;
   return { ...entry, state: "invalid", problem: loadProblem(name, load) ?? `workflow ${name} does not load` };
 }
@@ -173,8 +176,8 @@ export function workflowEntries(c: RepoCatalog): WorkflowListEntry[] {
  * file holds is refused with the ones that load; one that does not load, with why.
  */
 export function shownWorkflow(c: RepoCatalog, name: string): { entry: WorkflowListEntry; workflow: LoadedWorkflow } {
-  const load = c.workflows[name];
-  const held = c.held[name];
+  const load = own(c.workflows, name);
+  const held = own(c.held, name);
   if (!load && !held) {
     const loading = workflowEntries(c).flatMap((w) => (w.state === "ok" ? [w.name] : []));
     throw refuse(`no workflow ${name}`, `name one of ${loading.join(", ")}${c.repo === null ? "" : `, or write ${REPO_WORKFLOWS_DIR}/${name}.yaml`}`, "unknown_workflow");

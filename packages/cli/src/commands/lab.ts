@@ -11,7 +11,7 @@
 import { tmpdir } from "node:os";
 import { defineCommand, opt } from "../command.ts";
 import type { CliContext } from "../context.ts";
-import { runLabCommand } from "../lab/act.ts";
+import { resetLab, runLabCommand } from "../lab/act.ts";
 import { buttonCommand, dashboardState, labHandler, type LabActionName } from "../lab/dashboard.ts";
 import { CHILD_TIMEOUT_MS, labEnv, labMarkdown, type LabRun, type LabView, openLab, playLab } from "../lab/lab.ts";
 import { LAB_PAGE } from "../lab/page.ts";
@@ -102,13 +102,16 @@ export const labCommand = defineCommand({
         page: LAB_PAGE,
         state: async () => dashboardState(await readLab(ctx.io, paths), (key) => labMerge(script, key)),
         act: async (name: LabActionName, typed: string | undefined) => {
-          const key = view?.story ?? null;
+          // until the first build ends there is no lab to act on, and a reset would build a second one over it
+          if (view === null) throw refuse(`${name} needs the lab, and the lab is still being built`, "wait for the lab to build, then press it again", "lab_not_ready");
+          const key = view.story;
           const command = buttonCommand(name, key === null ? null : { key, workflow: script.workflow, merge: labMerge(script, key) }, typed);
           if (command === null) throw refuse(`${name} needs the lab's story, and the lab has none yet`, "wait for the lab to build, or press Reset", "lab_not_ready");
           return serial(async () => {
-            const answer = await runLabCommand(lab, name, command);
-            if (name === "reset") view = await openLab(lab, { clean: false });
-            return answer;
+            if (command.kind !== "reset") return runLabCommand(lab, name, command);
+            const reset = await resetLab(lab, name);
+            view = reset.view;
+            return reset.answer;
           });
         },
       }),
@@ -120,8 +123,9 @@ export const labCommand = defineCommand({
     const log = ctx.io.log ?? (() => {});
     try {
       log(`norn lab: the dashboard is at ${served.value.url}`);
-      view = await openLab(lab, { clean });
-      log(labMarkdown(view));
+      const built = await serial(() => openLab(lab, { clean }));
+      view = built;
+      log(labMarkdown(built));
       log(`norn lab: ticking the lab every ${LAB_TICK_MS / 1000}s; open ${served.value.url} and press Ctrl-C to stop`);
       await tickLab(ctx, lab, serial);
     } finally {

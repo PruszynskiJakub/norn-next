@@ -181,7 +181,8 @@ describe("the dashboard's routes", () => {
       return { action: name, command: `ran ${name}`, exit: 0, output: "", way_out: null };
     },
   });
-  const post = (path: string, body?: unknown) => handle(new Request(`http://127.0.0.1${path}`, { method: "POST", ...(body === undefined ? {} : { body: JSON.stringify(body) }) }));
+  const JSON_BODY = { "content-type": "application/json" };
+  const post = (path: string, body?: unknown, headers: Record<string, string> = JSON_BODY) => handle(new Request(`http://127.0.0.1${path}`, { method: "POST", headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }));
 
   test("GET / is the page, which polls the state and posts the buttons", async () => {
     const res = await handle(new Request("http://127.0.0.1/"));
@@ -205,6 +206,46 @@ describe("the dashboard's routes", () => {
     expect((await handle(new Request("http://127.0.0.1/etc/passwd"))).status).toBe(404);
     expect(pressed).toEqual([{ name: "reject", typed: "Name it in the README." }]);
   });
+
+  test("a button pressed from the dashboard's own page, with its Origin and Sec-Fetch-Site, runs", async () => {
+    pressed.length = 0;
+    const res = await post("/api/act/approve", {}, { ...JSON_BODY, host: "127.0.0.1:8737", origin: "http://127.0.0.1:8737", "sec-fetch-site": "same-origin" });
+    expect(res.status).toBe(200);
+    expect(pressed.map((p) => p.name)).toEqual(["approve"]);
+  });
+
+  test("a button pressed from another page is refused before anything runs: a foreign Origin, a cross-site fetch, or a body that is not JSON", async () => {
+    pressed.length = 0;
+    const foreign = await post("/api/act/approve", { text: "x" }, { ...JSON_BODY, host: "127.0.0.1:8737", origin: "https://evil.example" });
+    expect(foreign.status).toBe(403);
+    expect(await foreign.json()).toMatchObject({ code: "foreign_origin" });
+    const otherPort = await post("/api/act/approve", {}, { ...JSON_BODY, host: "127.0.0.1:8737", origin: "http://127.0.0.1:9999" });
+    expect(otherPort.status).toBe(403);
+    const crossSite = await post("/api/act/approve", {}, { ...JSON_BODY, host: "127.0.0.1:8737", "sec-fetch-site": "cross-site" });
+    expect(crossSite.status).toBe(403);
+    expect(await crossSite.json()).toMatchObject({ code: "foreign_origin" });
+    // a text/plain body is what a cross-origin page can send without a preflight
+    const plain = await post("/api/act/reset", { text: "x" }, { "content-type": "text/plain;charset=UTF-8" });
+    expect(plain.status).toBe(415);
+    expect(await plain.json()).toMatchObject({ code: "not_json" });
+    expect((await post("/api/act/reset", undefined, {})).status).toBe(415);
+    expect(pressed).toEqual([]);
+  });
+
+  test("a request whose Host is not the loopback address, as a DNS-rebound page sends, is refused on every route", async () => {
+    pressed.length = 0;
+    for (const req of [
+      new Request("http://127.0.0.1/api/state", { headers: { host: "rebound.example:8737" } }),
+      new Request("http://127.0.0.1/", { headers: { host: "rebound.example:8737" } }),
+      new Request("http://127.0.0.1/api/act/approve", { method: "POST", headers: { ...JSON_BODY, host: "rebound.example:8737", origin: "http://rebound.example:8737" }, body: "{}" }),
+    ]) {
+      const res = await handle(req);
+      expect(res.status).toBe(403);
+      expect(await res.json()).toMatchObject({ code: "foreign_host" });
+    }
+    expect((await handle(new Request("http://127.0.0.1/api/state", { headers: { host: "localhost:8737" } }))).status).toBe(200);
+    expect(pressed).toEqual([]);
+  });
 });
 
 describe("the dashboard's buttons over a lab", () => {
@@ -224,7 +265,7 @@ describe("the dashboard's buttons over a lab", () => {
       },
     });
     const press = async (name: LabActionName, text?: string): Promise<LabActAnswer> => {
-      const res = await handle(new Request(`http://127.0.0.1/api/act/${name}`, { method: "POST", body: JSON.stringify({ text }) }));
+      const res = await handle(new Request(`http://127.0.0.1/api/act/${name}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) }));
       expect(res.status).toBe(200);
       return (await res.json()) as LabActAnswer;
     };
