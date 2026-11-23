@@ -1,14 +1,14 @@
 /**
  * The generated part of docs/reference.md: every command and verb with its usage and options, every
- * config key with its type (read off the file schema) and default, the shipped workflows and the exit
- * codes, rendered from the cli's own registry, its config schema and the defaults the kernel and the
- * runtime fall back on. Pure: the caller passes the workflow files' text. `bun run docs:emit` writes
- * it between the markers; a unit test fails when the file is stale.
+ * config key with its type (read off the file schema) and default, the pack's workflow and skill
+ * catalog and the exit codes, rendered from the cli's own registry, its config schema and the defaults
+ * the kernel and the runtime fall back on. Pure: the caller passes the pack's catalog. `bun run
+ * docs:emit` writes it between the markers; a unit test fails when the file is stale.
  */
 import { DEFAULT_KERNEL_CONFIG } from "@norn/kernel";
 import { DEFAULT_CHECKS, DEFAULT_LOCK_STALE_MS, DEFAULT_TRACE_RETAIN_MS } from "@norn/runtime";
 import { ExitCode } from "@norn/schema";
-import { parse } from "yaml";
+import type { Catalog, CatalogWorkflow } from "./catalog.ts";
 import type { Command, Noun } from "./command.ts";
 import { CONFIG_DEFAULTS, ConfigLayer, DEFAULT_SETUP_TIMEOUT } from "./config/schema.ts";
 import { tableCell } from "./output.ts";
@@ -30,7 +30,7 @@ export const REFERENCE_MARKERS: MarkerPair = { start: REFERENCE_START, end: REFE
  */
 export const REFERENCE_GROUPS: ReadonlyArray<{ title: string; commands: readonly string[] }> = [
   { title: "Setup", commands: ["init", "doctor", "config", "plugin"] },
-  { title: "A person's commands", commands: ["status", "story", "run", "workflow", "lab"] },
+  { title: "A person's commands", commands: ["status", "story", "run", "workflow", "skill", "lab"] },
   { title: "Background: run by a person, cron or a terminal multiplexer", commands: ["watch", "tick"] },
   { title: "Agent protocol: the only commands an agent runs", commands: ["brief", "done", "ask", "stuck"] },
   { title: "Called by a harness, not by hand", commands: ["hook", "lab-agent"] },
@@ -200,11 +200,28 @@ function renderConfig(): string[] {
   ];
 }
 
-/** `name:` and `description:` of a shipped workflow file. */
-function workflowLine(text: string): string {
-  const doc = parse(text) as { name?: unknown; description?: unknown };
-  const description = typeof doc.description === "string" ? doc.description.trim().replace(/\s+/g, " ") : "";
-  return `- \`${String(doc.name ?? "?")}\`: ${description}`;
+function renderWorkflow(w: CatalogWorkflow): string[] {
+  const label = w.label === null ? "No label: a story's `slices` step runs it on each slice" : `Label \`${w.label}\``;
+  const steps = w.steps.map((st) => `| \`${st.name}\` | ${tableCell(st.kind)} | ${st.skills.length ? st.skills.map((k) => `\`${k}\``).join(", ") : "—"} |`);
+  return [`#### \`${w.name}\``, "", `${label} · starts at \`${w.start}\``, "", w.description, "", `**When:** ${w.when}`, "", ...(steps.length ? ["| Step | Kind | Skills |", "|---|---|---|", ...steps, ""] : [])];
+}
+
+function renderCatalog(pack: string, catalog: Catalog): string[] {
+  return [
+    "### Workflow catalog",
+    "",
+    `The \`${pack}\` pack's workflows, each drawn as a graph in [Workflows](workflows.md). An issue's \`norn:wf:<name>\` label picks the workflow its first round runs; a person starts each later round with \`norn story round\`, and each workflow's When names the rounds that follow it. A repo's own \`.agents/workflows/\` file replaces the pack's of the same name. Each step lists the skills its agent loads.`,
+    "",
+    ...catalog.workflows.flatMap(renderWorkflow),
+    "### Skills",
+    "",
+    `The \`${pack}\` pack's skills. A skill marked (a person's) is one only a person runs, never a workflow step.`,
+    "",
+    "| Skill | Use when |",
+    "|---|---|",
+    ...catalog.skills.map((k) => `| \`${k.name}\`${k.personOnly ? " (a person's)" : ""} | ${tableCell(k.useWhen)} |`),
+    "",
+  ];
 }
 
 /** What each exit code means; a code with no line here fails the reference test. */
@@ -221,10 +238,10 @@ export const EXIT_MEANING: Record<keyof typeof ExitCode, string> = {
 export interface ReferenceInput {
   commands: readonly Command[];
   nouns: readonly Noun[];
-  /** the name of the pack whose workflows are listed */
+  /** the name of the pack whose workflows and skills are listed */
   pack: string;
-  /** the text of each workflow file that pack ships */
-  workflows: readonly string[];
+  /** that pack's workflows and skills */
+  catalog: Catalog;
 }
 
 /** The generated block, markers included. */
@@ -240,7 +257,7 @@ export function renderReference(input: ReferenceInput): string {
     }
   }
   out.push("### Config keys", "", ...renderConfig(), "");
-  out.push("### Shipped workflows", "", `The \`${input.pack}\` pack's workflows:`, "", ...input.workflows.map(workflowLine).sort(), "");
+  out.push(...renderCatalog(input.pack, input.catalog));
   out.push(
     "### Exit codes",
     "",
@@ -251,6 +268,25 @@ export function renderReference(input: ReferenceInput): string {
   );
   out.push(REFERENCE_END);
   return out.join("\n");
+}
+
+export const CONTRIBUTING_FILE = "CONTRIBUTING.md";
+export const CONTRIBUTING_MARKERS: MarkerPair = {
+  start: "<!-- norn:workflows:start — generated by `bun run docs:emit` from the pack and .agents/workflows/; edit the workflow files, not this block -->",
+  end: "<!-- norn:workflows:end -->",
+};
+
+/** CONTRIBUTING.md's workflow table, markers included: one row per workflow a repo can start, by label. */
+export function renderWorkflowTable(workflows: readonly CatalogWorkflow[]): string {
+  return [
+    CONTRIBUTING_MARKERS.start,
+    "",
+    "| Label | Workflow | When |",
+    "|---|---|---|",
+    ...workflows.map((w) => `| ${w.label === null ? "—" : `\`${w.label}\``} | ${w.name} | ${tableCell(w.when)} |`),
+    "",
+    CONTRIBUTING_MARKERS.end,
+  ].join("\n");
 }
 
 /** `doc` with the text between `markers` replaced by `block`; prose around them is kept. */

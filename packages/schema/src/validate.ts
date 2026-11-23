@@ -1,5 +1,6 @@
 import type { Static } from "@sinclair/typebox";
 import { check, type SchemaError, type ValidationResult } from "./check.ts";
+import { SkillList, WorkflowList, WorkflowShow } from "./catalog.ts";
 import { CheckOrder, ClaimBlob, LeaseFile } from "./claim.ts";
 import { CliError } from "./cli.ts";
 import { CriteriaReport } from "./criteria.ts";
@@ -28,6 +29,10 @@ export const SCHEMAS = {
   "check-order": CheckOrder,
   "cli-error": CliError,
   "criteria-report": CriteriaReport,
+  // what the catalog commands print with --json
+  "workflow-list": WorkflowList,
+  "workflow-show": WorkflowShow,
+  "skill-list": SkillList,
 } as const;
 export type SchemaName = keyof typeof SCHEMAS;
 

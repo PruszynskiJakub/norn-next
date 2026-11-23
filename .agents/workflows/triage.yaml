@@ -14,7 +14,7 @@ steps:
       `norn:priority:low|medium|high|extreme`; a label missing on the remote is named in the comment
       for a person to create. That comment and those labels are the only remote writes this step allows,
       an exception to the brief's rule on remote writes; never remove a label, the intake label `norn` included. Change no file, spec.md included,
-      but the handoff. Report the outcome the comment recommends, with its reason as the note:
+      but the handoff. Recommend from the workflow catalog (each workflow's `when:`), not a list of your own. Report the outcome the comment recommends, with its reason as the note:
       `norn done <recommendation> --note "<reason>"`.
     with: { skills: [norn-triage] }
     reads: [spec, handoff]

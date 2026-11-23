@@ -75,7 +75,7 @@ A plugin that does not ship with norn is one command: `norn plugin add <npm spec
 
 ## Run a first story
 
-On GitHub, an issue labelled `norn` and assigned to you is a story; with the local tracker, `norn story create` makes one.
+On GitHub, an issue labelled `norn` and assigned to you is a story; with the local tracker, `norn story create` makes one. `norn workflow list` shows every workflow you can start and when to pick it, `norn workflow show <name>` one workflow as norn runs it, and `norn skill list` every skill an agent here can use; all three work before `norn init` too, on the pack alone.
 
 Before you start `norn watch`: in auto mode, which `norn init` writes with the headless runner, each agent step launches an agent on its own, and every agent run costs money on your harness's account. To start in manual mode instead, where nothing launches until you say so, run `norn config set kernel.mode manual` first; then `norn status` shows each agent step waiting and `norn run start <unit>` starts it. `norn watch` runs the ticks for you, one after another, so a story moves on by itself until something waits for you; a hand `norn tick` moves it one small step and stops.
 
@@ -100,6 +100,7 @@ norn status    # in another terminal: every story, what needs you first
 |---|---|
 | [Concepts](docs/concepts.md) | how norn works: the kernel and its plugins, stories, units, workflows, steps, gates, modes, one tick, the agent's worktree, config, and the glossary |
 | [Reference](docs/reference.md) | every command, flag and config key, the workflows the bundled pack ships, and the exit codes |
+| [Workflows](docs/workflows.md) | every workflow the bundled pack ships, drawn as a graph: its steps, outcomes, limits and gates |
 | [Recipes](docs/recipes.md) | what to do when an agent asks or dies, a gate waits, you want your own workflow or plugin, or you run without GitHub |
 | [Limitations](docs/limitations.md) | what is not built, not proven in real use, or out of scope by design |
 | [Contributing](CONTRIBUTING.md) | how norn is built with norn, and how to propose a change |
