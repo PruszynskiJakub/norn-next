@@ -829,7 +829,7 @@ Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner`, `ru
 
 ### Shipped workflows
 
-The `sdlc` pack's workflows:
+The `sdlc` pack's workflows, each drawn as a graph in [Workflows](workflows.md):
 
 - `fix`: Reproduce a bug and confirm its cause, fix it test-first, review it, open the draft PR, wait for CI.
 - `quick`: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.

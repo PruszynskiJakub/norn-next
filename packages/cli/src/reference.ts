@@ -240,7 +240,7 @@ export function renderReference(input: ReferenceInput): string {
     }
   }
   out.push("### Config keys", "", ...renderConfig(), "");
-  out.push("### Shipped workflows", "", `The \`${input.pack}\` pack's workflows:`, "", ...input.workflows.map(workflowLine).sort(), "");
+  out.push("### Shipped workflows", "", `The \`${input.pack}\` pack's workflows, each drawn as a graph in [Workflows](workflows.md):`, "", ...input.workflows.map(workflowLine).sort(), "");
   out.push(
     "### Exit codes",
     "",
