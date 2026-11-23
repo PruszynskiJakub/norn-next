@@ -614,6 +614,7 @@ export type UseStep = Static<typeof UseStep>;
 export const WorkflowSource = Type.Object(
   {
     ...Workflow.properties,
+    when: Type.Optional(Type.String({ minLength: 1, description: "When to pick this workflow, for the catalog; kept out of the pinned workflow and its hash" })),
     steps: Type.Record(StepName, Type.Union([...FileSteps, UseStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
     // a dotted name is derived from its edge, so a declared one never clashes with it
     counters: Type.Optional(Type.Record(CounterName, CounterSpec, { additionalProperties: false })),

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { packProblems, stepRoles } from "@norn/plugin-api";
+import { parse } from "yaml";
 import { packSdlcPlugin, SDLC_PACK } from "../../src/index.ts";
 
 const ASSETS = join(import.meta.dir, "..", "..", "assets");
@@ -52,5 +53,15 @@ describe("norn-pack-sdlc", () => {
     expect(Object.keys(SDLC_PACK.workflows).sort()).toEqual(["fix.yaml", "quick.yaml", "refinement.yaml", "reproduce.yaml", "slice.yaml", "story.yaml", "triage.yaml"]);
     expect(Object.keys(SDLC_PACK.shared).sort()).toEqual(["base-update.yaml", "build.yaml", "catch-up.yaml", "diagnose.yaml", "land.yaml", "publish.yaml"]);
     for (const [skill, files] of Object.entries(SDLC_PACK.skills)) expect({ skill, has: typeof files["SKILL.md"] }).toEqual({ skill, has: "string" });
+  });
+
+  test("every bundled skill's description says when it applies, with a Use when or Use for clause", () => {
+    const unsaid = Object.entries(SDLC_PACK.skills).flatMap(([skill, files]) => {
+      const fm = (files["SKILL.md"] as string).match(/^---\n([\s\S]*?)\n---\n/);
+      const description = fm ? (parse(fm[1] as string) as { description?: unknown }).description : undefined;
+      return typeof description === "string" && /\bUse (when|for)\b/.test(description) ? [] : [skill];
+    });
+    expect(Object.keys(SDLC_PACK.skills).length).toBeGreaterThan(0);
+    expect(unsaid).toEqual([]);
   });
 });

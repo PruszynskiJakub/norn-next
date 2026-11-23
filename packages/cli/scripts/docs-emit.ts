@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { SDLC_PACK } from "@norn/pack-sdlc";
 import { COMMANDS, NOUNS } from "../src/commands/index.ts";
 import { CONFIG_DEFAULTS } from "../src/config/schema.ts";
-import { REFERENCE_FILE, renderReference, replaceReference } from "../src/reference.ts";
+import { REFERENCE_FILE, REFERENCE_MARKERS, renderReference, replaceReference } from "../src/reference.ts";
 
 export const ROOT = join(import.meta.dir, "..", "..", "..");
 
@@ -16,6 +16,6 @@ export function freshReference(): string {
 
 if (import.meta.main) {
   const file = join(ROOT, REFERENCE_FILE);
-  writeFileSync(file, replaceReference(readFileSync(file, "utf8"), freshReference()));
+  writeFileSync(file, replaceReference(readFileSync(file, "utf8"), freshReference(), REFERENCE_MARKERS));
   console.log(JSON.stringify({ emitted: REFERENCE_FILE }));
 }

@@ -154,6 +154,12 @@ export type WorkflowGraph = Static<typeof WorkflowGraph>;
 export interface LoadedWorkflow {
   pinned: PinnedWorkflow;
   graph: WorkflowGraph;
+  /**
+   * step → the shared file (`shared/<name>.yaml`, by name) it was brought in from, as `loadWorkflow`
+   * sets it. Kept beside the pinned document, never in it, so it moves no hash; a pinned document is
+   * already flat, so loading one again gives none.
+   */
+  included?: Readonly<Record<string, string>>;
 }
 
 /**

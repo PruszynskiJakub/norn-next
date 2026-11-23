@@ -188,7 +188,7 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
 
   const pinned = pin(written, flat.flat, read, routes, derived.counters);
   const graph = compile(pinned, read, routes, derived.counters, opts.config);
-  return { ok: true, workflow: { pinned, graph } };
+  return { ok: true, workflow: { pinned, graph, included: { ...included } } };
 }
 
 /** Every route goes to a step, `$done` or `$stuck`; the counters, `start` and `base` name what exists. */
@@ -249,7 +249,7 @@ function pin(
   const docCounters: Record<string, CounterDoc> = {};
   for (const [name, c] of Object.entries(counters))
     docCounters[name] = { max: c.max, ...(c.reset_on.length === 1 ? { reset_on: c.reset_on[0] } : c.reset_on.length > 1 ? { reset_on: c.reset_on } : {}) };
-  const { $schema: _schema, counters: _counters, steps: _steps, start: _start, base: _base, ...rest } = written;
+  const { $schema: _schema, when: _when, counters: _counters, steps: _steps, start: _start, base: _base, ...rest } = written;
   const doc: WorkflowDocument = {
     ...rest,
     start: flat.start,
