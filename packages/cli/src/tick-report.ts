@@ -3,6 +3,7 @@
  * failures and the problems that kept facts from being whole. The JSON is the runtime's report itself.
  */
 import type { TickReport } from "@norn/runtime";
+import { ruleCaption } from "./captions.ts";
 
 type Outcome = TickReport["outcomes"][number];
 
@@ -14,8 +15,13 @@ function who(d: Outcome["decision"]): string {
   return typeof loose.item?.key === "string" ? loose.item.key : "-";
 }
 
-export function outcomeLine(o: Outcome): string {
-  const base = `${who(o.decision)}  ${o.decision.rule} → ${o.decision.kind}`;
+/**
+ * One action as a line. `captioned` adds the rule's plain-word caption, for `norn tick`'s markdown only:
+ * the watch's lines also travel in its JSON, which carries no prose.
+ */
+export function outcomeLine(o: Outcome, captioned = false): string {
+  const caption = captioned ? ruleCaption(o.decision.rule) : undefined;
+  const base = `${who(o.decision)}  ${o.decision.rule} → ${o.decision.kind}${caption ? `: ${caption}` : ""}`;
   if (o.ok) return base;
   if (lostRace(o)) return `${base}  lost a race, decided again next tick: ${o.error}`;
   return `${base}  FAILED: ${o.error}${o.retryable ? " (retried next tick)" : ""}`;
@@ -59,12 +65,12 @@ export const lostRace = (o: Outcome): boolean => !o.ok && o.retryable && o.error
 /** A lost race is not a failure: it changed nothing, and the next tick reads the record as it is. */
 export const failedCount = (r: TickReport): number => r.outcomes.filter((o) => !o.ok && !lostRace(o)).length;
 
-export function tickLines(r: TickReport): string[] {
-  return [...r.outcomes.map(outcomeLine), ...r.problems.map((p) => `problem: ${p}`)];
+export function tickLines(r: TickReport, captioned = false): string[] {
+  return [...r.outcomes.map((o) => outcomeLine(o, captioned)), ...r.problems.map((p) => `problem: ${p}`)];
 }
 
 export function tickMarkdown(r: TickReport): string {
-  const lines = tickLines(r);
+  const lines = tickLines(r, true);
   const head = `# Tick ${r.tick_id}\n\n${r.outcomes.length} action${r.outcomes.length === 1 ? "" : "s"}, ${failedCount(r)} failed`;
   return lines.length === 0 ? `${head}\n\nNothing to do.` : `${head}\n\n${lines.map((l) => `- ${l}`).join("\n")}`;
 }
