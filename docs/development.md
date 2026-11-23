@@ -10,7 +10,7 @@ bun run test        # the unit tier, in seconds: your loop after each change; a 
 bun run test:integration  # the integration tier (packages/*/test/integration/), 6 workers: CI runs it in shards, never a local check
 bun run typecheck   # tsc --noEmit over every package and scripts/
 bun run schema:emit # regenerate packages/schema/json/*.schema.json after changing a schema
-bun run docs:emit   # regenerate the generated blocks of docs/reference.md and docs/workflows.md after changing a command, flag, config key or the pack's workflows
+bun run docs:emit   # regenerate the generated blocks of docs/reference.md, docs/workflows.md and CONTRIBUTING.md after changing a command, flag, config key, or a workflow or skill of the pack or .agents/workflows/
 bun run build       # dist/npm/: one bundled norn.js + package.json; build:bin [<target>…] builds the binaries
 bun run golden -- --update  # behaviour change: re-decide every golden case, rewrite only its decisions
 bun run golden      # add the golden cases the scenarios in packages/kernel/scripts/golden/ produce
