@@ -645,7 +645,25 @@ norn run attach <unit> | norn run attach --next
 
 ##### `norn workflow` (noun)
 
-Workflows: confirm a repo workflow held for the person
+Workflows: list the ones this repo can start, show one as norn runs it, confirm a repo workflow held for the person
+
+##### `norn workflow list`
+
+List every workflow this repo can start, with when to pick it and where it comes from
+
+```sh
+norn workflow list
+```
+
+##### `norn workflow show`
+
+Show a workflow as norn runs it: steps, outcomes, counters, gates and skills, or its graph
+
+```sh
+norn workflow show <name> [--mermaid]
+```
+
+- `--mermaid`: print the workflow's Mermaid graph, as docs/workflows.md draws it, instead (no --json)
 
 ##### `norn workflow confirm`
 
@@ -655,6 +673,18 @@ A person's command: refused in an agent's session (`person_only`).
 
 ```sh
 norn workflow confirm <name>
+```
+
+##### `norn skill` (noun)
+
+Skills: list every skill an agent in this repo can use
+
+##### `norn skill list`
+
+List every skill an agent in this repo can use, with when it applies and where it comes from
+
+```sh
+norn skill list
 ```
 
 #### Background: run by a person, cron or a terminal multiplexer
