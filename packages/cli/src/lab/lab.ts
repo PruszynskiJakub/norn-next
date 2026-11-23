@@ -42,7 +42,7 @@ export interface LabView {
 }
 
 /** The part of `norn status --json` the lab reads. */
-const StatusJson = Type.Object({ stories: Type.Array(Type.Object({ key: Type.String({ minLength: 1 }), units: Type.Array(LabUnit) })), intake: Type.Array(Type.Object({ key: Type.String({ minLength: 1 }) })) });
+const StatusJson = Type.Object({ stories: Type.Array(Type.Object({ key: Type.String({ minLength: 1 }), units: Type.Array(LabUnit), claim: Type.Union([Type.Object({}), Type.Null()]) })), intake: Type.Array(Type.Object({ key: Type.String({ minLength: 1 }) })) });
 
 export interface LabRun {
   host: HostContext;
@@ -104,13 +104,13 @@ async function writeAgentBeats(lab: LabRun): Promise<void> {
 }
 
 /** The lab's story and its unit, read from `norn status --json`. */
-async function storyState(lab: LabRun): Promise<{ key: string | null; unit: LabUnit | null }> {
+async function storyState(lab: LabRun): Promise<LabState> {
   const out = await norn(lab, "read the lab's status", ["status"]);
   const r = parseJson(StatusJson, out, "norn status --json");
   if (!r.ok) throw refuse(`norn lab could not read the lab's status: ${r.failure.message}`, `start the lab again with \`${CLEAN}\``, "lab_failed");
   const story = r.value.stories[0];
-  if (story !== undefined) return { key: story.key, unit: story.units[0] ?? null };
-  return { key: r.value.intake[0]?.key ?? null, unit: null };
+  if (story !== undefined) return { key: story.key, unit: story.units[0] ?? null, claimed: story.claim !== null };
+  return { key: r.value.intake[0]?.key ?? null, unit: null, claimed: false };
 }
 
 /**

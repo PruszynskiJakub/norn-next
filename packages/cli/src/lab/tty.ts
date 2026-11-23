@@ -15,6 +15,8 @@ export const TOUR_POLL_MS = 500;
 export interface LabState {
   key: string | null;
   unit: LabUnit | null;
+  /** the story's claim is held: once its unit ended, the next tick gives it up */
+  claimed: boolean;
 }
 
 /** The person's typed lines: the next one, or null once the input ended. */
@@ -110,6 +112,11 @@ export async function playTour(script: LabScript, paths: LabPaths, io: TourIo, s
     if (unit.step !== step && unit.ended === undefined) {
       step = unit.step;
       io.say(`· step ${step}`);
+    }
+    // the claim is given up on a tick after the one that ended the unit: the story ends only once it is
+    if (unit.ended !== undefined && st.claimed) {
+      await io.tick();
+      continue;
     }
     if (unit.ended !== undefined) {
       io.say(`The story ended \`${unit.ended}\`. \`norn lab --clean\` plays the lab again from beat 1.`);

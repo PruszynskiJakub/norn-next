@@ -150,16 +150,17 @@ interface Play {
   seen: UnitSeen[];
 }
 
-/** `norn tick --json` again and again, as watch does, until `done` holds of the story's unit. */
-async function tickUntil(l: Lab, play: Play, done: (u: UnitSeen | undefined) => boolean, maxMs = 240_000): Promise<UnitSeen> {
+/** `norn tick --json` again and again, as watch does, until `done` holds of the story's unit (and its story). */
+async function tickUntil(l: Lab, play: Play, done: (u: UnitSeen | undefined, s: StorySeen | undefined) => boolean, maxMs = 240_000): Promise<UnitSeen> {
   for (const until = performance.now() + maxMs; performance.now() < until; ) {
     const t = await norn(l, "tick", "--json");
     const outcomes = (t.body.outcomes ?? []) as { decision: { rule: string }; ok: boolean }[];
     play.rules.push(...outcomes.map((o) => `${o.decision.rule}${o.ok ? "" : "!"}`));
     if (t.code !== 0) throw new Error(`tick exited ${t.code}: ${t.stdout}${t.stderr}\nrules: ${play.rules.join(", ")}`);
-    const unit = (await story(l))?.units[0];
+    const s = await story(l);
+    const unit = s?.units[0];
     if (unit !== undefined) play.seen.push(unit);
-    if (done(unit) && unit !== undefined) return unit;
+    if (done(unit, s) && unit !== undefined) return unit;
     await Bun.sleep(250);
   }
   throw new Error(`the lab did not get there in ${maxMs}ms; rules: ${play.rules.join(", ")}; unit: ${JSON.stringify(play.seen.at(-1))}`);
@@ -208,6 +209,7 @@ describe("norn lab plays its story through eight beats", () => {
   let personBefore: Record<string, string>;
   let siblingBefore: { files: Record<string, string>; head: string; status: string };
   let built: LabSeen;
+  let app: { greet: string; test: string };
   let config: Record<string, Out>;
   let taken: { story: StorySeen | undefined; worktrees: string; branches: string };
   let asked: UnitSeen;
@@ -225,6 +227,8 @@ describe("norn lab plays its story through eight beats", () => {
     personBefore = snapshot(l.personHome);
     siblingBefore = { files: snapshot(join(l.sibling)), head: await sh(l.sibling, "git", "rev-parse", "HEAD"), status: await sh(l.sibling, "git", "status", "--porcelain") };
     built = await nornLab(l);
+    // read before the play merges the story's change into the lab's repo
+    app = { greet: readFileSync(join(l.repo, "greet.sh"), "utf8"), test: readFileSync(join(l.repo, "test.sh"), "utf8") };
     config = Object.fromEntries(
       await Promise.all(["tracker.use", "forge.use", "store.use", "checks.test", "executors.lab", "kernel.mode", "kernel.workflow"].map(async (k) => [k, await norn(l, "config", "get", k, "--json")] as const)),
     );
@@ -246,14 +250,15 @@ describe("norn lab plays its story through eight beats", () => {
     // beat 8: the person merges with git
     const merge = await inLab(l, ["sh", "-c", toMerge.next ?? "false"]);
     if (merge.code !== 0) throw new Error(`the merge the lab names failed: ${merge.stdout}${merge.stderr}`);
-    await tickUntil(l, play, (u) => u?.ended !== undefined);
+    // the claim is given up on a tick after the one that ends the unit, as watch and the tour tick on
+    await tickUntil(l, play, (u, s) => u?.ended !== undefined && s?.claim === null);
     ended = { story: await story(l), lab: await nornLab(l), log: await sh(l.repo, "git", "log", "--format=%s", "main") };
   }, SLOW);
 
   test("AC1: norn lab builds a git repo with the toy app and its test, a bare remote and its own norn home, set up for the lab, with a quick story", async () => {
     expect(built).toMatchObject({ built: true, story: KEY, root: l.root, repo: l.repo, home: l.home, beat: { n: 1, of: 8 } });
-    expect(readFileSync(join(l.repo, "greet.sh"), "utf8")).toContain('echo "hello"');
-    expect(readFileSync(join(l.repo, "test.sh"), "utf8")).toContain("want=");
+    expect(app.greet).toContain('echo "hello"');
+    expect(app.test).toContain("want=");
     expect(await sh(built.remote, "git", "rev-parse", "--is-bare-repository")).toBe("true");
     expect(await sh(l.repo, "git", "remote", "get-url", "origin")).toBe(built.remote);
     expect(existsSync(join(l.home, "repos"))).toBe(true);

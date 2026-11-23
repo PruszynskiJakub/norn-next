@@ -14,6 +14,8 @@ interface Stop {
   unit: LabUnit | null;
   /** the person's command (printed form) that moves it on: a norn decision leaves a receipt the next tick applies */
   needs?: { command: string; receipt: boolean };
+  /** the story's claim is still held: it is given up on a tick after the unit ended */
+  claimed?: boolean;
 }
 
 const u = (over: Partial<LabUnit>): LabUnit => ({ id: KEY, step: "sync", waiting: null, counters: {}, ...over });
@@ -35,6 +37,7 @@ const STORY: Stop[] = [
   { unit: u({ step: "implement", counters: spent("land.rejected") }) },
   { unit: u({ step: "ready", waiting: gate, counters: spent("land.rejected") }), needs: { command: youLine(paths, `norn story approve ${KEY}`), receipt: true } },
   { unit: u({ step: "merge", counters: spent("land.rejected") }), needs: { command: youLine(paths, `git merge --no-ff --no-edit norn/${KEY} && git push -q origin main`), receipt: false } },
+  { unit: u({ step: "merge", ended: "done", counters: spent("land.rejected") }), claimed: true },
   { unit: u({ step: "merge", ended: "done", counters: spent("land.rejected") }) },
 ];
 
@@ -59,7 +62,7 @@ function world(stops: Stop[] = STORY, at = 0) {
     state: async (): Promise<LabState> => {
       const unit = stops[i]?.unit ?? null;
       const pending = decided && stops[i]?.needs?.receipt === true ? 1 : 0;
-      return { key: KEY, unit: unit === null ? null : { ...unit, pending_receipts: pending } };
+      return { key: KEY, unit: unit === null ? null : { ...unit, pending_receipts: pending }, claimed: stops[i]?.claimed ?? false };
     },
     tick: async () => {
       if (stops[i]?.needs !== undefined && !decided) return;
@@ -119,6 +122,14 @@ describe("norn lab --tty", () => {
     expect(titles).toEqual(script.beats.map((b) => `## Beat ${b.n} of 8: ${b.title}`));
     for (const b of script.beats) expect(t.said.filter((l) => l === b.caption.replaceAll("{key}", KEY))).toHaveLength(1);
     expect(t.said.at(-1)).toContain("ended `done`");
+  });
+
+  test("AC9: once the story ended it ticks on until the story's claim is given up, and says the end once", async () => {
+    const w = world();
+    const t = terminal();
+    const end = await playTour(script, paths, { ...w, say: t.say, input: t.input, sleep: tick0 }, 0);
+    expect(end).toMatchObject({ unit: { ended: "done" }, claimed: false });
+    expect(t.said.filter((l) => l.includes("ended `done`"))).toHaveLength(1);
   });
 
   test("AC2: at each beat that needs the person it prints the exact command with the lab's norn home and repo, and Enter runs that command", async () => {
