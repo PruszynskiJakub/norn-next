@@ -687,6 +687,16 @@ List every skill an agent in this repo can use, with when it applies and where i
 norn skill list
 ```
 
+##### `norn lab`
+
+Build or resume a throwaway lab repo where a stand-in agent plays a story in eight beats
+
+```sh
+norn lab [--clean]
+```
+
+- `--clean`: remove the lab and build it again, from beat 1
+
 #### Background: run by a person, cron or a terminal multiplexer
 
 ##### `norn watch`

@@ -14,6 +14,7 @@ import { doneCommand } from "./done.ts";
 import { helpCommand } from "./help.ts";
 import { hookCommand } from "./hook.ts";
 import { initCommand } from "./init.ts";
+import { labCommand } from "./lab.ts";
 import { labAgentCommand } from "./lab-agent.ts";
 import { pluginAddCommand } from "./plugin-add.ts";
 import { pluginListCommand } from "./plugin-list.ts";
@@ -51,6 +52,7 @@ export const COMMANDS: readonly Command[] = [
   tickCommand,
   watchCommand,
   tidyCommand,
+  labCommand,
   briefCommand,
   doneCommand,
   askCommand,

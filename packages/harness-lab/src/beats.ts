@@ -34,7 +34,7 @@ export const LabBeat = Type.Object(
     /** the visit it plays at; absent, every visit that has no beat of its own */
     attempt: Type.Optional(Type.Integer({ minimum: 1 })),
     work: LabWork,
-    /** what a resumed session does instead, such as after the person answered its question */
+    /** what a resumed session does instead, such as after the person answered its question, and a fresh session norn's brief calls a retry */
     resumed: Type.Optional(LabWork),
   },
   { additionalProperties: false },

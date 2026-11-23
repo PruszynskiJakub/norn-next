@@ -5,7 +5,8 @@ import type { RunState } from "@norn/kernel";
 import type { CriterionVerdict } from "@norn/schema";
 import { doneMarkdown } from "../../src/commands/done.ts";
 import { ExitCode, runCli } from "../../src/index.ts";
-import { machine, ROOT, type TestMachine } from "./support.ts";
+import { labAgentBeatsFile } from "../../src/lab/paths.ts";
+import { HOME, machine, ROOT, type TestMachine } from "./support.ts";
 import { AGENT_STEP, configured, envOf, GATE_STEP, RUN, receiptsOf, runEnv, seedUnit, UNIT, withEnv } from "./units.ts";
 
 const json = (stdout: string): unknown => Bun.JSONL.parse(stdout)[0];
@@ -624,5 +625,15 @@ describe("norn lab-agent runs only inside a lab run", () => {
     expect(r.exit).toBe(ExitCode.refused);
     expect(json(r.stdout)).toMatchObject({ code: "not_lab_run", error: expect.stringContaining(LAB_BEATS_ENV), do_instead: expect.stringContaining("lab") });
     expect(await receiptsOf(m)).toEqual([]);
+  });
+
+  test("with no env naming a beat script, it plays the one `norn lab` left in the lab's norn home", async () => {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { step: AGENT_STEP });
+    await m.files.write(labAgentBeatsFile(HOME), JSON.stringify([{ workflow: "w", step: AGENT_STEP, work: { report: { verb: "done", outcome: "done" } } }]));
+    const r = await runCli(["lab-agent", "--json", "--", "go"], m.io);
+    expect(json(r.stdout)).not.toMatchObject({ code: "not_lab_run" });
+    // the agent ran: it asked the same norn for its brief
+    expect(m.exec.calls.map((c) => c.argv.join(" "))).toContain("norn brief --json");
   });
 });

@@ -1,0 +1,98 @@
+# The stand-in agent's beats over `quick`: what it does at each visit of a step, by attempt, so the
+# lab's story plays the same every time. `resumed` is what a resumed session does: after the person
+# answered its question, or after norn retried it once it died. Paths are relative to the worktree;
+# `{story}` is the story's key.
+- workflow: quick
+  step: implement
+  attempt: 1
+  work:
+    files:
+      greet.sh: |
+        #!/bin/sh
+        # the lab's toy app: it prints a greeting
+        echo "hello world"
+      test.sh: |
+        #!/bin/sh
+        # the toy app's test, which the lab's check runs: greet.sh prints the greeting below
+        want="hello, world"
+        got="$(sh greet.sh)"
+        if [ "$got" = "$want" ]; then
+          echo "ok: greet.sh prints '$want'"
+        else
+          echo "FAIL: greet.sh printed '$got', want '$want'"
+          exit 1
+        fi
+    commit: Greet the world
+    report: { verb: done, outcome: done }
+- workflow: quick
+  step: implement
+  attempt: 2
+  work:
+    report: { verb: ask, question: "The test wants 'hello, world' and greet.sh prints 'hello world'. Should the greeting keep the comma?" }
+  resumed:
+    files:
+      greet.sh: |
+        #!/bin/sh
+        # the lab's toy app: it prints a greeting
+        echo "hello, world"
+    commit: Keep the comma in the greeting
+    report: { verb: done, outcome: done }
+- workflow: quick
+  step: implement
+  attempt: 3
+  work:
+    files:
+      greet.sh: |
+        #!/bin/sh
+        # the lab's toy app: it prints the greeting test.sh expects, "hello, world"
+        echo "hello, world"
+    commit: Say what greet.sh prints
+    report: { verb: done, outcome: done }
+- workflow: quick
+  step: implement
+  attempt: 4
+  work:
+    files:
+      README.md: |
+        # greet
+
+        The norn lab's toy app. `sh greet.sh` prints `hello, world`; `sh test.sh` tests it.
+    commit: Name the greeting in the README
+    report: { verb: done, outcome: done }
+- workflow: quick
+  step: implement
+  work:
+    report: { verb: done, outcome: done }
+- workflow: quick
+  step: review
+  attempt: 1
+  work:
+    files:
+      .agents/run/out/findings.json: |
+        [{"severity": "blocking", "title": "greet.sh does not say what it prints", "detail": "Its comment still says only 'a greeting'; name the greeting test.sh expects.", "file": "greet.sh", "line": 2}]
+    report: { verb: done, outcome: changes_requested }
+- workflow: quick
+  step: review
+  work:
+    report: { verb: done, outcome: approve }
+- workflow: quick
+  step: describe
+  attempt: 1
+  work:
+    report: { verb: exit, code: 1 }
+  resumed:
+    files:
+      .agents/specs/{story}/pr.md: |
+        ## Summary
+
+        greet.sh now greets the world: it prints `hello, world`, and test.sh expects it.
+    report: { verb: done, outcome: done }
+- workflow: quick
+  step: describe
+  work:
+    files:
+      .agents/specs/{story}/pr.md: |
+        ## Summary
+
+        greet.sh now greets the world: it prints `hello, world`, and test.sh expects it. The README names the greeting.
+    report: { verb: done, outcome: done }
