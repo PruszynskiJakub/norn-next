@@ -94,7 +94,7 @@ Take ref names and shapes from the code, never by hand: story keys and unit ids 
 
 ## Golden cases
 
-`packages/kernel/test/unit/golden.test.ts` replays every case in `packages/kernel/test/golden/` through `decide` and wants exactly the decisions recorded. The corpus fires every rule id in `RULE_IDS` at least once; `packages/kernel/test/unit/parity.test.ts` holds `packages/kernel/test/parity.md`, the map from the old engine's rules to the kernel's, to that list.
+`packages/kernel/test/unit/golden.test.ts` replays every case in `packages/kernel/test/golden/` through `decide` and wants exactly the decisions recorded. The corpus fires every rule id in `RULE_IDS` at least once; `packages/kernel/test/unit/parity.test.ts` holds `packages/kernel/test/parity.md`, the map from the old engine's rules to the kernel's, to that list. A new rule id also needs its plain-word caption in `RULE_CAPTIONS` (`packages/cli/src/captions.ts`), which `norn tick` prints beside it; `packages/cli/test/unit/captions.test.ts` holds that map to `RULE_IDS` both ways.
 
 A change that keeps behaviour leaves the corpus alone. For an intended change in what decide decides, run `bun run golden -- --update`. It decides each existing case again and rewrites only its `decisions` (names, facts, workflows and config stay), printing the decisions that went and came per case, so the diff is exactly the behaviour change; review it.
 
