@@ -40,6 +40,8 @@ const HOLD = ["name: hold", "start: build", "steps:", "  build:", "    agent: Bu
 const ALICE = { USER: "alice" };
 const BOB = { USER: "bob" };
 const NORN_VERSION = (JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "package.json"), "utf8")) as { version: string }).version;
+/** A floor above this norn whatever its version: a fixed one stops being above it once a release bumps to it. */
+const NEWER_FLOOR = `${Number(NORN_VERSION.split(".")[0]) + 1}.0.0`;
 
 /** Every rule one tick fired, a failed action marked `!`; the tick's exit. */
 async function tickAs(w: World, env: Record<string, string>, rules: string[]): Promise<NornOut> {
@@ -223,7 +225,7 @@ describe("another clone while one clone holds the story", () => {
     bobStop = await norn(b, ["run", "stop", KEY, "--json"], BOB);
     aliveAfterVerbs = (await Bun.$`kill -0 ${pid}`.nothrow().quiet()).exitCode === 0;
 
-    await forgeFloor(a, "0.40.0");
+    await forgeFloor(a, NEWER_FLOOR);
     tooOld = await norn(b, ["tick", "--json"], BOB);
     lookBelowFloor = await norn(b, ["status", "--json"], BOB);
     viewBelowFloor = await norn(b, ["story", "view", KEY, "--json"], BOB);
@@ -256,7 +258,7 @@ describe("another clone while one clone holds the story", () => {
 
   test("a norn below the store's version floor is refused when it acts, and still shows the story", () => {
     expect(tooOld.code).toBe(3);
-    expect(structuredClone(tooOld.body)).toMatchObject({ code: "version_too_old", details: { floor: "0.40.0" }, do_instead: expect.stringContaining("upgrade norn to 0.40.0") });
+    expect(structuredClone(tooOld.body)).toMatchObject({ code: "version_too_old", details: { floor: NEWER_FLOOR }, do_instead: expect.stringContaining(`upgrade norn to ${NEWER_FLOOR}`) });
     expect(lookBelowFloor.code).toBe(0);
     expect(viewBelowFloor.code).toBe(0);
   });
