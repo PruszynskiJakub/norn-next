@@ -45,6 +45,7 @@ li { margin:2px 0; }
 button { cursor:pointer; padding:6px 12px; border-radius:6px; border:1px solid var(--line); background:var(--ink); color:var(--bg); font-weight:600; }
 button:disabled { opacity:.5; cursor:wait; }
 .ran { margin-top:6px; }
+.way { margin-top:6px; border-left:3px solid var(--live); padding-left:8px; }
 .beat { font-size:15px; }
 details { margin:4px 0; }
 summary { cursor:pointer; }
@@ -60,6 +61,7 @@ summary { cursor:pointer; }
   <section class="wide"><h2>Workflow</h2><div id="graph"></div><div id="steps" class="steps"></div></section>
   <section><h2>Needs you</h2><div id="needs"></div></section>
   <section><h2>Act as the person</h2><div id="actions"></div></section>
+  <section><h2>Break it</h2><p class="muted">Each switch breaks the lab on purpose, in its own repo, remote and norn home only, then shows the way out.</p><div id="breaks"></div></section>
   <section><h2>Decisions, in plain words</h2><ol id="decisions"></ol></section>
   <section><h2>Receipts, in the order written</h2><p class="muted">Each receipt is written before the effect it records; the unit's state is committed last.</p><ol id="receipts"></ol></section>
   <section><h2>Story documents</h2><div id="docs"></div></section>
@@ -84,10 +86,12 @@ async function draw(graph) {
 
 function actions(list) {
   if (!built) {
-    $("actions").innerHTML = list.map((a) =>
+    const box = (a) =>
       '<div class="action" id="a-' + a.name + '"><div><b>' + esc(a.label) + '</b></div>' +
       (a.input ? '<input placeholder="your ' + a.input + '" data-for="' + a.name + '">' : "") +
-      '<div>runs <code class="cmd"></code></div><button data-act="' + a.name + '">' + esc(a.label) + '</button><div class="ran"></div></div>').join("");
+      '<div>runs <code class="cmd"></code></div><button data-act="' + a.name + '">' + esc(a.label) + '</button><div class="ran"></div></div>';
+    $("actions").innerHTML = list.filter((a) => a.group === "person").map(box).join("");
+    $("breaks").innerHTML = list.filter((a) => a.group === "break").map(box).join("");
     for (const i of document.querySelectorAll("input[data-for]")) i.addEventListener("input", () => { typed[i.dataset.for] = i.value; });
     for (const b of document.querySelectorAll("button[data-act]")) b.addEventListener("click", () => press(b.dataset.act, b));
     built = true;
@@ -97,7 +101,7 @@ function actions(list) {
     const t = typed[a.name];
     box.querySelector(".cmd").textContent = a.input && t ? a.command.replace("'<" + a.input + ">'", "'" + t.trim().replaceAll("'", "'\\\\''") + "'") : a.command;
     const r = ran[a.name];
-    box.querySelector(".ran").innerHTML = r ? (r.error ? '<span class="bad">' + esc(r.error) + "</span>" : 'ran <code>' + esc(r.command) + "</code> → exit " + r.exit + (r.output ? "<pre>" + esc(r.output) + "</pre>" : "")) : "";
+    box.querySelector(".ran").innerHTML = r ? (r.error ? '<span class="bad">' + esc(r.error) + "</span>" + (r.do_instead ? '<div class="muted">' + esc(r.do_instead) + "</div>" : "") : 'ran <code>' + esc(r.command) + "</code> → exit " + r.exit + (r.output ? "<pre>" + esc(r.output) + "</pre>" : "") + (r.way_out ? '<div class="way"><b>The way out:</b> ' + esc(r.way_out) + "</div>" : "")) : "";
   }
 }
 

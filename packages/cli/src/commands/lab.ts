@@ -2,7 +2,8 @@
  * `norn lab [--clean] [--port <n>] [--tty]`: a throwaway norn repo under the temp directory where the
  * lab's stand-in agent plays a story through its eight beats. It builds the lab, or resumes the one
  * there, then serves the lab's dashboard on localhost and ticks the lab until a signal stops it: the
- * page shows the story live and its buttons run the person's real commands. It prints the page's URL
+ * page shows the story live, its buttons run the person's real commands, and its break-it switches
+ * break the lab on purpose and show the way out. It prints the page's URL
  * and opens no browser. With `--json` it prints where the lab is and its beat as one JSON value, and
  * serves nothing, as a JSON answer is one value and ends. `--tty` plays the tour in the terminal
  * instead, its lines on stderr as they happen, and prints the lab as its story ended.
