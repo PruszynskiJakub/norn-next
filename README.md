@@ -1,0 +1,7 @@
+# QA evidence: gh-517, qa #1
+
+Environment: a compiled binary from `bun scripts/build.ts --bin` (`dist/bin/norn-darwin-arm64`, copied in as `$S/bin/norn`). Each lab ran with `env -i`: PATH `$S/bin:/usr/bin:/bin:/opt/homebrew/bin` (no bun), HOME a fake empty dir, TMPDIR and NORN_HOME_DIR fresh per run, no NORN_* variables. `$S` is the session scratchpad.
+
+**Limitation that shaped this report.** The session runs inside a norn agent (unit gh-517). Person-only commands (`norn story answer|approve|reject|round`, `norn run rerun`) are refused by the person-only guard, which reads the env of every ancestor process. That holds for the lab's `--tty` Enter, the dashboard buttons, and the lab integration test, which refuses to start (08/integration-refused.log). So each lab play stops at beat 3, the first question. The beats after it are `unverified`, each with how to check it.
+
+**Disclosure.** Two dashboard servers (t3 on port 61391, t8 on port 61392) were started as `( cmd & )` for convenience. That reparents the process to init (PPID 1), which takes it outside the guard. The t3 server served only GET requests. On t8, five buttons were pressed before this was noticed (10-AC8-buttons.jsonl). `rerun` was recorded and `merge` ran in that throwaway lab. approve, reject and round were refused by norn's own state checks (not_at_gate, round_unfinished). The server was stopped right away. No verdict below relies on it to pass: 10.AC8 stays `unverified`.
