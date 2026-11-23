@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { ASKED_PARK } from "@norn/kernel";
-import { reportOnRecord } from "@norn/runtime";
+import { ASKED_PARK, SNAPSHOT_FAILED_PARK } from "@norn/kernel";
+import { reportOnRecord, SETUP_FAILED_PARK } from "@norn/runtime";
 import { decisionRoute } from "../../src/commands/decision-route.ts";
 import { CliFailure, configPaths, ExitCode, runCli } from "../../src/index.ts";
 import { fakeGh, GITHUB_CONFIG, HOME, machine, ROOT } from "./support.ts";
@@ -170,6 +170,40 @@ describe("story answer", () => {
     await seedUnit(m, { step: AGENT_STEP, extra: { parked: { reason: ASKED_PARK, since: "2026-11-17T10:00:00.000Z", text: "Which db?" } } });
     const shown = json((await runCli(["status", "--json"], m.io)).stdout) as { stories: { units: unknown[] }[] };
     expect(shown.stories[0]?.units[0]).toMatchObject({ parked: ASKED_PARK, waiting: { for: "answer", text: "Which db?", next: `norn story answer ${UNIT} "<answer>"` } });
+  });
+
+  test("a snapshot that could not be taken waits on a person and names a rerun, never an answer, also with a retry's run on the state", async () => {
+    const text = "the snapshot run r1 is checked against could not be taken: git ls-files --stage in /wt exited 128: fatal: index file corrupt";
+    const parked = { parked: { reason: SNAPSHOT_FAILED_PARK, since: "2026-11-17T10:00:00.000Z", text } };
+    for (const run of [null, undefined]) {
+      const m = configured();
+      await seedUnit(m, { step: AGENT_STEP, run, extra: parked });
+      const shown = json((await runCli(["status", "--json"], m.io)).stdout) as { stories: { units: unknown[] }[] };
+      expect(shown.stories[0]?.units[0]).toMatchObject({ parked: SNAPSHOT_FAILED_PARK, waiting: { for: "person", text, next: `norn run rerun ${UNIT}` } });
+    }
+  });
+
+  test("a worktree setup that failed waits on a person and names a rerun, never an answer, also with a retry's run on the state", async () => {
+    const text = "the worktree setup `bun install --frozen-lockfile` exited 1 in /wt (log: /log): lockfile had changes; fix setup.command or the files it reads, then rerun the step";
+    const parked = { parked: { reason: SETUP_FAILED_PARK, since: "2026-11-17T10:00:00.000Z", text } };
+    for (const run of [null, undefined]) {
+      const m = configured();
+      await seedUnit(m, { step: AGENT_STEP, run, extra: parked });
+      const shown = json((await runCli(["status", "--json"], m.io)).stdout) as { stories: { units: unknown[] }[] };
+      expect(shown.stories[0]?.units[0]).toMatchObject({ parked: SETUP_FAILED_PARK, waiting: { for: "person", text, next: `norn run rerun ${UNIT}` } });
+    }
+  });
+
+  test("a park no view names shows its text when it carries one, and its reason when it does not", async () => {
+    for (const [extra, text] of [
+      [{ reason: "some.other.park", since: "2026-11-17T10:00:00.000Z", text: "what a person reads" }, "what a person reads"],
+      [{ reason: "some.other.park", since: "2026-11-17T10:00:00.000Z" }, "some.other.park"],
+    ] as const) {
+      const m = configured();
+      await seedUnit(m, { step: AGENT_STEP, run: null, extra: { parked: extra } });
+      const shown = json((await runCli(["status", "--json"], m.io)).stdout) as { stories: { units: unknown[] }[] };
+      expect(shown.stories[0]?.units[0]).toMatchObject({ waiting: { for: "person", text, next: `norn run rerun ${UNIT}` } });
+    }
   });
 
   test("an agent that reports stuck with a question asks it: the unit waits on an answer, never on a rerun", async () => {

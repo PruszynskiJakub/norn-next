@@ -6,7 +6,7 @@ import { DEFAULT_KERNEL_CONFIG, type KernelConfig, launchTarget } from "@norn/ke
 import { ATTENDANCE, type Attendance } from "@norn/schema";
 import type { ExecutorChoice, RuntimeConfig, SlotChoice } from "@norn/runtime";
 import type { LoadedConfig } from "./load.ts";
-import { DEFAULT_RUNNERS, type NornConfig } from "./schema.ts";
+import { DEFAULT_RUNNERS, DEFAULT_SETUP_TIMEOUT, type NornConfig } from "./schema.ts";
 
 const UNIT_MS = { ms: 1, s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 } as const;
 
@@ -126,6 +126,7 @@ export function runtimeConfigOf(loaded: LoadedConfig, holder: string, formerHold
     ...(lockStale ? { lockStaleMs: durationMs(lockStale) } : {}),
     ...(retain ? { traceRetainMs: retain === "keep" ? null : durationMs(retain) } : {}),
     ...(config.checks ? { checks: { ...config.checks } } : {}),
+    ...(config.setup ? { setup: { command: config.setup.command, inputs: [...(config.setup.inputs ?? [])], timeoutMs: durationMs(config.setup.timeout ?? DEFAULT_SETUP_TIMEOUT) } } : {}),
     evidencePublish: config.evidence?.publish !== false,
     standIn: { gates: [...(config.policy?.stand_in?.gates ?? [])], attended: [...(config.policy?.stand_in?.attended ?? [])] },
   };

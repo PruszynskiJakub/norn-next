@@ -305,6 +305,23 @@ describe("the runtime config derived from the person's", () => {
     expect(planSet(c, LOCAL_CONFIG, "local", "checks.Test", "x").ok).toBe(false);
   });
 
+  test("setup: its command, inputs and timeout reach the runtime, the timeout 15m when no file sets it; a layer may set one key of it", async () => {
+    const r = runtimeConfigOf(await loaded({ local: `${LOCAL_CONFIG}setup: { command: bun install --frozen-lockfile, inputs: [bun.lock, "packages/*/package.json"], timeout: 5m }\n` }), "me@box");
+    expect(r.setup).toEqual({ command: "bun install --frozen-lockfile", inputs: ["bun.lock", "packages/*/package.json"], timeoutMs: 300_000 });
+    expect(runtimeConfigOf(await loaded({ local: `${LOCAL_CONFIG}setup: { command: npm ci }\n` }), "me@box").setup).toEqual({ command: "npm ci", inputs: [], timeoutMs: 900_000 });
+    expect(runtimeConfigOf(await loaded({ user: "setup: { timeout: 20m }\n", local: `${LOCAL_CONFIG}setup: { command: npm ci }\n` }), "me@box").setup?.timeoutMs).toBe(1_200_000);
+    expect("setup" in runtimeConfigOf(await loaded({ local: LOCAL_CONFIG }), "me@box")).toBe(false);
+  });
+
+  test("setup: an unknown key, an absolute input, one through `..` and a `**` are refused, naming the file", async () => {
+    expect(await problems({ repo: "setup: { command: npm ci, cmd: x }\n" })).toEqual([{ layer: "repo", path: "/setup", message: "unknown property 'cmd'" }]);
+    for (const input of ["/etc/passwd", "../other/bun.lock", "a/../../b", "..", "packages/**/package.json"])
+      expect({ input, problems: (await problems({ repo: `setup: { command: npm ci, inputs: [${JSON.stringify(input)}] }\n` })).map((p) => `${p.layer} ${p.path}`) }).toEqual({ input, problems: ["repo /setup/inputs/0"] });
+    expect((await problems({ repo: "setup: { command: npm ci, timeout: soon }\n" }))[0]).toMatchObject({ layer: "repo", path: "/setup/timeout" });
+    expect((await problems({ user: "setup: { timeout: 5m }\n", local: LOCAL_CONFIG })).map((p) => p.layer)).toEqual(["merged"]);
+    expect(runtimeConfigOf(await loaded({ local: `${LOCAL_CONFIG}setup: { command: npm ci, inputs: [a..b/c, ./x, "*.lock"] }\n` }), "me@box").setup?.inputs).toEqual(["a..b/c", "./x", "*.lock"]);
+  });
+
   test("sources: each binding of a workflow source reaches the kernel, the local file's over the user's; a name or an empty path it refuses", async () => {
     const r = runtimeConfigOf(await loaded({ user: "sources: { brand: /assets/brand, adr: /old/adr }\n", local: `${LOCAL_CONFIG}sources: { adr: docs/decisions }\n` }), "me@box");
     expect(r.kernel.sources).toEqual({ brand: "/assets/brand", adr: "docs/decisions" });

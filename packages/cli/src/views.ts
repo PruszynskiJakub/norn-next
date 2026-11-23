@@ -3,8 +3,8 @@
  * gathered and never acted on, shaped for a person. What waits for a person (a gate, a question, a
  * parked or stuck unit) is named per unit, so `status` reads as a list of what needs doing.
  */
-import { ASKED_PARK, ITEM_CLOSED_REASON, isChangeClosedReason, type KernelCapabilities, type KernelWorkflows, type StoryFacts, type UnitFacts, unsyncedReason } from "@norn/kernel";
-import { gatherFacts, newTickId, type RuntimeEnv } from "@norn/runtime";
+import { ASKED_PARK, ITEM_CLOSED_REASON, isChangeClosedReason, type KernelCapabilities, type KernelWorkflows, SNAPSHOT_FAILED_PARK, type StoryFacts, type UnitFacts, unsyncedReason } from "@norn/kernel";
+import { gatherFacts, newTickId, type RuntimeEnv, SETUP_FAILED_PARK } from "@norn/runtime";
 import { refuse } from "./output.ts";
 
 export interface UnitView {
@@ -130,14 +130,20 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
       };
     case "gate.park":
       return { for: "gate", text: prompt ?? s.step, next: decide };
+    // the agent never started, so there is nothing to answer: the checkout is fixed and the step run again
+    case SNAPSHOT_FAILED_PARK:
+      return { for: "person", text: s.parked?.text ?? "the snapshot its step's run is checked against could not be taken; its agent never started", next: rerun };
+    // the step's run never launched: the setup command or the files it reads are fixed, and a rerun sets the worktree up again
+    case SETUP_FAILED_PARK:
+      return { for: "person", text: s.parked?.text ?? "its worktree's setup failed; fix setup.command or the files it reads", next: rerun };
     default:
       // a rerun alone would see the closed change park the unit again on the next tick
       if (isChangeClosedReason(reason)) return { for: "person", text: reason, next: `reopen the change on the forge, then ${rerun}; or ${newWork}` };
       // an agent's ask and a person's stop park a live run under their own text; the answer goes into
       // that session, where a rerun would throw the question and the session away
-      if (!STUCK_PARKS[reason] && kind === "agent" && s.run) return { for: "answer", text: reason, next: `norn story answer ${id} "<answer>"` };
+      if (!STUCK_PARKS[reason] && kind === "agent" && s.run) return { for: "answer", text: s.parked?.text ?? reason, next: `norn story answer ${id} "<answer>"` };
       // a park no rule derives (slice files that failed validation) holds until a person moves the unit on
-      return { for: "person", text: STUCK_PARKS[reason] ?? reason, next: rerun };
+      return { for: "person", text: s.parked?.text ?? STUCK_PARKS[reason] ?? reason, next: rerun };
   }
   if (u.session?.ask) return { for: "answer", text: u.session.ask.question, next: `norn story answer ${id} "<answer>"` };
   if (permission) return { for: "permission", text: permission.call ? `${permission.call.tool}: ${permission.prompt}` : permission.prompt, next: `norn story answer ${id} <option>` };

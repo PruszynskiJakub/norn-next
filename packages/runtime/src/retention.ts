@@ -10,6 +10,7 @@ import { checkExitsDir, checkLogsDir } from "./checks-detached.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { RUN_EVENT_FOLDERS, unitEventsDir } from "./events/paths.ts";
 import { sessionLogPath } from "./launcher.ts";
+import { dropSetupRecord, setupRecordPath } from "./setup-record.ts";
 import { TRACE_DIR } from "./trace.ts";
 
 export const DEFAULT_TRACE_RETAIN_MS = 7 * 24 * 3_600_000;
@@ -101,8 +102,9 @@ async function filesOfRuns(ctx: HostContext, dir: string, runs: ReadonlySet<stri
 }
 
 /**
- * A finished unit's logs: its hook event folders, and the session and check logs of every run its
- * record started. Called once its worktree is gone, so nothing is still writing them.
+ * A finished unit's logs: its hook event folders, the session and check logs of every run its record
+ * started, and its worktree's setup record and log. Called once its worktree is gone, so nothing is
+ * still writing them.
  */
 export async function removeUnitLogs(env: RuntimeEnv, unit: string): Promise<{ removed: number; problems: string[] }> {
   const { ctx } = env;
@@ -125,6 +127,11 @@ export async function removeUnitLogs(env: RuntimeEnv, unit: string): Promise<{ r
     problems.push(`${unit}: logs could not be listed: ${message(e)}`);
   }
   const removed = await removeAll(ctx, paths, failures);
+  try {
+    await dropSetupRecord(ctx, unit);
+  } catch (e) {
+    failures.add(setupRecordPath(ctx, unit), e);
+  }
   const problem = failures.problem();
   if (problem) problems.push(problem);
   return { removed, problems };

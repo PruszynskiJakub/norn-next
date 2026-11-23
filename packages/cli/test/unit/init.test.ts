@@ -135,28 +135,39 @@ describe("norn init: the test command", () => {
   const pkg = (test?: string) => JSON.stringify({ name: "app", scripts: test === undefined ? {} : { test } });
   const testOf = async (seed: Record<string, string>, tools: string[] = []) => {
     const { m, body } = await init([], { seed, w: { tools } });
-    return { checks: (await written(m, PATHS.local)).checks, test: body.test };
+    const file = await written(m, PATHS.local);
+    return { checks: file.checks, setup: file.setup, test: body.test };
+  };
+  const split = (test: string, setup: string, input: string) => ({ checks: { test }, setup: { command: setup, inputs: [input] } });
+  const both = async (seed: Record<string, string>, tools: string[] = []) => {
+    const { checks, setup } = await testOf(seed, tools);
+    return { checks, setup };
   };
 
-  test("detected from the lockfile beside package.json's test script, installing first, as a check runs in a fresh worktree", async () => {
-    expect((await testOf({ [at("package.json")]: pkg("jest"), [at("package-lock.json")]: "{}" })).checks).toEqual({ test: "npm ci && npm test" });
-    expect((await testOf({ [at("package.json")]: pkg("vitest"), [at("pnpm-lock.yaml")]: "" })).checks).toEqual({ test: "pnpm install --frozen-lockfile && pnpm test" });
-    expect((await testOf({ [at("package.json")]: pkg("vitest"), [at("yarn.lock")]: "" })).checks).toEqual({ test: "yarn install && yarn test" });
-    expect((await testOf({ [at("package.json")]: pkg("vitest") })).checks).toEqual({ test: "npm install --no-package-lock && npm test" });
-    expect((await testOf({ [at("package.json")]: pkg("bun test --bail"), [at("bun.lock")]: "" })).checks).toEqual({ test: "bun install --frozen-lockfile && bun run test" });
-    expect((await testOf({ [at("package.json")]: pkg(), [at("bun.lock")]: "" })).checks).toEqual({ test: "bun install --frozen-lockfile && bun test" });
+  test("detected from the lockfile beside package.json's test script, its install written as the worktree setup, never into the check", async () => {
+    expect(await both({ [at("package.json")]: pkg("jest"), [at("package-lock.json")]: "{}" })).toEqual(split("npm test", "npm ci", "package-lock.json"));
+    expect(await both({ [at("package.json")]: pkg("vitest"), [at("pnpm-lock.yaml")]: "" })).toEqual(split("pnpm test", "pnpm install --frozen-lockfile", "pnpm-lock.yaml"));
+    expect(await both({ [at("package.json")]: pkg("vitest"), [at("yarn.lock")]: "" })).toEqual(split("yarn test", "yarn install", "yarn.lock"));
+    expect(await both({ [at("package.json")]: pkg("vitest") })).toEqual(split("npm test", "npm install --no-package-lock", "package.json"));
+    expect(await both({ [at("package.json")]: pkg("bun test --bail"), [at("bun.lock")]: "" })).toEqual(split("bun run test", "bun install --frozen-lockfile", "bun.lock"));
+    expect(await both({ [at("package.json")]: pkg(), [at("bun.lock")]: "" })).toEqual(split("bun test", "bun install --frozen-lockfile", "bun.lock"));
   });
 
   test("with no lockfile, bun on PATH and package.json's scripts running bun pick bun; no install there writes a lockfile into the worktree", async () => {
     const bunPkg = JSON.stringify({ name: "app", scripts: { test: "bun test", dev: "bun run src/main.ts" } });
-    expect((await testOf({ [at("package.json")]: bunPkg }, ["bun"])).checks).toEqual({ test: "bun install --no-save && bun run test" });
+    expect(await both({ [at("package.json")]: bunPkg }, ["bun"])).toEqual(split("bun run test", "bun install --no-save", "package.json"));
     const bunDev = JSON.stringify({ name: "app", scripts: { dev: "bun run src/main.ts" } });
-    expect((await testOf({ [at("package.json")]: bunDev }, ["bun"])).checks).toEqual({ test: "bun install --no-save && bun test" });
+    expect(await both({ [at("package.json")]: bunDev }, ["bun"])).toEqual(split("bun test", "bun install --no-save", "package.json"));
     // bun not on PATH, or scripts that never run it: npm, as before, without leaving a package-lock.json
-    expect((await testOf({ [at("package.json")]: bunPkg })).checks).toEqual({ test: "npm install --no-package-lock && npm test" });
-    expect((await testOf({ [at("package.json")]: pkg("vitest") }, ["bun"])).checks).toEqual({ test: "npm install --no-package-lock && npm test" });
+    expect(await both({ [at("package.json")]: bunPkg })).toEqual(split("npm test", "npm install --no-package-lock", "package.json"));
+    expect(await both({ [at("package.json")]: pkg("vitest") }, ["bun"])).toEqual(split("npm test", "npm install --no-package-lock", "package.json"));
     // bun.lockb, the older lockfile, is bun's too
-    expect((await testOf({ [at("package.json")]: pkg("vitest"), [at("bun.lockb")]: "" })).checks).toEqual({ test: "bun install --frozen-lockfile && bun run test" });
+    expect(await both({ [at("package.json")]: pkg("vitest"), [at("bun.lockb")]: "" })).toEqual(split("bun run test", "bun install --frozen-lockfile", "bun.lockb"));
+  });
+
+  test("a build file that needs no install writes no setup", async () => {
+    expect(await both({ [at("Cargo.toml")]: "" })).toEqual({ checks: { test: "cargo test" }, setup: undefined });
+    expect(await both({})).toEqual({ checks: undefined, setup: undefined });
   });
 
   test("npm's placeholder is no test script; other build files and a Makefile's test target are read too", async () => {
@@ -169,11 +180,15 @@ describe("norn init: the test command", () => {
     expect((await testOf({ [at("Makefile")]: "test := unit\nbuild:\n\tcc x.c\n" })).checks).toBeUndefined();
   });
 
-  test("the answer and the markdown name where it came from, or that the checks run the default", async () => {
-    expect((await testOf({ [at("package.json")]: pkg("jest"), [at("package-lock.json")]: "{}" })).test).toEqual({ command: "npm ci && npm test", from: "package.json" });
+  test("the answer and the markdown name where it came from and its setup, or that the checks run the default", async () => {
+    expect((await testOf({ [at("package.json")]: pkg("jest"), [at("package-lock.json")]: "{}" })).test).toEqual({ command: "npm test", from: "package.json", setup: { command: "npm ci", inputs: ["package-lock.json"] } });
     expect((await testOf({})).test).toBeNull();
     const found = await runCli(["init"], machine({ script: world({}), seed: { [at("go.mod")]: "" } }).io);
     expect(found.stdout).toContain("- test: go test ./... (from go.mod), as checks.test");
+    expect(found.stdout).not.toContain("- setup:");
+    const js = await runCli(["init"], machine({ script: world({}), seed: { [at("package.json")]: pkg("jest"), [at("package-lock.json")]: "{}" } }).io);
+    expect(js.stdout).toContain("- test: npm test (from package.json), as checks.test");
+    expect(js.stdout).toContain("- setup: npm ci, run once in each new worktree and again when package-lock.json changes");
     const none = await runCli(["init"], machine({ script: world({}) }).io);
     expect(none.stdout).toContain('- test: none detected, so the checks run bun test; norn config set checks.test "<command>" names yours');
   });

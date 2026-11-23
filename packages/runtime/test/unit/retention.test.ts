@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { memoryFiles, memoryHost } from "@norn/conformance";
 import { ulidTime } from "@norn/schema";
 import { launchRecordPath } from "../../src/events/paths.ts";
-import { checkExitPath, checkLogPath, pruneTraces, sessionLogPath, TRACE_PRUNE_PER_TICK, tracePath } from "../../src/index.ts";
+import { checkExitPath, checkLogPath, pruneTraces, readSetupRecord, sessionLogPath, setupRecordPath, TRACE_PRUNE_PER_TICK, tracePath } from "../../src/index.ts";
 import { has, harness, record, tickUntil, trackerItem } from "./support.ts";
 
 const DAY = 24 * 3_600_000;
@@ -84,6 +84,19 @@ describe("a finished story's logs", () => {
     const left = Object.keys(h.files.snapshot());
     expect(ours.filter((p) => left.includes(p))).toEqual([]);
     expect(others.filter((p) => left.includes(p))).toEqual(others);
+  });
+
+  test("finishing a done story removes its worktree's setup record and log", async () => {
+    const h = harness({ setup: { command: "bun install", inputs: [], timeoutMs: 60_000 } });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("check.finished"));
+    const setup = await readSetupRecord(h.ctx, "lt-1");
+    expect(setup).toMatchObject({ state: "done" });
+    expect(await h.files.read(setup?.log as string)).toBe("ok");
+    const reports = await tickUntil(h, has("story.finish"));
+    expect(reports.at(-1)?.problems).toEqual([]);
+    expect(Object.keys(h.files.snapshot()).filter((p) => p.includes("/runtime/setup/"))).toEqual([]);
+    expect(await h.files.read(setupRecordPath(h.ctx, "lt-1"))).toBeNull();
   });
 
   test("a log that cannot be removed is a problem in the report; the finish still succeeds and the claim is released", async () => {

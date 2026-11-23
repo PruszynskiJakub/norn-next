@@ -10,7 +10,7 @@ import { DEFAULT_CHECKS, DEFAULT_LOCK_STALE_MS, DEFAULT_TRACE_RETAIN_MS } from "
 import { ExitCode } from "@norn/schema";
 import { parse } from "yaml";
 import type { Command, Noun } from "./command.ts";
-import { CONFIG_DEFAULTS, ConfigLayer } from "./config/schema.ts";
+import { CONFIG_DEFAULTS, ConfigLayer, DEFAULT_SETUP_TIMEOUT } from "./config/schema.ts";
 import { tableCell } from "./output.ts";
 
 export const REFERENCE_FILE = "docs/reference.md";
@@ -153,6 +153,8 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   "policy.stand_in.gates": { derived: "none: every gate is the person's" },
   "policy.allow": { derived: "none: every capability a role names may be granted" },
   "checks.<name>": { derived: `\`checks.test\` is ${JSON.stringify(DEFAULT_CHECKS.test)}, which the shipped workflows' test steps run; init detects the repo's own` },
+  "setup.inputs": { derived: "none: the setup runs once per worktree" },
+  "setup.timeout": DEFAULT_SETUP_TIMEOUT,
   "kernel.counters.check_fail": d.counterDefaults.checkFail,
   "kernel.counters.gate_reject": d.counterDefaults.gateReject,
   "kernel.counters.conflict": d.counterDefaults.conflict,

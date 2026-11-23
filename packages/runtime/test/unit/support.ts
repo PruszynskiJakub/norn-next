@@ -338,6 +338,19 @@ export const WORKFLOWS: Record<string, string> = {
     "    outcomes: { approve: $done }",
     "",
   ].join("\n"),
+  "built.yaml": [
+    "name: built",
+    "start: build",
+    "steps:",
+    "  build:",
+    "    agent: Build the thing.",
+    "    outcomes: { done: test }",
+    "  test:",
+    "    check: bun test",
+    "    timeout: 5m",
+    "    outcomes: { pass: $done, fail: build }",
+    "",
+  ].join("\n"),
   "handed.yaml": [
     "name: handed",
     "start: build",
@@ -610,6 +623,8 @@ export interface HarnessOptions {
   rawUrls?: boolean;
   /** the config's `evidence.publish`; absent, as a config that leaves it at its default */
   evidencePublish?: boolean;
+  /** the config's `setup`, which readies a unit's worktree before a launch */
+  setup?: RuntimeConfig["setup"];
 }
 
 export function harness(opts: HarnessOptions = {}): Harnessed {
@@ -658,6 +673,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     ...(opts.formerHolders ? { formerHolders: opts.formerHolders } : {}),
     ...(opts.checks ? { checks: opts.checks } : {}),
     ...(opts.evidencePublish !== undefined ? { evidencePublish: opts.evidencePublish } : {}),
+    ...(opts.setup ? { setup: opts.setup } : {}),
   };
   const tickIds: string[] = [];
   const built = createRuntimeEnv({ ctx, plugins, config, launcher, sessions });

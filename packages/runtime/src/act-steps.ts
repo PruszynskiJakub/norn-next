@@ -17,6 +17,7 @@ import type { TickContext } from "./env.ts";
 import { latestReportEvidence, storyUnits } from "./input-history.ts";
 import { producerOf, readBackDocs, specFolder } from "./inputs.ts";
 import { unitInFacts } from "./record.ts";
+import { prepareWorktree } from "./setup.ts";
 import { readStepRun, type StepRunRecord, writeStepRun } from "./step-runs.ts";
 
 const unitOf = (d: { unit: string | null; rule: string }): string => {
@@ -66,16 +67,19 @@ export async function runCheck(t: TickContext, d: DecisionOf<"run_check">): Prom
   const unit = unitOf(d);
   const state = unitInFacts(t.facts, unit)?.state;
   const exits = state ? (t.workflows.byHash[state.workflow.hash]?.graph.steps[d.step]?.check?.exits ?? {}) : {};
-  const worktree = await ensureWorktree(t.env, unit);
-  if (!worktree.ok) return worktree;
+  const prepared = await prepareWorktree(t, unit);
+  if (!prepared.ok) return prepared;
+  // before the intent: a check that waits on its worktree's setup spends no retry and writes nothing
+  if (prepared.value.waiting) return ok({ performed: false, waiting: prepared.value.waiting });
+  const worktree = prepared.value.path;
   return underIntent(t, unit, d.intent, async () => {
     const record = base(t, unit, d, "check", d.intent);
     const command = checkCommandOf(d.command, t.env.config.checks);
     if (!command.ok) return { ...record, error: command.error };
-    const before = (await untrackedFiles(t.env, worktree.value)) ?? undefined;
+    const before = (await untrackedFiles(t.env, worktree)) ?? undefined;
     try {
-      const out = await t.env.ctx.exec(["sh", "-c", command.command], { cwd: worktree.value, timeoutMs: d.timeout_ms });
-      const removed = await removeLeftovers(t.env, worktree.value, before);
+      const out = await t.env.ctx.exec(["sh", "-c", command.command], { cwd: worktree, timeoutMs: d.timeout_ms });
+      const removed = await removeLeftovers(t.env, worktree, before);
       const output = `${out.stdout}${out.stderr ? `\n${out.stderr}` : ""}${out.timedOut ? `\n(timed out after ${d.timeout_ms} ms)` : ""}`;
       return { ...record, outcome: checkOutcome(exits, out.code, out.timedOut), exit: out.code, output: output.slice(-(OUTPUT_TAIL - removed.length)) + removed };
     } catch (e) {

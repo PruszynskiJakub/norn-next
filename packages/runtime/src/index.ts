@@ -50,6 +50,8 @@ export { type BranchFate, branchHome, dropUnitBranch } from "./branch-cleanup.ts
 export { closeUnitRuns } from "./run-panes.ts";
 export { type TidyClosed, type TidyKept, type TidyRemoved, type TidyReport, tidy } from "./tidy.ts";
 export { baseRefOf, branchOf, cutFrom, ensureWorktree } from "./branches.ts";
+export { type PreparedWorktree, prepareWorktree, SETUP_FAILED_PARK, SETUP_OUTPUT_TAIL, setupDigest, setupParkText } from "./setup.ts";
+export { dropSetupRecord, readSetupRecord, SETUP_DIR, SetupRecord, setupExitPath, setupFilesDir, setupLogPath, setupPidPath, setupRecordPath, writeSetupRecord } from "./setup-record.ts";
 export type { RuntimeEnv, TickContext } from "./env.ts";
 export { type GatherOptions, type GatheredFacts, gatherFacts } from "./facts.ts";
 export { acquireTickLock, DEFAULT_LOCK_STALE_MS, type TickLock, tickLockPath } from "./lock.ts";

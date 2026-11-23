@@ -21,7 +21,7 @@ import type { ConfigLayer } from "../config/schema.ts";
 import { setKeyInText } from "../config/write.ts";
 import { CliContext } from "../context.ts";
 import { doctorLines, runDoctor } from "../doctor.ts";
-import { choose, completable, completedText, detect, detectTestCommand, initLayer, initText, offerLine, personalText, splitPersonal, testLine, withExcluded } from "../init.ts";
+import { choose, completable, completedText, detect, detectTestCommand, initLayer, initText, offerLine, personalText, setupLine, splitPersonal, testLine, withExcluded } from "../init.ts";
 import { refuse, rendered, usageError } from "../output.ts";
 import { wirePlugins } from "../wiring.ts";
 
@@ -195,6 +195,7 @@ export const initCommand = defineCommand({
       ...(localMigrated && { local_migrated: { file: localMigrated.file, backup: localMigrated.backup, mapped: localMigrated.mapped, ignored: localMigrated.ignored } }),
       doctor,
     };
+    const setup = setupLine(test);
     const md = [
       `# norn init in ${w.repo.root}`,
       "",
@@ -209,6 +210,7 @@ export const initCommand = defineCommand({
         : `- mode: ${choices.mode}${flags.mode ? "" : choices.mode === "auto" ? ` (the ${choices.runner} runner has nobody beside the agent: agent steps start on their own)` : ` (agents run in ${choices.runner} beside a person: start each agent step with norn run start <unit>)`}${commit ? `; in ${REPO_LOCAL_FILE}, as each person picks their own` : ""}`,
       `- base: ${choices.base}`,
       testLine(test),
+      ...(setup ? [setup] : []),
       `- .git/info/exclude: ${exclude === "added" ? `added ${excluded}` : `${excluded} already there`}`,
       ...offered.map((o) => offerLine(o, choices)),
       ...(old ? oldConfigLines(old) : []),

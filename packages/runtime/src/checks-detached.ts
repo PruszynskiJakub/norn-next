@@ -21,13 +21,16 @@ import type { DecisionOf, StepRunFacts } from "@norn/kernel";
 import { fail, type HostContext, hostProcesses, ok, parseJson, type PluginResult } from "@norn/plugin-api";
 import { IsoTime } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
-import { ensureWorktree } from "./branches.ts";
 import { checkCommandOf } from "./check-command.ts";
 import { untrackedFiles } from "./check-leftovers.ts";
+import { type DetachedRead, encodeCheckHandle, handleFromPidFile, readDetached, type StopDeps, stopDetached } from "./detached.ts";
 import type { TickContext } from "./env.ts";
 import { unitInFacts } from "./record.ts";
+import { prepareWorktree } from "./setup.ts";
 import { readStepRun, type StepRunRecord, writeStepRun } from "./step-runs.ts";
 import { CHECK_WAKE_WRITER, wakePath } from "./wake.ts";
+
+export { CHECK_KILL_GRACE_MS, CHECK_START_GRACE_MS, decodeCheckHandle, encodeCheckHandle, type StopDeps } from "./detached.ts";
 
 /** What the wrapper leaves when the command exits. */
 export const CheckExit = Type.Object(
@@ -79,21 +82,6 @@ export function checkWrapperArgv(command: string, exitPath: string, wakeFile: st
   return ["sh", "-c", WRAPPER, "norn-check", command, exitPath, wakeFile];
 }
 
-/** A detached check's handle: `<pid>@<start marker>`; the marker is opaque, so only the first `@` splits. */
-export function encodeCheckHandle(pid: number, started: string): string {
-  return `${pid}@${started}`;
-}
-
-/** The handle's pid and start marker; an empty marker (a process found by its pid file) matches the pid alone. */
-export function decodeCheckHandle(handle: string): { pid: number; started?: string } | null {
-  const at = handle.indexOf("@");
-  if (at < 1) return null;
-  const pid = Number(handle.slice(0, at));
-  if (!Number.isInteger(pid) || pid < 1) return null;
-  const started = handle.slice(at + 1);
-  return started === "" ? { pid } : { pid, started };
-}
-
 /** Whether this host can run a check detached; one that cannot runs it inside the tick. */
 export function canDetach(ctx: HostContext): boolean {
   return hostProcesses(ctx).ok;
@@ -113,8 +101,11 @@ export async function startDetachedCheck(t: TickContext, d: DecisionOf<"run_chec
   const { ctx } = t.env;
   const procs = hostProcesses(ctx);
   if (!procs.ok) return fail("unavailable", `this host cannot run a check detached: it lacks ${procs.missing.join(", ")}`, false);
-  const worktree = await ensureWorktree(t.env, unit);
-  if (!worktree.ok) return worktree;
+  const prepared = await prepareWorktree(t, unit);
+  if (!prepared.ok) return prepared;
+  // before the intent: a check that waits on its worktree's setup spends no retry and writes nothing
+  if (prepared.value.waiting) return ok({ performed: false, waiting: prepared.value.waiting });
+  const worktree = prepared.value.path;
   const intent = d.intent;
   let reused = false;
   const perform = async (): Promise<PluginResult<StepRunRecord>> => {
@@ -128,7 +119,7 @@ export async function startDetachedCheck(t: TickContext, d: DecisionOf<"run_chec
     }
     if (ours && prior.running === true) {
       // a start cut short after its record: the pid file says whether it spawned
-      const handle = await handleFromPidFile(ctx, prior);
+      const handle = await handleFromPidFile(ctx, checkPidPath(ctx, unit, d.run_id, d.attempt));
       if (handle !== null) {
         reused = true;
         const found: StepRunRecord = { ...prior, handle };
@@ -138,7 +129,7 @@ export async function startDetachedCheck(t: TickContext, d: DecisionOf<"run_chec
       return spawnInto(prior);
     }
     const log = checkLogPath(ctx, unit, d.run_id, d.attempt);
-    const before = await untrackedFiles(t.env, worktree.value);
+    const before = await untrackedFiles(t.env, worktree);
     // a rerun goes under the same run and attempt: what the cut-short run left must not read as this one's
     await ctx.files.remove(exitPath);
     await ctx.files.remove(pidPath);
@@ -169,7 +160,7 @@ export async function startDetachedCheck(t: TickContext, d: DecisionOf<"run_chec
     if (!command.ok) record = { ...rest, error: command.error };
     else
       try {
-        const p = await procs.value.spawn(checkWrapperArgv(command.command, exitPath, wakePath(ctx)), { cwd: worktree.value, logPath: base.log as string });
+        const p = await procs.value.spawn(checkWrapperArgv(command.command, exitPath, wakePath(ctx)), { cwd: worktree, logPath: base.log as string });
         record = { ...base, handle: encodeCheckHandle(p.pid, p.started) };
       } catch (e) {
         record = { ...rest, error: `the check could not start: ${message(e)}` };
@@ -233,92 +224,52 @@ async function finished(ctx: HostContext, r: StepRunRecord, text: string): Promi
   return settle(r, { outcome: checkOutcome(recordedExits(r), parsed.value.exit, false), exit: parsed.value.exit, output: output.slice(-OUTPUT_TAIL), finished_at: parsed.value.finished_at });
 }
 
-async function isAlive(ctx: HostContext, handle: string | undefined): Promise<boolean> {
-  const h = handle ? decodeCheckHandle(handle) : null;
-  if (!h) return false;
-  // without a probe the run cannot be told dead; the deadline still ends it
-  if (typeof ctx.alive !== "function") return true;
-  return ctx.alive(h.pid, h.started);
-}
-
-/** How long a start recorded without a handle or pid file is taken as still starting, not cut short. */
-export const CHECK_START_GRACE_MS = 30_000;
-
 /** The step-run fact of a detached check at `now`, from its record, its exit file and its process. */
 export async function readDetachedCheck(ctx: HostContext, recorded: StepRunRecord, now: string): Promise<DetachedCheckRead> {
   if (recorded.running !== true) return { fact: factOf(recorded) };
-  let record = recorded;
-  if (record.handle === undefined) {
-    const found = await handleFromPidFile(ctx, record);
-    if (found === null) {
-      // a tick may be between recording the start and its wrapper leaving the pid file: until the grace
-      // has passed the start is in flight, and settling it now would make decide spawn the check twice
-      if (Date.parse(now) - Date.parse(record.at) <= CHECK_START_GRACE_MS) return { fact: factOf(record) };
-      // no pid file long after the start: the spawn never ran, so the run reads cut short and decide runs it again
-      const { running: _running, ...rest } = record;
-      return { fact: factOf(rest), settled: rest };
+  const read = await readDetached(
+    ctx,
+    {
+      ...(recorded.handle !== undefined && { handle: recorded.handle }),
+      at: recorded.at,
+      ...(recorded.timeout_ms !== undefined && { timeoutMs: recorded.timeout_ms }),
+      exitPath: checkExitPath(ctx, recorded.unit, recorded.run_id, recorded.attempt),
+      pidPath: checkPidPath(ctx, recorded.unit, recorded.run_id, recorded.attempt),
+    },
+    now,
+  );
+  if (read.kind === "starting") return { fact: factOf(recorded) };
+  if (read.kind === "never_started") {
+    // no pid file long after the start: the spawn never ran, so the run reads cut short and decide runs it again
+    const { running: _running, ...rest } = recorded;
+    return { fact: factOf(rest), settled: rest };
+  }
+  const record = read.handle === recorded.handle ? recorded : { ...recorded, handle: read.handle };
+  const out = await settleRead(ctx, record, read, now);
+  return out.settled || record === recorded ? out : { ...out, settled: record };
+}
+
+async function settleRead(ctx: HostContext, record: StepRunRecord, read: Exclude<DetachedRead, { kind: "starting" | "never_started" }>, now: string): Promise<DetachedCheckRead> {
+  switch (read.kind) {
+    case "exited":
+      return finished(ctx, record, read.exitText);
+    case "timed_out": {
+      const settled = settle(record, { outcome: "fail", output: `${await tail(ctx, record)}\n(timed out after ${record.timeout_ms} ms)`.slice(-OUTPUT_TAIL), finished_at: now });
+      return read.alive ? { ...settled, stop: read.handle } : settled;
     }
-    record = { ...record, handle: found };
+    case "running":
+      return { fact: factOf(record) };
+    case "died":
+      return settle(record, {
+        outcome: "fail",
+        error: "the check's process ended without recording its exit (killed, or the machine restarted)",
+        output: (await tail(ctx, record)).slice(-OUTPUT_TAIL),
+        finished_at: now,
+      });
   }
-  const read = await readRunning(ctx, record, now);
-  return read.settled || record === recorded ? read : { ...read, settled: record };
 }
 
-/** The handle of the process a start cut short before recording it made, from the wrapper's pid file. */
-async function handleFromPidFile(ctx: HostContext, r: StepRunRecord): Promise<string | null> {
-  const pid = Number((await ctx.files.read(checkPidPath(ctx, r.unit, r.run_id, r.attempt)))?.trim());
-  return Number.isInteger(pid) && pid > 0 ? encodeCheckHandle(pid, "") : null;
-}
-
-async function readRunning(ctx: HostContext, record: StepRunRecord, now: string): Promise<DetachedCheckRead> {
-  const exitPath = checkExitPath(ctx, record.unit, record.run_id, record.attempt);
-  const exitText = await ctx.files.read(exitPath);
-  if (exitText !== null) return finished(ctx, record, exitText);
-  const deadline = record.timeout_ms !== undefined ? Date.parse(record.at) + record.timeout_ms : Number.POSITIVE_INFINITY;
-  const alive = await isAlive(ctx, record.handle);
-  if (Date.parse(now) > deadline) {
-    const read = settle(record, { outcome: "fail", output: `${await tail(ctx, record)}\n(timed out after ${record.timeout_ms} ms)`.slice(-OUTPUT_TAIL), finished_at: now });
-    return alive && record.handle ? { ...read, stop: record.handle } : read;
-  }
-  if (alive) return { fact: factOf(record) };
-  // it may have exited between the first read and the probe
-  const late = await ctx.files.read(exitPath);
-  if (late !== null) return finished(ctx, record, late);
-  return settle(record, {
-    outcome: "fail",
-    error: "the check's process ended without recording its exit (killed, or the machine restarted)",
-    output: (await tail(ctx, record)).slice(-OUTPUT_TAIL),
-    finished_at: now,
-  });
-}
-
-/** Between TERM to a check's group and KILL, while its leader lives on. */
-export const CHECK_KILL_GRACE_MS = 2_000;
-const STOP_POLL_MS = 100;
-
-export interface StopDeps {
-  /** waits between stop's looks; a test passes one that returns at once */
-  sleep?: (ms: number) => Promise<void>;
-}
-
-const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/**
- * End a detached check's process group: TERM, then KILL once the leader ends or outlives the grace,
- * as a test runner's workers may ignore TERM and outlive the wrapper; a group id is not handed out
- * again while any member lives, so the KILL reaches only what is left of the check. One already gone,
- * or a host that cannot kill, is nothing to do.
- */
+/** End a detached check's process group (detached.ts). */
 export async function stopDetachedCheck(ctx: HostContext, handle: string, deps: StopDeps = {}): Promise<void> {
-  const h = decodeCheckHandle(handle);
-  if (!h || typeof ctx.kill !== "function") return;
-  const probe = typeof ctx.alive === "function" ? ctx.alive.bind(ctx) : null;
-  if (probe && !(await probe(h.pid, h.started))) return;
-  await ctx.kill(h.pid, "TERM");
-  const sleep = deps.sleep ?? realSleep;
-  for (let waited = 0; probe && waited < CHECK_KILL_GRACE_MS; waited += STOP_POLL_MS) {
-    await sleep(STOP_POLL_MS);
-    if (!(await probe(h.pid, h.started))) break;
-  }
-  await ctx.kill(h.pid, "KILL");
+  return stopDetached(ctx, handle, deps);
 }

@@ -6,6 +6,7 @@
  */
 import { ok, type PluginResult, parseUnitId } from "@norn/plugin-api";
 import type { RuntimeEnv } from "./env.ts";
+import { dropSetupRecord } from "./setup-record.ts";
 
 export function branchOf(unit: string): string {
   const ref = parseUnitId(unit);
@@ -36,10 +37,15 @@ export async function baseRefOf(env: RuntimeEnv): Promise<string> {
 /**
  * The unit's checkout, made when missing. A vcs without worktrees runs every unit in the repo's own
  * checkout. Ensuring is idempotent, so every run asks again rather than trusting a folder made earlier.
+ * A worktree made new drops the unit's setup record, so it is set up again (setup.ts).
  */
 export async function ensureWorktree(env: RuntimeEnv, unit: string): Promise<PluginResult<string>> {
   const vcs = env.slots.vcs;
   if (!vcs.capabilities.worktrees) return ok(env.ctx.repo.root);
+  // a git worktree always holds its `.git` entry, so an empty listing is a folder that is not there yet
+  const fresh = env.config.setup !== undefined && (await env.ctx.files.list(vcs.worktree.path(unit))).length === 0;
   const made = await vcs.worktree.ensure(unit, branchOf(unit), cutFrom(unit, await baseRefOf(env)));
-  return made.ok ? ok(made.value.path) : made;
+  if (!made.ok) return made;
+  if (fresh) await dropSetupRecord(env.ctx, unit);
+  return ok(made.value.path);
 }
