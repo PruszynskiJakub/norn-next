@@ -1,0 +1,135 @@
+{
+  "scenario": "ask-question",
+  "description": "The agent asks through AskUserQuestion; the person answers in the dialog in the pane.",
+  "derived_from": "Derived, not recorded: the claude recording of this scenario, each event it normalizes to fired as the lab agent's hook for it (packages/harness-lab/src/protocol.ts), at the same instants.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "lab-run-1"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_ask1",
+        "kind": "ask",
+        "tool": "AskUserQuestion"
+      }
+    },
+    {
+      "hook": "ask",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_ask1",
+        "question": "Which database should the store use?",
+        "options": [
+          "sqlite",
+          "postgres"
+        ]
+      }
+    },
+    {
+      "hook": "answer",
+      "at": "2026-11-17T11:06:40.000Z",
+      "payload": {
+        "id": "toolu_ask1",
+        "by": "pane"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T11:06:40.000Z",
+      "payload": {
+        "id": "toolu_ask1",
+        "ok": true
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T11:06:45.000Z",
+      "payload": {
+        "id": "toolu_02",
+        "kind": "write",
+        "tool": "Edit",
+        "detail": "/repo/.worktrees/gh-12/src/a.ts"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T11:06:46.000Z",
+      "payload": {
+        "id": "toolu_02",
+        "ok": true
+      }
+    },
+    {
+      "hook": "stop",
+      "at": "2026-11-17T11:06:50.000Z",
+      "payload": {
+        "last_message": "Switched the store to postgres."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 4,
+      "now": "2026-11-17T10:00:11.000Z",
+      "expect": {
+        "activity": "asking",
+        "ask": {
+          "id": "toolu_ask1",
+          "question": "Which database should the store use?",
+          "options": [
+            "sqlite",
+            "postgres"
+          ]
+        }
+      }
+    },
+    {
+      "after": 4,
+      "now": "2026-11-17T11:00:00.000Z",
+      "expect": {
+        "activity": "asking",
+        "silent": false,
+        "ask": {
+          "id": "toolu_ask1",
+          "question": "Which database should the store use?",
+          "options": [
+            "sqlite",
+            "postgres"
+          ]
+        }
+      },
+      "why": "an open ask is a reason to be quiet"
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T11:06:41.000Z",
+      "expect": {
+        "activity": "working",
+        "pane_answers": 1,
+        "pending_tools": 0
+      }
+    },
+    {
+      "after": 9,
+      "now": "2026-11-17T11:06:51.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "pane_answers": 1
+      }
+    }
+  ]
+}

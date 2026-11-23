@@ -14,6 +14,7 @@ import { doneCommand } from "./done.ts";
 import { helpCommand } from "./help.ts";
 import { hookCommand } from "./hook.ts";
 import { initCommand } from "./init.ts";
+import { labAgentCommand } from "./lab-agent.ts";
 import { pluginAddCommand } from "./plugin-add.ts";
 import { pluginListCommand } from "./plugin-list.ts";
 import { pluginRemoveCommand } from "./plugin-remove.ts";
@@ -52,6 +53,7 @@ export const COMMANDS: readonly Command[] = [
   askCommand,
   stuckCommand,
   hookCommand,
+  labAgentCommand,
 ];
 
 export const NOUNS: readonly Noun[] = [

@@ -1,0 +1,123 @@
+{
+  "scenario": "person-types-in-pane",
+  "description": "The agent ends its turn on a question in prose; the person types the answer in the pane, then norn nudges once.",
+  "derived_from": "Derived, not recorded: the claude recording of this scenario, each event it normalizes to fired as the lab agent's hook for it (packages/harness-lab/src/protocol.ts), at the same instants.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "lab-run-1"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_01",
+        "kind": "other",
+        "tool": "Read",
+        "detail": "/repo/.worktrees/gh-12/src/a.ts"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "id": "toolu_01",
+        "ok": true
+      }
+    },
+    {
+      "hook": "stop",
+      "at": "2026-11-17T10:00:20.000Z",
+      "payload": {
+        "last_message": "Should the store use sqlite or postgres?"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:10:00.000Z",
+      "payload": {
+        "prompt": "postgres"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:10:10.000Z",
+      "payload": {
+        "id": "toolu_02",
+        "kind": "write",
+        "tool": "Edit",
+        "detail": "/repo/.worktrees/gh-12/src/a.ts"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:10:11.000Z",
+      "payload": {
+        "id": "toolu_02",
+        "ok": true
+      }
+    },
+    {
+      "hook": "stop",
+      "at": "2026-11-17T10:10:20.000Z",
+      "payload": {
+        "last_message": "Switched to postgres."
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:20:00.000Z",
+      "payload": {
+        "prompt": "Report the step with norn done.\n\n<!-- norn-prompt source=nudge id=p-nudge-9 -->"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 5,
+      "now": "2026-11-17T10:00:21.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "pane_answers": 0,
+        "last_message": "Should the store use sqlite or postgres?"
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:10:01.000Z",
+      "expect": {
+        "activity": "working",
+        "pane_answers": 1
+      }
+    },
+    {
+      "after": 9,
+      "now": "2026-11-17T10:10:21.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "pane_answers": 1,
+        "last_message": "Switched to postgres."
+      }
+    },
+    {
+      "after": 10,
+      "now": "2026-11-17T10:20:01.000Z",
+      "expect": {
+        "activity": "working",
+        "pane_answers": 1
+      },
+      "why": "a prompt norn sent is no answer from the pane"
+    }
+  ]
+}

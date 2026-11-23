@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "@norn/harness-claude": "workspace:*",
+    "@norn/harness-lab": "workspace:*",
     "@norn/harness-pi": "workspace:*",
     "@norn/store-local": "workspace:*"
   }

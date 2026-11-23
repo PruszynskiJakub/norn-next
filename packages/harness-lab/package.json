@@ -1,0 +1,12 @@
+{
+  "name": "@norn/harness-lab",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@norn/plugin-api": "workspace:*",
+    "@norn/schema": "workspace:*",
+    "@sinclair/typebox": "^0.34.41"
+  }
+}

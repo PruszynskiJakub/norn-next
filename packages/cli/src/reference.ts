@@ -33,7 +33,7 @@ export const REFERENCE_GROUPS: ReadonlyArray<{ title: string; commands: readonly
   { title: "A person's commands", commands: ["status", "story", "run", "workflow"] },
   { title: "Background: run by a person, cron or a terminal multiplexer", commands: ["watch", "tick"] },
   { title: "Agent protocol: the only commands an agent runs", commands: ["brief", "done", "ask", "stuck"] },
-  { title: "Called by the harness's hooks, not by hand", commands: ["hook"] },
+  { title: "Called by a harness, not by hand", commands: ["hook", "lab-agent"] },
 ];
 
 function commandOrder(commands: readonly Command[], nouns: readonly Noun[]): Array<{ title: string; items: Array<Command | Noun> }> {
@@ -210,7 +210,7 @@ function renderCatalog(pack: string, catalog: Catalog): string[] {
   return [
     "### Workflow catalog",
     "",
-    `The \`${pack}\` pack's workflows. An issue's \`norn:wf:<name>\` label picks the workflow its first round runs; a person starts each later round with \`norn story round\`, and each workflow's When names the rounds that follow it. A repo's own \`.agents/workflows/\` file replaces the pack's of the same name. Each step lists the skills its agent loads.`,
+    `The \`${pack}\` pack's workflows, each drawn as a graph in [Workflows](workflows.md). An issue's \`norn:wf:<name>\` label picks the workflow its first round runs; a person starts each later round with \`norn story round\`, and each workflow's When names the rounds that follow it. A repo's own \`.agents/workflows/\` file replaces the pack's of the same name. Each step lists the skills its agent loads.`,
     "",
     ...catalog.workflows.flatMap(renderWorkflow),
     "### Skills",

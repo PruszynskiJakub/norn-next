@@ -721,7 +721,7 @@ norn stuck <reason> [--report-id <id>]
 
 - `--report-id <id>`: the report's id; a retry with the same id records it once
 
-#### Called by the harness's hooks, not by hand
+#### Called by a harness, not by hand
 
 ##### `norn hook`
 
@@ -730,6 +730,16 @@ Answer a harness hook: the payload on stdin, the harness's reply on stdout
 ```sh
 norn hook <harness> <hook>
 ```
+
+##### `norn lab-agent`
+
+Run the lab's stand-in agent for the run in the launch env (the lab harness starts it)
+
+```sh
+norn lab-agent [--resume <session>] -- <prompt>
+```
+
+- `--resume <session>`: the session a resumed launch continues
 
 #### Other
 
@@ -819,7 +829,7 @@ Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner`, `ru
 
 ### Workflow catalog
 
-The `sdlc` pack's workflows. An issue's `norn:wf:<name>` label picks the workflow its first round runs; a person starts each later round with `norn story round`, and each workflow's When names the rounds that follow it. A repo's own `.agents/workflows/` file replaces the pack's of the same name. Each step lists the skills its agent loads.
+The `sdlc` pack's workflows, each drawn as a graph in [Workflows](workflows.md). An issue's `norn:wf:<name>` label picks the workflow its first round runs; a person starts each later round with `norn story round`, and each workflow's When names the rounds that follow it. A repo's own `.agents/workflows/` file replaces the pack's of the same name. Each step lists the skills its agent loads.
 
 #### `fix`
 

@@ -67,6 +67,13 @@ describe("reference render", () => {
     expect([durationText(900_000), durationText(3_600_000), durationText(400_000), durationText(1_500), durationText(604_800_000)]).toEqual(["15m", "1h", "400s", "1500ms", "7d"]);
   });
 
+  test("the commands a harness runs, its hooks and the lab's stand-in agent, are listed apart from a person's and an agent's", () => {
+    const section = fresh.slice(fresh.indexOf("#### Called by a harness, not by hand"));
+    const end = section.indexOf("\n#### ", 1);
+    const headings = [...(end < 0 ? section : section.slice(0, end)).matchAll(/^##### `norn ([a-z-]+)`/gm)].map((m) => m[1]);
+    expect(headings).toEqual(["hook", "lab-agent"]);
+  });
+
   test("every exit code with its meaning", () => {
     for (const [k, v] of Object.entries(ExitCode)) expect(fresh).toMatch(new RegExp(`^\\| ${v} \\| \`${k}\` \\| \\S`, "m"));
   });

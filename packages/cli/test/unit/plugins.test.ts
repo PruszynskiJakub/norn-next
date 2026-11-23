@@ -80,6 +80,7 @@ describe("bundled plugins", () => {
         "norn-forge-none",
         "norn-github",
         "norn-harness-claude",
+        "norn-harness-lab",
         "norn-harness-pi",
         "norn-pack-sdlc",
         "norn-runner-headless",
@@ -91,6 +92,13 @@ describe("bundled plugins", () => {
         "norn-vcs-git",
       ].sort(),
     );
+  });
+
+  test("an executor on the lab harness resolves with nothing installed", async () => {
+    const c = await config();
+    c.executors.lab = { harness: "lab", runner: "headless" };
+    const r = resolvePlugins({ config: c, bundled: BUNDLED_PLUGINS, lock: lockOf(), installed: [] });
+    expect(r.ok && r.plugins.some((p) => p.provides.harness?.lab !== undefined)).toBe(true);
   });
 
   test("a config on bundled plugins alone resolves with no lock", async () => {

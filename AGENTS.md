@@ -34,6 +34,7 @@ packages/store-local      @norn/store-local      store: run data in the machine 
 packages/store-refs       @norn/store-refs       store: run data on git refs shared through the remote
 packages/harness-claude   @norn/harness-claude   harness: Claude Code (hooks, launch, events)
 packages/harness-pi       @norn/harness-pi       harness: pi (extension, launch, events)
+packages/harness-lab      @norn/harness-lab      harness: the lab's scripted stand-in agent (beats, launch, events)
 packages/runner-headless  @norn/runner-headless  runner: the agent as a detached process
 packages/runner-herdr     @norn/runner-herdr     runner: the agent in a Herdr pane
 packages/pack-sdlc        @norn/pack-sdlc        pack: the shipped workflows, shared files and skills
@@ -41,7 +42,7 @@ packages/conformance      @norn/conformance      contract suites for the slots, 
 packages/cli              @norn/cli              wiring + commands, config layers, plugin install; bin `norn` → src/main.ts
 ```
 
-Dependencies point one way only: `schema ← plugin-api ← kernel ← runtime ← cli`. Every plugin package (`host-node`, `vcs-git`, `tracker-local`, `plugin-github`, `forge-none`, `store-local`, `store-refs`, `harness-claude`, `harness-pi`, `runner-headless`, `runner-herdr`) reads only `schema` and `plugin-api`; `pack-sdlc` reads only `plugin-api`; `conformance` adds `kernel`; `cli` wires them all. `test/repo/repo.test.ts` enforces it: every `@norn/*` import must be allowed **and** declared in the package's `package.json`. Each package in full: [Development › Layout](docs/development.md#layout).
+Dependencies point one way only: `schema ← plugin-api ← kernel ← runtime ← cli`. Every plugin package (`host-node`, `vcs-git`, `tracker-local`, `plugin-github`, `forge-none`, `store-local`, `store-refs`, `harness-claude`, `harness-pi`, `harness-lab`, `runner-headless`, `runner-herdr`) reads only `schema` and `plugin-api`; `pack-sdlc` reads only `plugin-api`; `conformance` adds `kernel`; `cli` wires them all. `test/repo/repo.test.ts` enforces it: every `@norn/*` import must be allowed **and** declared in the package's `package.json`. Each package in full: [Development › Layout](docs/development.md#layout).
 
 ## Process
 

@@ -1,0 +1,119 @@
+{
+  "scenario": "logged-out-login-nudge",
+  "description": "The turn fails on a lost login; the person runs /login in the pane and norn nudges the agent, which carries on.",
+  "derived_from": "Derived, not recorded: the claude recording of this scenario, each event it normalizes to fired as the lab agent's hook for it (packages/harness-lab/src/protocol.ts), at the same instants.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "lab-run-1"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_01",
+        "kind": "shell",
+        "tool": "Bash",
+        "detail": "ls"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "id": "toolu_01",
+        "ok": true
+      }
+    },
+    {
+      "hook": "ask",
+      "at": "2026-11-17T10:00:20.000Z",
+      "payload": {
+        "id": "login-18988cd3",
+        "question": "agent logged out: run /login in the pane"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:30:00.000Z",
+      "payload": {
+        "prompt": "go on\n\n<!-- norn-prompt source=nudge id=p-nudge-5 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:30:05.000Z",
+      "payload": {
+        "id": "toolu_02",
+        "kind": "write",
+        "tool": "Edit",
+        "detail": "/repo/.worktrees/gh-12/src/a.ts"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:30:06.000Z",
+      "payload": {
+        "id": "toolu_02",
+        "ok": true
+      }
+    },
+    {
+      "hook": "stop",
+      "at": "2026-11-17T10:30:10.000Z",
+      "payload": {
+        "last_message": "Done."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 5,
+      "now": "2026-11-17T10:25:00.000Z",
+      "expect": {
+        "activity": "asking",
+        "silent": false,
+        "ask": {
+          "question": "agent logged out: run /login in the pane"
+        }
+      },
+      "why": "a logged-out agent cannot act until a person logs it in"
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:30:01.000Z",
+      "expect": {
+        "activity": "working",
+        "pending_tools": 0
+      },
+      "why": "a prompt norn sends after /login starts a new turn, which closes the ask"
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T10:30:05.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 9,
+      "now": "2026-11-17T10:30:11.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "last_message": "Done."
+      }
+    }
+  ]
+}

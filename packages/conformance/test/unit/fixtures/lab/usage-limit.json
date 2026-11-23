@@ -1,0 +1,108 @@
+{
+  "scenario": "usage-limit",
+  "description": "pi reports no usage limit: a run that pi gave up retrying on a 429 settles on a provider error, with no reset time. The session reads as a turn that ended on that error, never limited and never silent, until norn nudges it.",
+  "derived_from": "Derived, not recorded: the pi recording of this scenario, each event it normalizes to fired as the lab agent's hook for it (packages/harness-lab/src/protocol.ts), at the same instants.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "lab-run-1"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "call_01",
+        "kind": "shell",
+        "tool": "bash",
+        "detail": "bun run test"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:01:00.000Z",
+      "payload": {
+        "id": "call_01",
+        "ok": true
+      }
+    },
+    {
+      "hook": "stop",
+      "at": "2026-11-17T10:01:02.000Z",
+      "payload": {
+        "last_message": "pi stopped on an error: 429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your account's rate limit. Please try again later.\"}}",
+        "error": "pi stopped on an error: 429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your account's rate limit. Please try again later.\"}}"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T13:00:00.000Z",
+      "payload": {
+        "prompt": "Carry on with the step.\n\n<!-- norn-prompt source=nudge id=p-nudge-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T13:00:05.000Z",
+      "payload": {
+        "id": "call_02",
+        "kind": "shell",
+        "tool": "bash",
+        "detail": "bun run test"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 4,
+      "now": "2026-11-17T10:01:01.000Z",
+      "expect": {
+        "activity": "working"
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T10:01:02.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "silent": false,
+        "last_message": "pi stopped on an error: 429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your account's rate limit. Please try again later.\"}}"
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T12:59:59.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "silent": false
+      },
+      "why": "hours of quiet after the error are an ended turn a person or norn can read, never a silent agent"
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T13:00:01.000Z",
+      "expect": {
+        "activity": "working",
+        "silent": false
+      }
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T13:00:06.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "silent": false
+      }
+    }
+  ]
+}
