@@ -74,6 +74,12 @@ describe("reference render", () => {
     expect(headings).toEqual(["hook", "lab-agent"]);
   });
 
+  test("the catalog commands are listed among a person's commands, workflow show with its --mermaid flag", () => {
+    const persons = fresh.slice(fresh.indexOf("#### A person's commands"), fresh.indexOf("#### Background"));
+    for (const usage of ["norn workflow list", "norn workflow show <name> [--mermaid]", "norn skill list"]) expect(persons).toContain(usage);
+    expect(persons).toContain("- `--mermaid`: ");
+  });
+
   test("every exit code with its meaning", () => {
     for (const [k, v] of Object.entries(ExitCode)) expect(fresh).toMatch(new RegExp(`^\\| ${v} \\| \`${k}\` \\| \\S`, "m"));
   });

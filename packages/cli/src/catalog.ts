@@ -1,13 +1,25 @@
 /**
- * What a pack offers, as a newcomer picks from it: each workflow with when to pick it, its label, its
- * start step and the skills each step uses, and each skill with when it applies. Read from the pack's
- * files and loaded through the kernel's loader with the plugins' step kinds, so a step a shared file
- * brings in is listed like one the workflow writes itself. Pure: the caller passes the pack and plugins.
+ * What a pack and a repo offer, as a newcomer picks from them. Two readers share it:
+ *
+ * - `packCatalog`, for the generated reference: each pack workflow with when to pick it, its label, its
+ *   start step and the skills each step uses, and each skill with when it applies. Loaded through the
+ *   kernel's loader with the plugins' step kinds, so a step a shared file brings in is listed like one
+ *   the workflow writes itself. Pure: the caller passes the pack and plugins.
+ * - `readCatalog`, for the catalog commands: the workflows a repo can start (the pack's, the repo's laid
+ *   over them, the ones held for the person) and the skills its agents can use. Read only, through the
+ *   runtime env a tick builds, so a workflow lists as it would run. Outside a norn repo (no checkout, or
+ *   no config yet) the bundled default pack is read alone, so a newcomer can look before `norn init`.
  */
-import { DEFAULT_KERNEL_CONFIG } from "@norn/kernel";
+import { DEFAULT_KERNEL_CONFIG, type LoadedWorkflow, loadProblem, type WorkflowLoad } from "@norn/kernel";
 import type { NornPlugin, Pack } from "@norn/plugin-api";
-import { collectSignals, collectStepKinds, loadPackWorkflows, signalDeclarations } from "@norn/runtime";
+import { collectSignals, collectStepKinds, type HeldWorkflow, loadPackWorkflows, NO_REPO_WORKFLOWS, REPO_WORKFLOWS_DIR, type RepoWorkflows, repoFileOf, signalDeclarations, workflowNameOf } from "@norn/runtime";
+import type { SkillListEntry, WorkflowListEntry, WorkflowShow } from "@norn/schema";
 import { parse } from "yaml";
+import { CONFIG_DEFAULTS } from "./config/schema.ts";
+import type { CliContext } from "./context.ts";
+import { CliFailure, failure, refuse } from "./output.ts";
+import { BUNDLED_PLUGINS } from "./plugins/bundled.ts";
+import { lookupSkills } from "./skill-lookup.ts";
 
 export interface CatalogStep {
   name: string;
@@ -80,4 +92,109 @@ export function packCatalog(pack: Pack, plugins: readonly NornPlugin[]): Catalog
   const skills = Object.entries(pack.skills).map(([name, files]) => catalogSkill(name, files));
   const byKey = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name);
   return { workflows: workflows.sort(byKey), skills: skills.sort(byKey) };
+}
+
+/** The refusals that mean "not a norn repo": no checkout, or a checkout with no config at all. */
+const NOT_A_NORN_REPO = new Set(["not_a_repo", "config_missing"]);
+
+/** What the line under every catalog view says outside a norn repo. */
+export const PACK_ALONE = "Not in a norn repo: the pack alone, no repo overrides were read.";
+
+export interface RepoCatalog {
+  /** the checkout read, or null for the pack alone */
+  repo: string | null;
+  pack: Pack;
+  workflows: Readonly<Record<string, WorkflowLoad>>;
+  repoWorkflows: RepoWorkflows;
+  held: Readonly<Record<string, HeldWorkflow>>;
+  skills(): Promise<SkillListEntry[]>;
+}
+
+/** The bundled default pack, its workflows loaded with the bundled step kinds and signals. */
+function packAlone(): RepoCatalog {
+  const name = CONFIG_DEFAULTS.packs?.[0] ?? "sdlc";
+  const pack = BUNDLED_PLUGINS.flatMap((p) => p.provides.packs?.[name] ?? [])[0];
+  const kinds = collectStepKinds(BUNDLED_PLUGINS);
+  const signals = collectSignals(BUNDLED_PLUGINS);
+  if (!pack || !kinds.ok || !signals.ok) throw failure(`the bundled pack ${name} does not load`, "reinstall norn", "pack_missing");
+  const loads = loadPackWorkflows(pack, kinds.value, DEFAULT_KERNEL_CONFIG, signalDeclarations(signals.value));
+  if (!loads.ok) throw failure(`the bundled pack ${name} does not load: ${loads.failure.message}`, "reinstall norn", loads.failure.code);
+  return { repo: null, pack, workflows: loads.value, repoWorkflows: NO_REPO_WORKFLOWS, held: {}, skills: () => lookupSkills(pack.skills, null) };
+}
+
+export async function readCatalog(ctx: CliContext): Promise<RepoCatalog> {
+  try {
+    const env = await ctx.runtimeEnv();
+    const pack = env.slots.pack;
+    const repo = { files: env.ctx.files, root: env.ctx.repo.root, harnesses: Object.values(env.slots.executors) };
+    return { repo: env.ctx.repo.root, pack, workflows: env.workflows, repoWorkflows: env.repoWorkflows, held: env.held, skills: () => lookupSkills(pack.skills, repo) };
+  } catch (e) {
+    if (e instanceof CliFailure && NOT_A_NORN_REPO.has(e.body.code ?? "")) return packAlone();
+    throw e;
+  }
+}
+
+/** The `when:` and `description:` a workflow file says, read off its text: the loader keeps `when:` out of the pinned document. */
+function said(text: string | undefined): { when: string | null; description: string | null } {
+  let doc: unknown;
+  try {
+    doc = text === undefined ? null : parse(text);
+  } catch {
+    doc = null;
+  }
+  const field = (k: string): string | null => {
+    const v = (doc as Record<string, unknown> | null)?.[k];
+    return typeof v === "string" && v.trim() ? v.trim().replace(/\s+/g, " ") : null;
+  };
+  return { when: field("when"), description: field("description") };
+}
+
+const fileText = (files: Readonly<Record<string, string>>, name: string): string | undefined => Object.entries(files).find(([f]) => workflowNameOf(f) === name)?.[1];
+
+/** One workflow as the list shows it. */
+export function workflowEntry(c: RepoCatalog, name: string): WorkflowListEntry {
+  const file = repoFileOf(c.repoWorkflows, name, "workflow");
+  const packText = fileText(c.pack.workflows, name);
+  const source = file === null ? "pack" : packText === undefined ? "repo" : "replaces-pack";
+  const entry: WorkflowListEntry = { name, ...said(file === null ? packText : fileText(c.repoWorkflows.workflows, name)), source, state: "ok", file };
+  const held = c.held[name];
+  if (held) return { ...entry, state: "held", changes: held.changes, confirm: `norn workflow confirm ${name}` };
+  const load = c.workflows[name];
+  if (load?.ok) return entry;
+  return { ...entry, state: "invalid", problem: loadProblem(name, load) ?? `workflow ${name} does not load` };
+}
+
+export function workflowEntries(c: RepoCatalog): WorkflowListEntry[] {
+  return [...new Set([...Object.keys(c.workflows), ...Object.keys(c.held)])].sort().map((n) => workflowEntry(c, n));
+}
+
+/**
+ * The workflow `workflow show` reads: a held one's repo file as it would run once confirmed. A name no
+ * file holds is refused with the ones that load; one that does not load, with why.
+ */
+export function shownWorkflow(c: RepoCatalog, name: string): { entry: WorkflowListEntry; workflow: LoadedWorkflow } {
+  const load = c.workflows[name];
+  const held = c.held[name];
+  if (!load && !held) {
+    const loading = workflowEntries(c).flatMap((w) => (w.state === "ok" ? [w.name] : []));
+    throw refuse(`no workflow ${name}`, `name one of ${loading.join(", ")}${c.repo === null ? "" : `, or write ${REPO_WORKFLOWS_DIR}/${name}.yaml`}`, "unknown_workflow");
+  }
+  const entry = workflowEntry(c, name);
+  if (held) return { entry, workflow: held.current };
+  if (load?.ok) return { entry, workflow: load.workflow };
+  throw refuse(entry.problem ?? `workflow ${name} does not load`, `fix ${entry.file ?? `the workflow ${name}`}, then norn doctor`, "invalid_workflow");
+}
+
+/** The JSON `workflow show` prints. */
+export function workflowShow(c: RepoCatalog, entry: WorkflowListEntry, workflow: LoadedWorkflow): WorkflowShow {
+  const { graph } = workflow;
+  const steps = Object.values(graph.steps).map((s) => ({
+    name: s.name,
+    kind: s.kind,
+    role: s.agent?.role ?? null,
+    skills: s.agent?.skills ?? [],
+    outcomes: Object.entries(s.routes).map(([outcome, r]) => ({ outcome, to: r.to, counter: r.counter ?? null })),
+  }));
+  const counters = Object.entries(graph.counters).map(([name, k]) => ({ name, max: k.max, reset_on: k.reset_on }));
+  return { repo: c.repo, ...entry, hash: graph.hash, start: graph.start, steps, counters, gates: steps.filter((s) => s.kind === "gate").map((s) => s.name) };
 }

@@ -30,7 +30,7 @@ export const REFERENCE_MARKERS: MarkerPair = { start: REFERENCE_START, end: REFE
  */
 export const REFERENCE_GROUPS: ReadonlyArray<{ title: string; commands: readonly string[] }> = [
   { title: "Setup", commands: ["init", "doctor", "config", "plugin"] },
-  { title: "A person's commands", commands: ["status", "story", "run", "workflow"] },
+  { title: "A person's commands", commands: ["status", "story", "run", "workflow", "skill"] },
   { title: "Background: run by a person, cron or a terminal multiplexer", commands: ["watch", "tick"] },
   { title: "Agent protocol: the only commands an agent runs", commands: ["brief", "done", "ask", "stuck"] },
   { title: "Called by a harness, not by hand", commands: ["hook", "lab-agent"] },
