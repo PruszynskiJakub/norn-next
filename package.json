@@ -20,6 +20,7 @@
     "@norn/kernel": "workspace:*",
     "@norn/harness-claude": "workspace:*",
     "@norn/harness-pi": "workspace:*",
+    "@norn/harness-lab": "workspace:*",
     "@norn/conformance": "workspace:*",
     "@norn/plugin-github": "workspace:*",
     "@norn/tracker-local": "workspace:*",

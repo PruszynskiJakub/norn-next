@@ -33,7 +33,7 @@ export const REFERENCE_GROUPS: ReadonlyArray<{ title: string; commands: readonly
   { title: "A person's commands", commands: ["status", "story", "run", "workflow"] },
   { title: "Background: run by a person, cron or a terminal multiplexer", commands: ["watch", "tick"] },
   { title: "Agent protocol: the only commands an agent runs", commands: ["brief", "done", "ask", "stuck"] },
-  { title: "Called by the harness's hooks, not by hand", commands: ["hook"] },
+  { title: "Called by a harness, not by hand", commands: ["hook", "lab-agent"] },
 ];
 
 function commandOrder(commands: readonly Command[], nouns: readonly Noun[]): Array<{ title: string; items: Array<Command | Noun> }> {

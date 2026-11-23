@@ -36,6 +36,7 @@ packages/store-local      @norn/store-local      a store in the machine dir (run
 packages/store-refs       @norn/store-refs       a store on git refs (refs/norn/v2/…) shared through the remote
 packages/harness-claude   @norn/harness-claude   the Claude Code harness: hooks in .claude/settings.local.json, launch, normalize, respond
 packages/harness-pi       @norn/harness-pi       the pi harness: an extension pi loads, launch, normalize, respond
+packages/harness-lab      @norn/harness-lab      the lab harness: a scripted stand-in agent (`runLabAgent`, run as `norn lab-agent`) playing a beat script, launch, normalize, respond
 packages/runner-headless  @norn/runner-headless  agents as detached processes, output to a log
 packages/runner-herdr     @norn/runner-herdr     agents in Herdr panes, one workspace per story and one tab per run, closed by `close` (plugin API 1.17) once the run's unit is done with; `focus`, `split` and `label` (plugin API 1.18) bring a run's pane in front, open the cockpit below a person's pane and write a story workspace's `$norn` sidebar token
 packages/pack-sdlc        @norn/pack-sdlc        the sdlc pack: workflows, shared files and skills, imported as text
@@ -51,7 +52,7 @@ A plugin is one value made with `defineNornPlugin({ name, api, provides })`; `ap
 
 | Slot | Contract | Bundled |
 |---|---|---|
-| `harness` | the agent tool: install its hooks in a worktree, launch it, normalize its hook payloads into harness events, render norn's answer back | `claude`, `pi` |
+| `harness` | the agent tool: install its hooks in a worktree, launch it, normalize its hook payloads into harness events, render norn's answer back | `claude`, `pi`, `lab` |
 | `tracker` | where stories come from: list items, intake label, comments, close | `github`, `local` |
 | `forge` | changes for review: open or update a change, read its state and checks, and (`checkReport`, optional, plugin API 1.27) each failed check with its link and whether the change conflicts with its base, which `forge.await-checks` reads, and (`fileUrl`, optional, plugin API 1.28) where it serves a commit's file, as an image or a link, for a forge that reports `raw_urls` | `github`, `none` |
 | `store` | run data: numbered receipts, state by compare-and-swap, claims, mailbox, artifacts | `local`, `refs` |

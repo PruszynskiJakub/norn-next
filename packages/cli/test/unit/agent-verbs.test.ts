@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { LAB_BEATS_ENV } from "@norn/harness-lab";
 import { INPUTS_DIR, OUT_DIR, reportReceiptId, SPEC_ARTIFACT, worktreeOf, writeStoryDoc } from "@norn/runtime";
 import type { RunState } from "@norn/kernel";
 import type { CriterionVerdict } from "@norn/schema";
@@ -71,6 +72,8 @@ describe("the agent verbs act for the run in the launch env", () => {
     const r = await runCli(["brief", "--json"], m.io);
     expect(r.exit).toBe(ExitCode.ok);
     expect(json(r.stdout)).toMatchObject({ unit: UNIT, run_id: RUN, markdown: expect.stringContaining(AGENT_STEP) });
+    // the visit as data, so a scripted agent never reads it from the markdown
+    expect(json(r.stdout)).toMatchObject({ workflow: "story", step: AGENT_STEP, attempt: 1 });
     expect((await runCli(["brief"], m.io)).stdout).toContain(AGENT_STEP);
     const stale = await runCli(["brief", "--json"], withEnv(m, runEnv(UNIT, "01JBBBBBBBBBBBBBBBBBBBBBBB")).io);
     expect({ exit: stale.exit, code: (json(stale.stdout) as { code: string }).code }).toEqual({ exit: ExitCode.refused, code: "stale_run" });
@@ -604,5 +607,22 @@ describe("what done prints of the evidence it kept", () => {
 
   test("a report that kept nothing prints as before", () => {
     expect(doneMarkdown("gh-1", "done", { seq: 4, replayed: true })).toBe("Reported gh-1 done with outcome `done` (recorded before). End your turn.");
+  });
+});
+
+describe("norn lab-agent runs only inside a lab run", () => {
+  test("outside a launched session it is refused, saying the lab harness starts it", async () => {
+    const r = await runCli(["lab-agent", "--json", "--", "go"], configured().io);
+    expect(r.exit).toBe(ExitCode.refused);
+    expect(json(r.stdout)).toMatchObject({ code: "no_run_env", do_instead: expect.stringContaining("lab") });
+  });
+
+  test("in a launched session with no beat script it is refused, naming the env that names one", async () => {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { step: AGENT_STEP });
+    const r = await runCli(["lab-agent", "--json", "--", "go"], m.io);
+    expect(r.exit).toBe(ExitCode.refused);
+    expect(json(r.stdout)).toMatchObject({ code: "not_lab_run", error: expect.stringContaining(LAB_BEATS_ENV), do_instead: expect.stringContaining("lab") });
+    expect(await receiptsOf(m)).toEqual([]);
   });
 });

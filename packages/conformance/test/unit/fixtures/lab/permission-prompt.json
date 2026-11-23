@@ -1,0 +1,122 @@
+{
+  "scenario": "permission-prompt",
+  "description": "A shell call waits for the person's permission while a parallel read finishes; the person approves it.",
+  "derived_from": "Derived, not recorded: the claude recording of this scenario, each event it normalizes to fired as the lab agent's hook for it (packages/harness-lab/src/protocol.ts), at the same instants.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "lab-run-1"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_r1",
+        "kind": "other",
+        "tool": "Read",
+        "detail": "/repo/.worktrees/gh-12/src/a.ts"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_b1",
+        "kind": "shell",
+        "tool": "Bash",
+        "detail": "rm -rf build"
+      }
+    },
+    {
+      "hook": "permission",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "id": "perm-d5adf954",
+        "prompt": "Claude needs your permission to use Bash"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "id": "toolu_r1",
+        "ok": true
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:15:00.000Z",
+      "payload": {
+        "id": "toolu_b1",
+        "ok": true
+      }
+    },
+    {
+      "hook": "stop",
+      "at": "2026-11-17T10:15:10.000Z",
+      "payload": {
+        "last_message": "Cleaned the build."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 4,
+      "now": "2026-11-17T10:00:10.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pending_tools": 2
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T10:00:11.000Z",
+      "expect": {
+        "activity": "permission",
+        "permission": {
+          "prompt": "Claude needs your permission to use Bash"
+        }
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:10:00.000Z",
+      "expect": {
+        "activity": "permission",
+        "silent": false,
+        "pending_tools": 1,
+        "permission": {
+          "prompt": "Claude needs your permission to use Bash"
+        }
+      },
+      "why": "the parallel read finishing does not answer the shell call's prompt"
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T10:15:01.000Z",
+      "expect": {
+        "activity": "working",
+        "pending_tools": 0
+      },
+      "why": "the call the prompt was about ran, so the prompt was answered"
+    },
+    {
+      "after": 8,
+      "now": "2026-11-17T10:15:11.000Z",
+      "expect": {
+        "activity": "turn_ended"
+      }
+    }
+  ]
+}

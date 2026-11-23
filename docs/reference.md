@@ -721,7 +721,7 @@ norn stuck <reason> [--report-id <id>]
 
 - `--report-id <id>`: the report's id; a retry with the same id records it once
 
-#### Called by the harness's hooks, not by hand
+#### Called by a harness, not by hand
 
 ##### `norn hook`
 
@@ -730,6 +730,16 @@ Answer a harness hook: the payload on stdin, the harness's reply on stdout
 ```sh
 norn hook <harness> <hook>
 ```
+
+##### `norn lab-agent`
+
+Run the lab's stand-in agent for the run in the launch env (the lab harness starts it)
+
+```sh
+norn lab-agent [--resume <session>] -- <prompt>
+```
+
+- `--resume <session>`: the session a resumed launch continues
 
 #### Other
 

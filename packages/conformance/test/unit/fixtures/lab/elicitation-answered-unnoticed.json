@@ -1,0 +1,110 @@
+{
+  "scenario": "elicitation-answered-unnoticed",
+  "description": "An MCP elicitation dialog is answered in the pane but no answer notification arrives; the agent requesting its next tool shows the dialog is over.",
+  "derived_from": "Derived, not recorded: the claude recording of this scenario, each event it normalizes to fired as the lab agent's hook for it (packages/harness-lab/src/protocol.ts), at the same instants.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "lab-run-1"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_m1",
+        "kind": "other",
+        "tool": "mcp__github__create_issue",
+        "detail": "{\"title\":\"Flaky test\",\"body\":\"...\"}"
+      }
+    },
+    {
+      "hook": "ask",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "id": "input-762147b5",
+        "question": "MCP server github requests input"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:20:01.000Z",
+      "payload": {
+        "id": "toolu_m1",
+        "ok": true
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:20:05.000Z",
+      "payload": {
+        "id": "toolu_b1",
+        "kind": "shell",
+        "tool": "Bash",
+        "detail": "bun run test"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:20:30.000Z",
+      "payload": {
+        "id": "toolu_b1",
+        "ok": true
+      }
+    },
+    {
+      "hook": "stop",
+      "at": "2026-11-17T10:20:35.000Z",
+      "payload": {
+        "last_message": "Filed #42 and the tests pass."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 4,
+      "now": "2026-11-17T10:15:00.000Z",
+      "expect": {
+        "activity": "asking",
+        "ask": {
+          "question": "MCP server github requests input"
+        }
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T10:20:02.000Z",
+      "expect": {
+        "activity": "asking",
+        "pending_tools": 0
+      },
+      "why": "the call the dialog was raised during finishing proves nothing about the dialog"
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:20:06.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pending_tools": 1
+      },
+      "why": "the agent acting again shows the dialog was answered"
+    },
+    {
+      "after": 8,
+      "now": "2026-11-17T10:20:36.000Z",
+      "expect": {
+        "activity": "turn_ended"
+      }
+    }
+  ]
+}
