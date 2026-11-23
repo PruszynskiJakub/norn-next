@@ -1,0 +1,114 @@
+{
+  "scenario": "background-subagents",
+  "description": "pi reports no subagents: its subagent extension runs each as a tool call that lasts until the subagent is done. Two run in parallel through a long quiet stretch, which reads as a wait on tools, never as silence.",
+  "derived_from": "Derived, not recorded: the pi recording of this scenario, each event it normalizes to fired as the lab agent's hook for it (packages/harness-lab/src/protocol.ts), at the same instants.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "lab-run-1"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "call_s1",
+        "kind": "other",
+        "tool": "subagent",
+        "detail": "{\"agent\":\"scout\",\"task\":\"Map the store's callers\"}"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "call_s2",
+        "kind": "other",
+        "tool": "subagent",
+        "detail": "{\"agent\":\"scout\",\"task\":\"Map the cli's callers\"}"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T11:30:00.000Z",
+      "payload": {
+        "id": "call_s1",
+        "ok": true
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T12:00:00.000Z",
+      "payload": {
+        "id": "call_s2",
+        "ok": true
+      }
+    },
+    {
+      "hook": "stop",
+      "at": "2026-11-17T12:00:10.000Z",
+      "payload": {
+        "last_message": "Both scouts reported; the map is in notes.md."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 4,
+      "now": "2026-11-17T10:00:11.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "subagents": 0,
+        "pending_tools": 2
+      }
+    },
+    {
+      "after": 4,
+      "now": "2026-11-17T10:40:00.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "silent": false,
+        "subagents": 0
+      },
+      "why": "forty minutes of quiet while the agent waits on its subagent calls is no silence"
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T11:40:00.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "silent": false,
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T12:00:01.000Z",
+      "expect": {
+        "activity": "working",
+        "silent": false,
+        "subagents": 0,
+        "pending_tools": 0
+      }
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T12:00:10.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "silent": false,
+        "subagents": 0
+      }
+    }
+  ]
+}
