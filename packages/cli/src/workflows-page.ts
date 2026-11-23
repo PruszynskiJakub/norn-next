@@ -13,7 +13,7 @@ export const WORKFLOWS_MARKERS: MarkerPair = {
 };
 
 // prefixed, so a step named after a Mermaid keyword (`end`, `graph`) never breaks the graph
-const nodeId = (step: string): string => (step === "$done" ? "DONE" : step === "$stuck" ? "STUCK" : `s_${step.replace(/[^A-Za-z0-9_]/g, "_")}`);
+export const nodeId = (step: string): string => (step === "$done" ? "DONE" : step === "$stuck" ? "STUCK" : `s_${step.replace(/[^A-Za-z0-9_]/g, "_")}`);
 const groupId = (shared: string): string => `u_${shared.replace(/[^A-Za-z0-9_]/g, "_")}`;
 const text = (s: string): string => s.replace(/"/g, "#quot;");
 

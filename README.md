@@ -23,6 +23,18 @@ You give a story to a coding agent and switch to something else. Forty minutes l
 
 norn is a small kernel and plugins. Where stories come from (GitHub issues, or markdown files on your machine), where changes are reviewed (GitHub pull requests, or plain git), where run data lives, which agent tool works (Claude Code, pi) and where it runs (headless, or a Herdr pane) are each a plugin you pick in the config; `norn init` picks them for you.
 
+## Try this
+
+Once norn is [installed](#install), see a whole story go through in a few minutes, for free and offline:
+
+```sh
+norn lab
+```
+
+`norn lab` builds a throwaway repo under your temp directory, with its own norn home, a toy app and a stand-in agent, so no real agent runs and nothing of yours is touched. A story plays through the `quick` workflow in eight beats: taken in, a failing check, a question for you, a review loop, a dead agent retried, a pull request, a gate you reject and approve, and a merge. It prints the URL of a dashboard on localhost (it opens no browser): the workflow graph with the live step lit, each decision in plain words, the receipts in the order they were written, what needs you, the story's documents and the agent's session. Its buttons run the real commands (`norn story answer`, `norn story approve`, the git merge) and show each one. `norn lab --clean` or the Reset button starts it again from beat 1; `--port <n>` picks the port.
+
+![norn lab playing its eight beats](docs/assets/norn-lab.gif)
+
 ## Is norn for you?
 
 **A good fit today:** one person, Claude Code or pi, a test suite you trust, and stories big enough to plan. GitHub works out of the box; a repository with no code host works too, with the local tracker and no forge. Several stories can run in parallel on one machine, started by you (manual mode) or by norn (auto mode).

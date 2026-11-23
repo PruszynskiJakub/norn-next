@@ -27,7 +27,7 @@ packages/schema           @norn/schema           JSON Schemas (TypeBox) + types 
 packages/plugin-api       @norn/plugin-api       the plugin contract: defineNornPlugin, the slots, HostContext, PluginResult, harness events, story keys, the plugin API version
 packages/kernel           @norn/kernel           pure: workflow loader and counters, the model (facts, actions, receipts, run state), decide, the journal's write rules, the session reducer and classifier, the brief
 packages/runtime          @norn/runtime          the host: tick (lock, gather facts, decide, act, trace), slot resolution, the launcher (executor = harness + runner), hook ingest and event log, inputs and skills in worktrees, detached checks, the open-pr, await-checks and await-merge step kinds
-packages/host-node        @norn/host-node        the HostContext over Bun and node: atomic file writes, exec with a bound, detached processes
+packages/host-node        @norn/host-node        the HostContext over Bun and node: atomic file writes, exec with a bound, detached processes; beside it, `serveHttp`, the loopback HTTP server the lab dashboard is served by
 packages/vcs-git          @norn/vcs-git          the vcs slot over git (worktrees, merge, push, refs) and the update-branch, integrate, push and verify-base step kinds
 packages/tracker-local    @norn/tracker-local    a tracker over one markdown file per item
 packages/plugin-github    @norn/plugin-github    a tracker over issues and a forge over pull requests, through gh

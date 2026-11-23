@@ -19,7 +19,7 @@ const LAB_EXECUTOR_LINE = "# the stand-in agent; set this line to {harness: clau
 /** Who the lab's first commit is by. */
 const SEEDER = { name: "norn lab", email: "lab@norn.invalid" };
 const BASE = "main";
-const CHILD_TIMEOUT_MS = 120_000;
+export const CHILD_TIMEOUT_MS = 120_000;
 const CLEAN = "norn lab --clean";
 
 export interface LabView {
@@ -51,7 +51,7 @@ export interface LabRun {
 }
 
 /** The env every child of the lab runs with: the lab's norn home, and no launch env of a session above it. */
-function labEnv(paths: LabPaths): Record<string, string> {
+export function labEnv(paths: LabPaths): Record<string, string> {
   return { NORN_HOME_DIR: paths.home, HERDR_ENV: "", [RUN_ENV.unit]: "", [RUN_ENV.run]: "", [WRITES_ENV]: "" };
 }
 
@@ -84,7 +84,7 @@ async function build(lab: LabRun, script: LabScript): Promise<void> {
 }
 
 /** The executor init wrote, as the block YAML renders it. */
-const EXECUTOR_BLOCK = "executors:\n  lab:\n    harness: lab\n    runner: headless\n";
+export const EXECUTOR_BLOCK = "executors:\n  lab:\n    harness: lab\n    runner: headless\n";
 
 /**
  * The lab's executor as one line of its config, with a comment saying how to swap the stand-in for a
@@ -118,7 +118,7 @@ async function storyState(lab: LabRun): Promise<{ key: string | null; unit: LabU
  */
 export async function openLab(lab: LabRun, opts: { clean: boolean }): Promise<LabView> {
   const script = labScript();
-  const { root, repo, remote, home } = lab.paths;
+  const { root, repo } = lab.paths;
   const exists = !opts.clean && (await lab.host.files.read(`${repo}/.git/HEAD`)) !== null;
   if (exists) await writeAgentBeats(lab);
   else {
@@ -127,14 +127,17 @@ export async function openLab(lab: LabRun, opts: { clean: boolean }): Promise<La
     await build(lab, script);
   }
   const { key, unit } = await storyState(lab);
+  return placeInBeat(lab.paths, !exists, key, unit);
+}
+
+/** The lab as its story's state places it in its beat: the view `norn lab` prints and the dashboard shows. */
+export function placeInBeat(paths: LabPaths, built: boolean, key: string | null, unit: LabUnit | null): LabView {
+  const script = labScript();
   const beat: LabBeatScript = beatOf(script, unit);
   const said = (text: string) => (key === null ? text : forStory(text, key));
   return {
-    root,
-    repo,
-    remote,
-    home,
-    built: !exists,
+    ...paths,
+    built,
     story: key,
     beat: { n: beat.n, of: script.beats.length, title: beat.title, caption: said(beat.caption), look: said(beat.look) },
     waiting: unit?.waiting ?? null,

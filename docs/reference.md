@@ -689,13 +689,14 @@ norn skill list
 
 ##### `norn lab`
 
-Build or resume a throwaway lab repo where a stand-in agent plays a story in eight beats
+Build or resume a throwaway lab repo where a stand-in agent plays a story in eight beats, and serve its dashboard
 
 ```sh
-norn lab [--clean]
+norn lab [--clean] [--port <n>]
 ```
 
 - `--clean`: remove the lab and build it again, from beat 1
+- `--port <n>`: serve the dashboard on this port of localhost (default: a free one); refused when it is taken
 
 #### Background: run by a person, cron or a terminal multiplexer
 
