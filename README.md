@@ -100,6 +100,7 @@ norn status    # in another terminal: every story, what needs you first
 |---|---|
 | [Concepts](docs/concepts.md) | how norn works: the kernel and its plugins, stories, units, workflows, steps, gates, modes, one tick, the agent's worktree, config, and the glossary |
 | [Reference](docs/reference.md) | every command, flag and config key, the workflows the bundled pack ships, and the exit codes |
+| [Workflows](docs/workflows.md) | every workflow the bundled pack ships, drawn as a graph: its steps, outcomes, limits and gates |
 | [Recipes](docs/recipes.md) | what to do when an agent asks or dies, a gate waits, you want your own workflow or plugin, or you run without GitHub |
 | [Limitations](docs/limitations.md) | what is not built, not proven in real use, or out of scope by design |
 | [Contributing](CONTRIBUTING.md) | how norn is built with norn, and how to propose a change |

@@ -10,7 +10,7 @@ bun run test        # the unit tier, in seconds: your loop after each change; a 
 bun run test:integration  # the integration tier (packages/*/test/integration/), 6 workers: CI runs it in shards, never a local check
 bun run typecheck   # tsc --noEmit over every package and scripts/
 bun run schema:emit # regenerate packages/schema/json/*.schema.json after changing a schema
-bun run docs:emit   # regenerate docs/reference.md's generated block after changing a command, flag, config key or the pack's workflows
+bun run docs:emit   # regenerate the generated blocks of docs/reference.md and docs/workflows.md after changing a command, flag, config key or the pack's workflows
 bun run build       # dist/npm/: one bundled norn.js + package.json; build:bin [<target>…] builds the binaries
 bun run golden -- --update  # behaviour change: re-decide every golden case, rewrite only its decisions
 bun run golden      # add the golden cases the scenarios in packages/kernel/scripts/golden/ produce
@@ -78,7 +78,7 @@ The unit tier (`bun run test`) and the type check must pass before you hand work
 - the docs lint in `test/repo/docs.test.ts` (doc set in `test/support/docs.ts`);
 - the repo's skills in `test/repo/process.test.ts`.
 
-The docs lint fails on a rules file coming back, a link or anchor that does not resolve, a `norn` command or flag the CLI does not have, a version named outside the README badge and the changelog, and a handoff tracked in the repo outside a spec folder's `handoffs/`. A test also fails if the emitted JSON schemas or the generated block of `docs/reference.md` (`packages/cli/test/unit/reference.test.ts`) are stale.
+The docs lint fails on a rules file coming back, a link or anchor that does not resolve, a `norn` command or flag the CLI does not have, a version named outside the README badge and the changelog, and a handoff tracked in the repo outside a spec folder's `handoffs/`. A test also fails if the emitted JSON schemas or the generated blocks of `docs/reference.md` (`packages/cli/test/unit/reference.test.ts`) and `docs/workflows.md` (`packages/cli/test/unit/workflows-page.test.ts`) are stale.
 
 CI (`.github/workflows/ci.yml`) runs the unit tier and the type check on every PR. Once they pass, it runs the integration tier in four shards, and builds the npm package and a binary and checks both with `scripts/smoke.sh`. The release run tests only the unit tier and the type check, since the release PR's CI ran every tier.
 
