@@ -14,7 +14,11 @@ base: main
 kernel:
   # a new story starts in triage unless its issue names a workflow (label norn:wf:<name>)
   workflow: triage
+# a unit worktree installs once, and again only when a lockfile or manifest changes, so no check reinstalls
+setup:
+  command: bun install --frozen-lockfile
+  inputs: [bun.lock, package.json, "packages/*/package.json"]
 # the pack's test checks run the unit tier and the type check; the integration tier runs in CI, which
 # the PR's checks step waits for
 checks:
-  test: bun install --frozen-lockfile && bun run test && bun run typecheck
+  test: bun run test && bun run typecheck

@@ -122,7 +122,7 @@ function loadAll(): { repo: Record<string, Written>; pack: Record<string, Writte
 describe("this repo's workflows, as norn loads them", () => {
   const { repo, pack } = loadAll();
   const steps = (wf: string) => (repo[wf] as Written).steps;
-  const UNIT_ONLY = "bun install --frozen-lockfile && bun run test && bun run typecheck";
+  const UNIT_ONLY = "bun run test && bun run typecheck";
 
   test("the team config names triage as the default workflow", () => {
     const config = parse(readFileSync(join(REPO, REPO_COMMITTED_FILE), "utf8")) as { kernel?: { workflow?: string } };
@@ -142,8 +142,10 @@ describe("this repo's workflows, as norn loads them", () => {
   });
 
   test("the test checks of quick, story and slice run the team config's checks.test, the unit tier then the type check, in 15m; the integration tier runs only in CI", () => {
-    const config = parse(readFileSync(join(REPO, REPO_COMMITTED_FILE), "utf8")) as { checks?: Record<string, string> };
+    const config = parse(readFileSync(join(REPO, REPO_COMMITTED_FILE), "utf8")) as { checks?: Record<string, string>; setup?: { command?: string; inputs?: string[] } };
     expect(config.checks?.test).toBe(UNIT_ONLY);
+    // the install lives in setup, so a check never reinstalls and a lockfile or manifest change installs again
+    expect(config.setup).toEqual({ command: "bun install --frozen-lockfile", inputs: ["bun.lock", "package.json", "packages/*/package.json"] });
     const delivery = ["quick", "story", "slice"];
     const checks = delivery.flatMap((wf) => ["check", "test"].filter((s) => steps(wf)[s]).map((s) => ({ wf, s, check: steps(wf)[s]?.check, timeout: steps(wf)[s]?.timeout })));
     expect(checks.map(({ wf, s }) => `${wf}.${s}`)).toEqual(["quick.check", "quick.test", "story.check", "story.test", "slice.check"]);
