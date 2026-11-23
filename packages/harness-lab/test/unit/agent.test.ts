@@ -21,9 +21,9 @@ const BEATS: LabBeat[] = [
 ];
 
 /** A norn and a git that answer as the real ones do, the brief naming `visit`. */
-function world(visit: LabVisit | null, brief: { code?: number; stdout?: string; unit?: string; retry?: true } = {}, hook: (name: string, input: string) => string = () => "") {
+function world(visit: LabVisit | null, brief: { code?: number; stdout?: string; unit?: string; retry?: true } = {}, hook: (name: string, input: string) => string = () => "", staged = true) {
   const exec = scriptedExec((argv, opts) => {
-    if (argv[0] === "git") return {};
+    if (argv[0] === "git") return argv[1] === "diff" ? { code: staged ? 1 : 0 } : {};
     const args = argv.slice(NORN.length);
     if (args[0] === "hook") return { stdout: hook(args[2] as string, opts.input ?? "") };
     if (args[0] === "brief") return brief.code !== undefined ? brief : { stdout: JSON.stringify({ unit: brief.unit ?? "lt-1", run_id: RUN, markdown: "# norn brief", ...visit, ...(brief.retry && { retry: true }) }) };
@@ -64,6 +64,7 @@ describe("the lab agent plays its beat over the host it is given", () => {
       `hook ${LAB_HARNESS} tool-done {"id":"t3","ok":true}`,
       `hook ${LAB_HARNESS} tool {"id":"t4","kind":"shell","tool":"Bash","detail":"git commit -m \\"greet\\""}`,
       "git add -A",
+      "git diff --cached --quiet",
       `git -c user.name=${LAB_AUTHOR.name} -c user.email=${LAB_AUTHOR.email} commit -q -m greet`,
       `hook ${LAB_HARNESS} tool-done {"id":"t4","ok":true}`,
       `hook ${LAB_HARNESS} tool {"id":"t5","kind":"shell","tool":"Bash","detail":"norn done done"}`,
@@ -91,6 +92,7 @@ describe("the lab agent plays its beat over the host it is given", () => {
     expect(lines.filter((l) => !l.startsWith("hook "))).toEqual([
       "norn brief --json",
       "git add -A",
+      "git diff --cached --quiet",
       `git -c user.name=${LAB_AUTHOR.name} -c user.email=${LAB_AUTHOR.email} commit -q -m greet the world`,
       "norn done done --json",
     ]);
@@ -116,6 +118,12 @@ describe("the lab agent plays its beat over the host it is given", () => {
     expect(await runLabAgent(w.host, beats, run())).toEqual({ session: `lab-${RUN}`, visit, report: { verb: "done", outcome: "done" }, exit: 0 });
     expect(trail(w.exec.calls)[0]).toBe(`hook ${LAB_HARNESS} start {"session_id":"lab-${RUN}"}`);
     expect(await w.files.read(`${CWD}/pr.md`)).toBe("## Summary\n");
+  });
+
+  test("a retry whose work a killed session already committed makes no commit and reports done, as an agent finding its work done goes on", async () => {
+    const w = world({ ...VISIT, attempt: 2 }, { retry: true }, () => "", false);
+    expect(await runLabAgent(w.host, BEATS, run())).toEqual({ session: `lab-${RUN}`, visit: { ...VISIT, attempt: 2 }, report: { verb: "done", outcome: "done" }, exit: 0 });
+    expect(trail(w.exec.calls).filter((l) => !l.startsWith("hook "))).toEqual(["norn brief --json", "git add -A", "git diff --cached --quiet", "norn done done --json"]);
   });
 
   test("a visit the beat script has no beat for reports stuck, naming it", async () => {

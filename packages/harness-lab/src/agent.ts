@@ -172,6 +172,9 @@ export async function runLabAgent(host: HostContext, beats: readonly LabBeat[], 
       const committed = await tool("shell", `git commit -m ${JSON.stringify(message)}`, async () => {
         const added = await exec(["git", "add", "-A"]);
         if (added.code !== 0) return added;
+        // a session killed after its commit leaves the work in place: its retry finds nothing staged and goes on
+        const staged = await exec(["git", "diff", "--cached", "--quiet"]);
+        if (staged.code === 0) return staged;
         return exec(["git", "-c", `user.name=${LAB_AUTHOR.name}`, "-c", `user.email=${LAB_AUTHOR.email}`, "commit", "-q", "-m", message]);
       });
       if (committed.code !== 0) return `could not commit: ${committed.stderr.trim() || committed.stdout.trim()}`;

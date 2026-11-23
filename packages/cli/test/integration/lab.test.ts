@@ -647,14 +647,17 @@ const alive = (pid: number): boolean => {
 /**
  * Holds every `git commit` an agent's run makes (its env names the run) while `hold` exists, saying so
  * in `held`: the stand-in agent commits its work through git on PATH, so its step is still running
- * when the kill switch is pressed, and the lab's own commits and ticks never wait.
+ * when the kill switch is pressed, and the lab's own commits and ticks never wait. Every exec child
+ * leads its own process group, so killing the agent's group leaves a held git running: it exits once
+ * its agent is gone (it is reparented), as a real agent's tool dies with it, and never commits behind
+ * the retry.
  */
 function holdCommits(l: Lab): { hold: string; held: string } {
   const hold = join(l.dir, "hold-commits");
   const held = join(l.dir, "commit-held");
   const git = Bun.which("git");
   if (git === null) throw new Error("no git on PATH");
-  writeFileSync(join(l.dir, "bin", "git"), `#!/bin/sh\nfor a in "$@"; do if [ "$a" = commit ] && [ -n "$${RUN_ENV.run}" ] && [ -e '${hold}' ]; then : > '${held}'; while [ -e '${hold}' ]; do sleep 0.2; done; fi; done\nexec '${git}' "$@"\n`);
+  writeFileSync(join(l.dir, "bin", "git"), `#!/bin/sh\nfor a in "$@"; do if [ "$a" = commit ] && [ -n "$${RUN_ENV.run}" ] && [ -e '${hold}' ]; then : > '${held}'; while [ -e '${hold}' ]; do [ "$(ps -o ppid= -p $$ | tr -d ' ')" = "$PPID" ] || exit 137; sleep 0.2; done; fi; done\nexec '${git}' "$@"\n`);
   chmodSync(join(l.dir, "bin", "git"), 0o755);
   return { hold, held };
 }
