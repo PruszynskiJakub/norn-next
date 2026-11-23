@@ -1,0 +1,28 @@
+(pass) norn lab plays its story through eight beats > AC1: norn lab builds a git repo with the toy app and its test, a bare remote and its own norn home, set up for the lab, with a quick story [3.00ms]
+(pass) norn lab plays its story through eight beats > AC2: beat 1 takes the story in, with its branch, its worktree and its claim
+(pass) norn lab plays its story through eight beats > AC3: beat 2 fails the check on a wrong greeting and loops back to implement, the check counter at 1
+(pass) norn lab plays its story through eight beats > AC4: beat 3 parks on implement's question as needs-you; after norn story answer, implement goes on
+(pass) norn lab plays its story through eight beats > AC5: beat 4's review returns changes_requested with findings, implement reworks, and review then approves [2.00ms]
+(pass) norn lab plays its story through eight beats > AC6: beat 5's agent dies mid-describe; a later tick retries it, and the fresh session finishes the step
+(pass) norn lab plays its story through eight beats > AC7: beat 6 opens the pull request on forge none
+(pass) norn lab plays its story through eight beats > AC8: beat 7's ready gate waits as needs-you; a reject with a reason sends it back once, and approve passes it
+(pass) norn lab plays its story through eight beats > AC9: beat 8 ends the story done after a git merge of its branch, and releases its claim
+(pass) norn lab plays its story through eight beats > AC10: no real harness is launched and no network tool is run: every agent run is the stand-in
+(pass) norn lab plays its story through eight beats > AC11: the person's own norn home and their repo beside the lab are left as they were [4.00ms]
+(pass) norn lab plays its story through eight beats > AC12: a second norn lab mid-story resumes at the beat the story's state shows, building nothing
+(pass) norn lab, side by side and again > AC11, AC12, AC13: two labs under different TMPDIRs share nothing; --clean starts one again from beat 1; one executor line swaps the stand-in for a real agent [58426.45ms]
+(pass) norn lab serves its dashboard > AC1, AC2, AC8, AC9, AC10: the dashboard is served on 127.0.0.1, a taken port is refused, each button runs its real command in the lab, Reset rebuilds it, and nothing beyond the lab changes [252219.95ms]
+(pass) norn lab --tty plays the tour in the terminal > AC1, AC2, AC3: Enter at each pause plays the eight beats to done with their captions; each decision prints its exact command, Enter runs it, and one run in another shell moves the tour on without it [211121.63ms]
+(fail) norn lab's break-it switches > AC1–AC7: each switch on the dashboard produces the state it names, answers with the command it ran and the way out, and changes nothing beyond the lab [275562.13ms]
+(fail) norn lab's break-it switches > AC1–AC7: each switch on the dashboard produces the state it names, answers with the command it ran and the way out, and changes nothing beyond the lab [275562.13ms]
+612 |     throw new Error(`the dashboard never showed ${what}; last: ${JSON.stringify(last?.lab)} ${JSON.stringify(last?.needs_you)}\n${said.join("")}`);
+                    ^
+error: the dashboard never showed the question; last: {"root":"/tmp/norn-lab-F4XigX/tmp/norn-lab","repo":"/tmp/norn-lab-F4XigX/tmp/norn-lab/repo","remote":"/tmp/norn-lab-F4XigX/tmp/norn-lab/remote.git","home":"/tmp/norn-lab-F4XigX/tmp/norn-lab/home","built":false,"story":"lt-1","beat":{"n":8,"of":8,"title":"You merge, and the story ends","caption":"Past the gate, the story waits for its change to merge. Merge it with git: forge none sees the story's branch in the base, the story ends `done`, and its claim is released.","look":"`norn status --json`: the unit's `ended`, and the story's `claim`, which is null"},"waiting":{"for":"person","text":"ended stuck: the beat for implement #1 could not commit: On branch norn/lt-1\nYour branch is ahead of 'origin/main' by 1 commit.\n  (use \"git push\" to publish your local commits)\n\nnothing to commit, working tree clean","next":"norn run rerun lt-1"},"ended":"stuck","next":null} [{"unit":"lt-1","for":"person","text":"ended stuck: the beat for implement #1 could not commit: On branch norn/lt-1\nYour branch is ahead of 'origin/main' by 1 commit.\n  (use \"git push\" to publish your local commits)\n\nnothing to commit, working tree clean","next":"norn run rerun lt-1"}]
+# norn lab
+
+Built a new lab in /tmp/norn-lab-F4XigX/tmp/norn-lab.
+
+- repo: /tmp/norn-lab-F4XigX/tmp/norn-lab/repo
+- remote: /tmp/norn-lab-F4XigX/tmp/norn-lab/remote.git, standing in for a code host
+- norn home: /tmp/norn-lab-F4XigX/tmp/norn-lab/home, the lab's own
+
