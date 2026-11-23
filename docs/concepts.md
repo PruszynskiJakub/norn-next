@@ -22,7 +22,7 @@ norn is a small **kernel** (the workflow model, decide, the journal's write rule
 | vcs | branches and worktrees | `git` |
 | harness | the agent tool | `claude` (Claude Code), `pi` |
 | runner | where an agent process runs | `headless` (a detached process), `herdr` (a Herdr pane) |
-| step kinds | workflow steps beyond `agent`, `check`, `gate` and `slices` | `update-branch`, `integrate`, `push`, `verify-base`, `open-pr`, `await-checks`, `await-merge` |
+| step kinds | workflow steps beyond an agent role, `shell` and `person` | `vcs.update-branch`, `vcs.integrate`, `vcs.push`, `vcs.verify-base`, `forge.open-pr`, `forge.await-checks`, `forge.await-merge` |
 | pack | workflows and skills shipped together | `sdlc` |
 
 A workflow's agent step names a **role** (`by: builder`), which the pack registers with what its agent is for and the capabilities it may be granted. An **executor** is a harness and a model, under a name: `claude` on `opus`, say, or `pi`. Each machine binds roles, or one workflow's step, to executors with `bind:` (a list is tried in order), and the step's `attended:` picks the **runner** from `runners:`: one with presence (`herdr`) when a person stays beside the agent, `headless` otherwise. Whether an executor can run a step (configured, with presence for a person, a harness that can refuse a tool for a docs-only step) is a fact decide reads, so a step no executor can hold parks before any agent starts ([Reference › Executors and runners](reference.md#executors-and-runners)). The bundled plugins ship in the binary; `norn plugin add <spec>` installs another (an npm spec, a git URL or a local path), and `norn plugin list` shows each plugin and what it provides.
@@ -73,7 +73,7 @@ review:
   do: "Review this slice's diff against its acceptance criteria and the spec."
   with: { skills: [norn-review] }
   outcomes:
-    approve: integrate
+    approve: { exit: reviewed }
     changes_requested: { to: implement, produces: [findings] }
 ```
 
@@ -94,11 +94,10 @@ ready:
     reject:  { exit: rejected }
   on:
     vcs.stale:    { exit: stale }
-    vcs.unpushed: open-pr
-    norn.timeout: { after: 48h, to: remind }
+    vcs.unpushed: { exit: unpushed }
 ```
 
-A signal is named by its namespace as a step kind is. When `vcs.stale` fires is set once for the whole workflow, under `signals:` (`signals: { vcs.stale: { when: conflict, verify: test } }`), and `entries:` names the step `norn story update-branch` re-enters (`entries: { update-branch: update }`); the older form writes both as `base: { stale, verify, step }`.
+A signal is named by its namespace as a step kind is. When `vcs.stale` fires is set once for the whole workflow, under `signals:` (`signals: { vcs.stale: { when: conflict, verify: test } }`), and `entries:` names the step `norn story update-branch` re-enters (`entries: { update-branch: base-update }`); the older form writes both as `base: { stale, verify, step }`.
 
 - **Only waiting steps.** `on:` sits on a person step or a wait step kind (`forge.await-checks`, `forge.await-merge`). A running agent or check is never moved by a signal, and `on:` on one is refused when the workflow loads.
 - **Only declared signals.** The host reports `vcs.stale` and `vcs.unpushed` (from the vcs) and `norn.timeout` (from the clock) itself; a plugin may declare more. A name no source declares is refused, and so is one under both `outcomes:` and `on:`.
@@ -151,7 +150,7 @@ Each unit works in its own git worktree, made by the vcs plugin in the machine d
 - **Setup.** The config's `setup.command` readies the worktree, such as installing its dependencies ([Reference › Worktree setup](reference.md#worktree-setup)). norn runs it once in a new worktree, and again before an agent or a check runs there when the command or a file its `setup.inputs` names changed since it last succeeded. A step waits while it runs and spends no retry. A setup that fails parks the unit for a person, with the command, how it exited and its log; `norn run rerun <unit>` tries it again. What it last did is kept in the machine dir, never in the worktree.
 - **Sources.** A workflow may name places its steps read that are neither norn's nor the code, such as design assets, under `sources:`; each machine binds one in its config (`sources.<name>`) unless the workflow gives it a path in the repo. The brief names where each is; a step that needs one nothing binds waits for a person ([Reference › Sources](reference.md#sources)).
 - **Produced files.** A file a step declares under `produces:` is written by its agent in the spec folder. norn reads it back with the spec and the handoff when the agent reports, and writes it into the worktree of a later step that lists its name, so a slice in its own worktree gets it too.
-- **Hooks.** The harness wires norn's hooks into the tool's local settings in that worktree (`.claude/settings.local.json` for Claude Code, an extension for pi). They feed norn the agent's events, keep it from ending a turn without a report, and refuse a file write outside the worktree or into norn's run state; on a `writes: docs` step, also one in the worktree outside the story's spec folder and the run folder's `out/`, with a reason telling the agent to hand back findings instead. The step's rule comes from the run's record; a docs-only run is also launched with `NORN_WRITES=docs`, which the hooks hold when the record cannot be read, so they never fall back to the worktree rule. They judge the agent tool's file writes (Claude Code's `Write`, `Edit`, `MultiEdit`, `NotebookEdit`; pi's `write`, `edit`), following a link to where a write really lands. A shell command is never judged, so `echo x > src/a.ts` or a formatter run from the shell gets through on any step: `writes: docs` keeps a review from editing code by mistake, not an agent set on it; the review skill asks the same of the agent in words.
+- **Hooks.** The harness wires norn's hooks into the tool's local settings in that worktree (`.claude/settings.local.json` for Claude Code, an extension for pi). They feed norn the agent's events, keep it from ending a turn without a report, and refuse a file write outside the worktree or into norn's run state; on a step that may change no code (`code:read`, as a `reviewer` is granted), also one in the worktree outside the story's spec folder and the run folder's `out/`, with a reason telling the agent to hand back findings instead. The step's rule comes from the run's record; a docs-only run is also launched with `NORN_WRITES=docs`, which the hooks hold when the record cannot be read, so they never fall back to the worktree rule. They judge the agent tool's file writes (Claude Code's `Write`, `Edit`, `MultiEdit`, `NotebookEdit`; pi's `write`, `edit`), following a link to where a write really lands. A shell command is never judged, so `echo x > src/a.ts` or a formatter run from the shell gets through on any step: `writes: docs` keeps a review from editing code by mistake, not an agent set on it; the review skill asks the same of the agent in words.
 
 The branch, and the PR, hold only the code.
 

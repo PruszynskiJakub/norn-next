@@ -48,6 +48,10 @@ describe("reference render", () => {
     expect(fresh).toMatch(/^`evidence\.publish` keeps an agent QA report's evidence on `refs\/norn\/evidence\/<story>`.*as visible as the repo.*`false` keeps nothing.*forge-none never publishes.*\(#evidence\)/m);
   });
 
+  test("the kernel.mode key says why init writes auto with the headless runner while the default is manual, and how to start in manual", () => {
+    expect(fresh).toMatch(/^`kernel\.mode` is `"manual"` when no file sets it.*`norn init` writes `"auto"` with the headless runner.*`"manual"` with Herdr.*costs? money.*`norn config set kernel\.mode manual`/m);
+  });
+
   test("every kernel knob has a default, and every default names a key the schema has", () => {
     const keys = new Set(configKeys().rows.map((r) => r.key));
     for (const k of Object.keys(KernelKnobs.properties).filter((k) => k !== "counters")) expect(KEY_DEFAULTS, k).toHaveProperty([`kernel.${k}`]);

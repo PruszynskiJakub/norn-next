@@ -38,3 +38,20 @@ describe("repo skills", () => {
     expect(skills.filter((s) => s.startsWith("norn") && !bundled.has(s))).toEqual([]);
   });
 });
+
+describe("the agent guide's docs rule", () => {
+  const agents = readFileSync(join(ROOT, "AGENTS.md"), "utf8");
+  const start = agents.indexOf("\n## Rules\n");
+  const end = agents.indexOf("\n## ", start + 1);
+  const rules = start < 0 ? "" : agents.slice(start, end < 0 ? undefined : end);
+
+  test("AGENTS.md's Rules hold the docs rule: a change a person or agent can notice updates its doc in the same PR, and the PR names the docs it touched or why none", () => {
+    const rule = rules.split("\n").find((line) => line.startsWith("- **Docs.**")) ?? "";
+    expect({
+      present: rule !== "",
+      noticeable: /a person or (an )?agent can notice/.test(rule),
+      samePr: /in the same (pull request|PR)/.test(rule),
+      named: /which docs it touched,? or why none/.test(rule),
+    }).toEqual({ present: true, noticeable: true, samePr: true, named: true });
+  });
+});
