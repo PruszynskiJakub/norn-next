@@ -32,12 +32,13 @@ describe("norn lab --port", () => {
     expect(r.value).toMatchObject({ code: "port_taken", details: { port: 8737 }, error: expect.stringContaining("8737") });
   });
 
-  test("a port that is not one, and --port with --json, are usage errors", async () => {
+  test("a port that is not one, --port with --json, and --port with --tty, are usage errors", async () => {
     const m = machine({ env: { TMPDIR: "/tmp/t" } });
     m.io.serve = () => {
       throw new Error("nothing is served for a usage error");
     };
     for (const p of ["0", "70000", "http"]) expect((await runCli(["lab", "--port", p], m.io)).exit).toBe(2);
     expect((await runCli(["lab", "--port", "8737", "--json"], m.io)).exit).toBe(2);
+    expect((await runCli(["lab", "--port", "8737", "--tty"], m.io)).exit).toBe(2);
   });
 });

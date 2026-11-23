@@ -1,8 +1,10 @@
 # The norn lab's script: one story through `quick`, in eight beats. Each beat says what norn did and
 # where to look. `when` places a story in a beat from its state alone (`norn status --json`): the
 # lab is at the highest beat whose `when` holds, with `steps` the unit's step, `counters` a counter
-# it has spent, and `ended` a unit that ended. `act` is the next command when nothing waits on the
-# person; `{key}` is the story's key.
+# it has spent, and `ended` a unit that ended. The top `act` is the next command when nothing waits on the
+# person; `you` is the person's own command at the beat, the first whose match holds (`for` what the
+# unit waits on, `steps` its step, `unspent` a counter it has not spent), which `norn lab --tty`
+# prints and runs on Enter; `{key}` is the story's key.
 workflow: quick
 check: sh test.sh
 story:
@@ -34,6 +36,8 @@ beats:
       the next tick resumes the same agent session with it, and implement goes on.
     look: "`norn status --json`: the unit's `waiting`, for an answer, with the command that gives it"
     when: { counters: [check.fail] }
+    you:
+      - { for: answer, run: 'norn story answer {key} "Keep the comma."' }
   - n: 4
     title: Review asks for changes, then approves
     caption: >-
@@ -63,6 +67,9 @@ beats:
       implement as its rework, and the story comes back to the gate. Then approve it.
     look: "`norn status --json`: the unit's `waiting`, for the gate; `land.rejected` in its `counters` after a reject"
     when: { steps: [ready], counters: [land.rejected] }
+    you:
+      - { for: gate, unspent: land.rejected, run: 'norn story reject {key} --reason "Name the greeting in the README too."' }
+      - { for: gate, run: "norn story approve {key}" }
   - n: 8
     title: You merge, and the story ends
     caption: >-
@@ -70,4 +77,5 @@ beats:
       story's branch in the base, the story ends `done`, and its claim is released.
     look: "`norn status --json`: the unit's `ended`, and the story's `claim`, which is null"
     when: { steps: [merge], ended: true }
-    act: git merge --no-ff --no-edit norn/{key} && git push -q origin main
+    you:
+      - { steps: [merge], run: "git merge --no-ff --no-edit norn/{key} && git push -q origin main" }

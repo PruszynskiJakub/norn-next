@@ -4,6 +4,7 @@
  * signals, exit). Everything else runs in `runCli`, in-process and testable.
  */
 import { homedir } from "node:os";
+import { createInterface } from "node:readline";
 import { createNodeHost, nodeAncestry, nodeExec, serveHttp } from "@norn/host-node";
 import { runCli } from "./cli.ts";
 import { importFromPluginsDir } from "./plugins/installed.ts";
@@ -53,6 +54,7 @@ const result = await runCli(process.argv.slice(2), {
   stdin: () => Bun.stdin.text(),
   signal: controller.signal,
   log: (line) => process.stderr.write(`${line}\n`),
+  lines: () => createInterface({ input: process.stdin, terminal: false }),
   terminal,
   serve: serveHttp,
   self,

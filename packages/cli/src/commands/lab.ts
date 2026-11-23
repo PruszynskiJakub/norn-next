@@ -1,22 +1,25 @@
 /**
- * `norn lab [--clean] [--port <n>]`: a throwaway norn repo under the temp directory where the lab's
- * stand-in agent plays a story through its eight beats. It builds the lab, or resumes the one there,
- * then serves the lab's dashboard on localhost and ticks the lab until a signal stops it: the page
- * shows the story live and its buttons run the person's real commands. It prints the page's URL and
- * opens no browser. With `--json` it prints where the lab is and its beat as one JSON value, and
- * serves nothing, as a JSON answer is one value and ends.
+ * `norn lab [--clean] [--port <n>] [--tty]`: a throwaway norn repo under the temp directory where the
+ * lab's stand-in agent plays a story through its eight beats. It builds the lab, or resumes the one
+ * there, then serves the lab's dashboard on localhost and ticks the lab until a signal stops it: the
+ * page shows the story live and its buttons run the person's real commands. It prints the page's URL
+ * and opens no browser. With `--json` it prints where the lab is and its beat as one JSON value, and
+ * serves nothing, as a JSON answer is one value and ends. `--tty` plays the tour in the terminal
+ * instead, its lines on stderr as they happen, and prints the lab as its story ended.
  */
 import { tmpdir } from "node:os";
 import { defineCommand, opt } from "../command.ts";
 import type { CliContext } from "../context.ts";
 import { runLabCommand } from "../lab/act.ts";
 import { buttonCommand, dashboardState, labHandler, type LabActionName } from "../lab/dashboard.ts";
-import { CHILD_TIMEOUT_MS, labEnv, labMarkdown, type LabRun, type LabView, openLab } from "../lab/lab.ts";
+import { CHILD_TIMEOUT_MS, labEnv, labMarkdown, type LabRun, type LabView, openLab, playLab } from "../lab/lab.ts";
 import { LAB_PAGE } from "../lab/page.ts";
 import { labPaths } from "../lab/paths.ts";
 import { readLab } from "../lab/read.ts";
 import { labMerge, labScript } from "../lab/script.ts";
+import { lineInput } from "../lab/tty.ts";
 import { failure, refuse, rendered, usageError } from "../output.ts";
+import { pause } from "./watch.ts";
 
 /** How long the lab waits between its ticks while the dashboard is served. */
 export const LAB_TICK_MS = 2000;
@@ -27,20 +30,6 @@ function portOf(text: string | undefined): number {
   const n = /^\d+$/.test(text) ? Number(text) : Number.NaN;
   if (!Number.isInteger(n) || n < 1 || n > MAX_PORT) throw usageError(`--port takes a port from 1 to ${MAX_PORT}, not ${JSON.stringify(text)}`, "norn lab --port 8737, or leave --port out for a free one", "usage");
   return n;
-}
-
-/** Resolves after `ms`, or as soon as the signal aborts. */
-function pause(ms: number, signal: AbortSignal | undefined): Promise<void> {
-  return new Promise((resolve) => {
-    if (signal?.aborted) return resolve();
-    const done = () => {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", done);
-      resolve();
-    };
-    const timer = setTimeout(done, ms);
-    signal?.addEventListener("abort", done, { once: true });
-  });
 }
 
 /**
@@ -76,11 +65,12 @@ async function tickLab(ctx: CliContext, lab: LabRun, serial: ReturnType<typeof o
 export const labCommand = defineCommand({
   name: "lab",
   summary: "Build or resume a throwaway lab repo where a stand-in agent plays a story in eight beats, and serve its dashboard",
-  usage: "norn lab [--clean] [--port <n>]",
-  options: { clean: { type: "boolean" }, port: { type: "string" } },
+  usage: "norn lab [--clean] [--port <n>] [--tty]",
+  options: { clean: { type: "boolean" }, port: { type: "string" }, tty: { type: "boolean" } },
   optionHelp: {
     "--clean": "remove the lab and build it again, from beat 1",
     "--port <n>": "serve the dashboard on this port of localhost (default: a free one); refused when it is taken",
+    "--tty": "play the tour in the terminal instead of serving the dashboard: pause at each beat with its caption, and at each decision of yours print its exact command, which Enter runs or you run in another shell",
   },
   async run(ctx, args) {
     const paths = labPaths(ctx.env.TMPDIR?.trim() || tmpdir());
@@ -88,6 +78,11 @@ export const labCommand = defineCommand({
     const lab: LabRun = { host, paths, self: ctx.io.self };
     const clean = opt.bool(args, "clean");
     const portText = opt.str(args, "port");
+    if (opt.bool(args, "tty")) {
+      if (portText !== undefined) throw usageError("--port serves the dashboard, and --tty plays the tour in the terminal instead", "norn lab --port <n>, or norn lab --tty");
+      const view = await playLab(lab, { clean }, { say: (line) => ctx.io.log?.(line), input: lineInput(ctx.io.lines?.()), sleep: (ms) => (ctx.io.sleep ?? pause)(ms, ctx.io.signal), signal: ctx.io.signal });
+      return rendered(view, labMarkdown(view));
+    }
     if (args.json) {
       if (portText !== undefined) throw usageError("--port serves the dashboard, and --json serves nothing", "norn lab --port <n>, or norn lab --json");
       const view = await openLab(lab, { clean });

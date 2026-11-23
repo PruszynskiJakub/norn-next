@@ -42,7 +42,7 @@ export const WAKE_SETTLE_MS = 250;
 type Sleep = (ms: number, signal?: AbortSignal) => Promise<void>;
 
 /** Resolves after `ms`, or as soon as the signal aborts, so a stop never waits out the interval. */
-function pause(ms: number, signal: AbortSignal | undefined): Promise<void> {
+export function pause(ms: number, signal: AbortSignal | undefined): Promise<void> {
   return new Promise((resolve) => {
     if (signal?.aborted) return resolve();
     const done = () => {

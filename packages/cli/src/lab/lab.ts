@@ -12,6 +12,7 @@ import { configPaths } from "../config/paths.ts";
 import { refuse } from "../output.ts";
 import { labAgentBeatsFile, type LabPaths } from "./paths.ts";
 import { beatOf, forStory, labAgentBeats, type LabBeatScript, type LabScript, labScript, LabUnit, nextCommand } from "./script.ts";
+import { type LabState, type LineInput, playTour, shellWord } from "./tty.ts";
 
 /** The one config line that names the lab's agent, and the comment above it on how to swap it. */
 const LAB_EXECUTOR_LINE = "# the stand-in agent; set this line to {harness: claude, runner: headless} (or runner: herdr) for a real one\n  lab: { harness: lab, runner: headless }";
@@ -130,6 +131,41 @@ export async function openLab(lab: LabRun, opts: { clean: boolean }): Promise<La
   return placeInBeat(lab.paths, !exists, key, unit);
 }
 
+export interface TtyIo {
+  /** where the tour's lines go, as they happen */
+  say(line: string): void;
+  input: LineInput;
+  sleep(ms: number): Promise<void>;
+  signal?: AbortSignal;
+}
+
+/**
+ * Open the lab and play its tour in the terminal (`tty.ts`) to the story's end, or until the signal
+ * stops it. The person's commands the lab runs on Enter run in a shell as printed, with `norn` this
+ * same build, so the command the person reads is the one that ran.
+ */
+export async function playLab(lab: LabRun, opts: { clean: boolean }, io: TtyIo): Promise<LabView> {
+  const script = labScript();
+  const start = await openLab(lab, opts);
+  io.say(labWhere(start).join("\n"));
+  const shell = `norn() { ${lab.self.map(shellWord).join(" ")} "$@"; }`;
+  const end: LabState = await playTour(
+    script,
+    lab.paths,
+    {
+      ...io,
+      state: () => storyState(lab),
+      tick: async () => void (await norn(lab, "tick the lab's story", ["tick"])),
+      run: async (command) => {
+        const r = await lab.host.exec(["sh", "-c", `${shell}\n${command}`], { cwd: lab.paths.repo, env: labEnv(lab.paths), timeoutMs: CHILD_TIMEOUT_MS });
+        return { code: r.code, output: `${r.stdout}${r.stderr}` };
+      },
+    },
+    start.built || start.story === null ? 0 : start.beat.n - 1,
+  );
+  return placeInBeat(lab.paths, start.built, end.key, end.unit);
+}
+
 /** The lab as its story's state places it in its beat: the view `norn lab` prints and the dashboard shows. */
 export function placeInBeat(paths: LabPaths, built: boolean, key: string | null, unit: LabUnit | null): LabView {
   const script = labScript();
@@ -146,8 +182,9 @@ export function placeInBeat(paths: LabPaths, built: boolean, key: string | null,
   };
 }
 
-export function labMarkdown(v: LabView): string {
-  const lines = [
+/** Where the lab is, and how a person runs norn in it. */
+function labWhere(v: LabView): string[] {
+  return [
     "# norn lab",
     "",
     v.built ? `Built a new lab in ${v.root}.` : `Resumed the lab in ${v.root}.`,
@@ -161,6 +198,12 @@ export function labMarkdown(v: LabView): string {
     `    cd ${v.repo}`,
     `    export NORN_HOME_DIR=${v.home}`,
     "",
+  ];
+}
+
+export function labMarkdown(v: LabView): string {
+  const lines = [
+    ...labWhere(v),
     `## Beat ${v.beat.n} of ${v.beat.of}: ${v.beat.title}`,
     "",
     v.beat.caption,

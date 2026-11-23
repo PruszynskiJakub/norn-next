@@ -12,6 +12,12 @@ import { parse } from "yaml";
 const Text = Type.String({ minLength: 1 });
 const Names = Type.Array(Text, { minItems: 1 });
 
+/** A person's command at a beat, and when it is theirs: what the unit waits on, its step, a counter it has not spent. */
+const YouAct = Type.Object(
+  { for: Type.Optional(Text), steps: Type.Optional(Names), unspent: Type.Optional(Text), run: Text },
+  { additionalProperties: false },
+);
+
 export const LabBeatScript = Type.Object(
   {
     n: Type.Integer({ minimum: 1 }),
@@ -22,8 +28,8 @@ export const LabBeatScript = Type.Object(
     look: Text,
     /** the story's state that places it in this beat: its step, a counter it spent, or its end */
     when: Type.Object({ steps: Type.Optional(Names), counters: Type.Optional(Names), ended: Type.Optional(Type.Boolean()) }, { additionalProperties: false }),
-    /** the next command while nothing waits on the person; the script's `act` otherwise */
-    act: Type.Optional(Text),
+    /** the person's own commands at this beat; the first whose match the unit meets is theirs to run */
+    you: Type.Optional(Type.Array(YouAct, { minItems: 1 })),
   },
   { additionalProperties: false },
 );
@@ -59,36 +65,48 @@ export const LabUnit = Type.Object({
   ended: Type.Optional(Text),
   waiting: Type.Union([Type.Object({ for: Text, text: Type.String(), next: Type.Optional(Text) }), Type.Null()]),
   counters: Type.Record(Text, Type.Object({ value: Type.Integer(), max: Type.Integer() })),
+  /** receipts not yet applied: a person's decision the next tick takes in */
+  pending_receipts: Type.Optional(Type.Integer({ minimum: 0 })),
 });
 export type LabUnit = Static<typeof LabUnit>;
 
 /** The highest beat whose `when` the unit's state meets; the first beat before a unit exists. */
+const spent = (unit: LabUnit, c: string): boolean => (unit.counters[c]?.value ?? 0) > 0;
+
 export function beatOf(script: LabScript, unit: LabUnit | null): LabBeatScript {
   const first = script.beats[0] as LabBeatScript;
   if (unit === null) return first;
-  const spent = (c: string): boolean => (unit.counters[c]?.value ?? 0) > 0;
   const meets = ({ when }: LabBeatScript): boolean =>
-    (when.ended === true && unit.ended !== undefined) || (unit.step !== null && (when.steps ?? []).includes(unit.step)) || (when.counters ?? []).some(spent);
+    (when.ended === true && unit.ended !== undefined) || (unit.step !== null && (when.steps ?? []).includes(unit.step)) || (when.counters ?? []).some((c) => spent(unit, c));
   return [...script.beats].sort((a, b) => b.n - a.n).find(meets) ?? first;
 }
 
 /** The script's text for one story: `{key}` is its key. */
 export const forStory = (text: string, key: string): string => text.replaceAll("{key}", key);
 
+/** The person's own command at the unit's beat, as the script says it; null when nothing there is theirs, or once it ended. */
+export function personCommand(beat: LabBeatScript, unit: LabUnit, key: string): string | null {
+  if (unit.ended !== undefined) return null;
+  const holds = (y: NonNullable<LabBeatScript["you"]>[number]): boolean =>
+    (y.for === undefined || unit.waiting?.for === y.for) && (y.steps === undefined || (unit.step !== null && y.steps.includes(unit.step))) && (y.unspent === undefined || !spent(unit, y.unspent));
+  const you = beat.you?.find(holds);
+  return you === undefined ? null : forStory(you.run, key);
+}
+
 /**
- * The command that moves the story on: what it waits on the person for, else the beat's act (the
- * script's, a tick, when the beat has none); null once it ended.
+ * The command that moves the story on: what it waits on the person for, else the person's own
+ * command at the beat, else the script's act (a tick); null once it ended.
  */
 export function nextCommand(script: LabScript, beat: LabBeatScript, key: string | null, unit: LabUnit | null): string | null {
   if (unit?.ended !== undefined) return null;
   if (unit?.waiting?.next !== undefined) return unit.waiting.next;
-  return key === null ? script.act : forStory(beat.act ?? script.act, key);
+  return (key !== null && unit !== null ? personCommand(beat, unit, key) : null) ?? script.act;
 }
 
-/** The git merge a person runs to land the story's branch: the last beat's act, for one story. */
+/** The git merge a person runs to land the story's branch: the last beat's own command, for one story. */
 export function labMerge(script: LabScript, key: string): string {
-  const act = script.beats.at(-1)?.act;
-  // the pack's own script: a last beat with no act is a broken build, never a person's mistake
-  if (act === undefined) throw new Error("the lab's last beat names no merge");
-  return forStory(act, key);
+  const run = script.beats.at(-1)?.you?.at(-1)?.run;
+  // the pack's own script: a last beat with no command of the person's is a broken build, never a person's mistake
+  if (run === undefined) throw new Error("the lab's last beat names no merge");
+  return forStory(run, key);
 }

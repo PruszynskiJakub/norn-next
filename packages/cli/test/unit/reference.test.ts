@@ -74,12 +74,13 @@ describe("reference render", () => {
     expect(headings).toEqual(["hook", "lab-agent"]);
   });
 
-  test("norn lab is among a person's commands, with --clean", () => {
+  test("norn lab is among a person's commands, with --clean and --tty", () => {
     const section = fresh.slice(fresh.indexOf("#### A person's commands"));
     const own = section.slice(0, section.indexOf("\n#### ", 1));
     expect(own).toContain("##### `norn lab`");
-    expect(own).toContain("norn lab [--clean]");
+    expect(own).toContain("norn lab [--clean] [--port <n>] [--tty]");
     expect(own).toContain("- `--clean`: remove the lab and build it again, from beat 1");
+    expect(own).toContain("- `--tty`: play the tour in the terminal");
   });
 
   test("the catalog commands are listed among a person's commands, workflow show with its --mermaid flag", () => {
