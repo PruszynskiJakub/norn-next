@@ -78,7 +78,7 @@ describe("reference render", () => {
     const section = fresh.slice(fresh.indexOf("#### A person's commands"));
     const own = section.slice(0, section.indexOf("\n#### ", 1));
     expect(own).toContain("##### `norn lab`");
-    expect(own).toContain("norn lab [--clean] [--tty]");
+    expect(own).toContain("norn lab [--clean] [--port <n>] [--tty]");
     expect(own).toContain("- `--clean`: remove the lab and build it again, from beat 1");
     expect(own).toContain("- `--tty`: play the tour in the terminal");
   });

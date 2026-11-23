@@ -1,0 +1,313 @@
+/**
+ * The lab's dashboard, pure: what its page shows, built from what was read of the lab, and the
+ * request handler that serves the page, its state and the person's buttons. Reading the lab and
+ * running a button's command are the caller's (`read.ts`, `act.ts`), so this module never touches a
+ * file or a process, and every route is a function of what it is handed.
+ */
+import type { LoadedWorkflow } from "@norn/kernel";
+import { parseJson } from "@norn/plugin-api";
+import { shellQuote } from "@norn/runtime";
+import { Type } from "@sinclair/typebox";
+import { ruleCaption } from "../captions.ts";
+import { toFailure } from "../output.ts";
+import { STANDING } from "../tick-report.ts";
+import type { StoryView } from "../views.ts";
+import { nodeId, workflowMermaid } from "../workflows-page.ts";
+import type { LabView } from "./lab.ts";
+
+/** One receipt as the store keeps it: its place in the unit's record and what it says. */
+export interface LabReceipt {
+  seq: number;
+  at: string;
+  data: unknown;
+}
+
+/** One action a tick's trace carries, as the dashboard reads it. */
+export interface LabTraceOutcome {
+  decision: { rule: string; kind: string; unit?: string | null };
+  ok: boolean;
+  error?: string;
+}
+
+export interface LabTrace {
+  tick_id: string;
+  at: string;
+  outcomes: LabTraceOutcome[];
+}
+
+/** Everything read of the lab for one look at it. */
+export interface LabSources {
+  view: LabView;
+  /** the workflow the lab's story plays, as the runtime loads it */
+  workflow: { name: string; loaded: LoadedWorkflow };
+  /** the lab's story as `norn status` shows it, once it exists */
+  story: StoryView | null;
+  /** the record of the story's own unit: its receipts and its committed state */
+  record: { receipts: LabReceipt[]; state: { version: number; data: unknown } | null } | null;
+  /** the tick traces, any order */
+  traces: LabTrace[];
+  /** the story's documents: spec, handoffs, pull request body */
+  docs: { path: string; text: string }[];
+  /** the newest agent run of the story's unit, with what its session wrote */
+  session: { run: string; executor: string; log: string } | null;
+}
+
+export interface LabDecision {
+  tick: string;
+  at: string;
+  /** the unit or story it is about, `-` for neither */
+  unit: string;
+  rule: string;
+  kind: string;
+  caption: string;
+  ok: boolean;
+}
+
+export interface LabReceiptLine {
+  /** null for the state commit, which has no place among the receipts */
+  seq: number | null;
+  at: string | null;
+  kind: string;
+  /** the step, outcome or run it names, said in a few words */
+  what: string;
+  /** the effect this receipt is written before, when it records one */
+  before: string | null;
+}
+
+export interface LabNeed {
+  unit: string;
+  for: string;
+  text: string;
+  next: string | null;
+}
+
+export interface LabActionView {
+  name: LabActionName;
+  label: string;
+  /** the command it runs, as a person types it; `<reason>` and `<answer>` stand for what they type */
+  command: string;
+  /** what the person types before pressing it */
+  input: "reason" | "answer" | null;
+}
+
+export interface LabState {
+  lab: LabView;
+  graph: { workflow: string; mermaid: string; live: string | null; steps: string[] };
+  decisions: LabDecision[];
+  receipts: { unit: string | null; entries: LabReceiptLine[] };
+  needs_you: LabNeed[];
+  docs: { path: string; text: string }[];
+  session: { run: string; executor: string; log: string } | null;
+  actions: LabActionView[];
+}
+
+/** How many decisions the panel keeps, newest last. */
+export const DECISIONS_SHOWN = 40;
+
+/** The effect each receipt is the record of, written first so a crash between the two is seen. */
+const BEFORE: Readonly<Record<string, string>> = {
+  "run.started": "the run is launched",
+  "run.checking": "the run's processes are stopped and its changes compared",
+  "run.resumed": "the session is resumed",
+  "answer.sent": "the answer is typed into the session",
+  "nudge.sent": "the nudge is typed into the session",
+  "stop.sent": "the run is stopped",
+  "branch.update": "the branch is updated",
+  "run.requested": "the run is started",
+};
+
+function receiptLine(r: LabReceipt): LabReceiptLine {
+  const d = (r.data ?? {}) as Record<string, unknown>;
+  const kind = typeof d.kind === "string" ? d.kind : "unknown";
+  const said = ["step", "outcome", "verb", "run_kind", "executor", "reason"].flatMap((k) => (typeof d[k] === "string" ? [`${k} ${d[k]}`] : []));
+  return { seq: r.seq, at: r.at, kind, what: said.join(", "), before: BEFORE[kind] ?? null };
+}
+
+/** The receipts in the order written, then the state committed after them all, the record's commit point. */
+function receiptLines(record: LabSources["record"]): LabReceiptLine[] {
+  if (record === null) return [];
+  const lines = [...record.receipts].sort((a, b) => a.seq - b.seq).map(receiptLine);
+  const state = record.state;
+  if (state !== null) {
+    const d = (state.data ?? {}) as { step?: unknown; applied_through?: unknown };
+    const said = [`version ${state.version}`, ...(typeof d.step === "string" ? [`step ${d.step}`] : []), ...(typeof d.applied_through === "number" ? [`receipts 1–${d.applied_through} applied`] : [])];
+    lines.push({ seq: null, at: null, kind: "state.committed", what: said.join(", "), before: null });
+  }
+  return lines;
+}
+
+function decisions(traces: readonly LabTrace[]): LabDecision[] {
+  const sorted = [...traces].sort((a, b) => (a.tick_id < b.tick_id ? -1 : a.tick_id > b.tick_id ? 1 : 0));
+  const out = sorted.flatMap((t) =>
+    t.outcomes
+      // a tick of only waiting asks again for what it asked before: the panel shows what moved
+      .filter((o) => !(o.ok && STANDING.has(o.decision.kind)))
+      .map((o) => ({
+        tick: t.tick_id,
+        at: t.at,
+        unit: o.decision.unit ?? "-",
+        rule: o.decision.rule,
+        kind: o.decision.kind,
+        caption: ruleCaption(o.decision.rule) ?? o.decision.rule,
+        ok: o.ok,
+      })),
+  );
+  return out.slice(-DECISIONS_SHOWN);
+}
+
+/** What waits for the person, unit by unit, as `norn status` lists it under Needs you. */
+function needs(story: StoryView | null): LabNeed[] {
+  if (story === null) return [];
+  const out: LabNeed[] = [];
+  if (story.unsynced?.waiting) out.push({ unit: story.key, for: "person", text: `run data unsynced: ${story.unsynced.text}`, next: story.unsynced.next });
+  for (const u of story.units) if (u.waiting !== null) out.push({ unit: u.id, for: u.waiting.for, text: u.waiting.text, next: u.waiting.next ?? null });
+  return out;
+}
+
+/** The workflow's graph with the live step lit. */
+function graph(w: LabSources["workflow"], live: string | null): LabState["graph"] {
+  const lines = [workflowMermaid(w.loaded)];
+  if (live !== null && w.loaded.graph.steps[live] !== undefined) lines.push("  classDef live fill:#86efac,stroke:#15803d,stroke-width:4px,color:#052e16", `  class ${nodeId(live)} live`);
+  return { workflow: w.name, mermaid: lines.join("\n"), live, steps: Object.keys(w.loaded.graph.steps) };
+}
+
+export const LAB_ACTION_NAMES = ["approve", "reject", "answer", "rerun", "merge", "round", "reset"] as const;
+export type LabActionName = (typeof LAB_ACTION_NAMES)[number];
+
+/** What a button runs: a norn command (run on the lab's own build), a shell line, or the lab's own reset. */
+export type LabCommand = { kind: "norn"; args: string[] } | { kind: "shell"; line: string } | { kind: "reset" };
+
+const PLACEHOLDER = { reason: "<reason>", answer: "<answer>" } as const;
+
+interface ActionSpec {
+  label: string;
+  input: "reason" | "answer" | null;
+  command(c: { key: string; workflow: string; merge: string }, typed: string): LabCommand;
+}
+
+/** The person's buttons: each runs the real command a person types, and nothing else. */
+const ACTIONS: Readonly<Record<LabActionName, ActionSpec>> = {
+  approve: { label: "Approve the gate", input: null, command: ({ key }) => ({ kind: "norn", args: ["story", "approve", key] }) },
+  reject: { label: "Reject the gate", input: "reason", command: ({ key }, reason) => ({ kind: "norn", args: ["story", "reject", key, "--reason", reason] }) },
+  answer: { label: "Answer the question", input: "answer", command: ({ key }, answer) => ({ kind: "norn", args: ["story", "answer", key, answer] }) },
+  rerun: { label: "Rerun the unit", input: null, command: ({ key }) => ({ kind: "norn", args: ["run", "rerun", key] }) },
+  merge: { label: "Merge with git", input: null, command: ({ merge }) => ({ kind: "shell", line: merge }) },
+  round: { label: "Start a new round", input: null, command: ({ key, workflow }) => ({ kind: "norn", args: ["story", "round", key, "--workflow", workflow] }) },
+  reset: { label: "Reset the lab", input: null, command: () => ({ kind: "reset" }) },
+};
+
+export const LAB_RESET_COMMAND = "norn lab --clean";
+
+/** The command as a person reads it. */
+export function commandText(c: LabCommand): string {
+  if (c.kind === "norn") return `norn ${shellQuote(c.args)}`;
+  if (c.kind === "shell") return c.line;
+  return LAB_RESET_COMMAND;
+}
+
+export interface LabActionContext {
+  key: string;
+  workflow: string;
+  /** the git merge a person runs to land the story's branch */
+  merge: string;
+}
+
+/**
+ * The command `name` runs for what the person typed; null when it needs the lab's story and there is
+ * none yet (`c` null), or needs input they left empty. Reset needs neither.
+ */
+export function buttonCommand(name: LabActionName, c: LabActionContext | null, typed: string | undefined): LabCommand | null {
+  const spec = ACTIONS[name];
+  if (name === "reset") return { kind: "reset" };
+  const text = typed?.trim() ?? "";
+  if (c === null || (spec.input !== null && text === "")) return null;
+  return spec.command(c, text);
+}
+
+function actionViews(c: LabActionContext | null): LabActionView[] {
+  return LAB_ACTION_NAMES.map((name) => {
+    const spec = ACTIONS[name];
+    const command = c === null ? (name === "reset" ? LAB_RESET_COMMAND : "(the lab has no story yet)") : commandText(spec.command(c, spec.input === null ? "" : PLACEHOLDER[spec.input]));
+    return { name, label: spec.label, command, input: spec.input };
+  });
+}
+
+/** What the page shows, from what was read of the lab. */
+export function dashboardState(s: LabSources, merge: (key: string) => string): LabState {
+  const unit = s.story?.units.find((u) => u.id === s.story?.key) ?? s.story?.units[0] ?? null;
+  const key = s.view.story;
+  return {
+    lab: s.view,
+    graph: graph(s.workflow, unit?.ended === undefined ? (unit?.step ?? null) : null),
+    decisions: decisions(s.traces),
+    receipts: { unit: key, entries: receiptLines(s.record) },
+    needs_you: needs(s.story),
+    docs: s.docs,
+    session: s.session,
+    actions: actionViews(key === null ? null : { key, workflow: s.workflow.name, merge: merge(key) }),
+  };
+}
+
+/** What a pressed button answers: the command it ran and how it went. */
+export interface LabActAnswer {
+  action: LabActionName;
+  command: string;
+  exit: number;
+  output: string;
+}
+
+export interface LabHandlerDeps {
+  /** the page itself */
+  page: string;
+  state(): Promise<LabState>;
+  /** runs the button's command; only a known name with the input it needs reaches it */
+  act(name: LabActionName, typed: string | undefined): Promise<LabActAnswer>;
+}
+
+const json = (value: unknown, status = 200): Response => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+const refusal = (status: number, error: string, do_instead: string | null, code: string): Response => json({ error, do_instead, code }, status);
+const isAction = (name: string): name is LabActionName => (LAB_ACTION_NAMES as readonly string[]).includes(name);
+
+/** A button's body: what the person typed, when it needs that. */
+const ActBody = Type.Object({ text: Type.Optional(Type.String()) });
+
+async function typedOf(req: Request): Promise<string | undefined> {
+  const text = await req.text();
+  if (text.trim() === "") return undefined;
+  const body = parseJson(ActBody, text, "the button's body");
+  return body.ok ? body.value.text : undefined;
+}
+
+/**
+ * The dashboard's routes: `GET /` the page, `GET /api/state` what it shows, `POST /api/act/<name>`
+ * a button, its body `{"text": ...}` when it needs what the person typed. Anything else is refused.
+ */
+export function labHandler(deps: LabHandlerDeps): (req: Request) => Promise<Response> {
+  return async (req) => {
+    const path = new URL(req.url).pathname;
+    try {
+      if (path === "/" || path === "/index.html") {
+        if (req.method !== "GET") return refusal(405, `${req.method} ${path} is not served`, `GET ${path}`, "method_not_allowed");
+        return new Response(deps.page, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+      }
+      if (path === "/api/state") {
+        if (req.method !== "GET") return refusal(405, `${req.method} ${path} is not served`, "GET /api/state", "method_not_allowed");
+        return json(await deps.state());
+      }
+      const act = /^\/api\/act\/([^/]+)$/.exec(path);
+      if (act !== null) {
+        const name = act[1] as string;
+        if (!isAction(name)) return refusal(404, `the lab has no button ${JSON.stringify(name)}`, `POST /api/act/<${LAB_ACTION_NAMES.join("|")}>`, "unknown_action");
+        if (req.method !== "POST") return refusal(405, `${req.method} ${path} is not served`, `POST ${path}`, "method_not_allowed");
+        const typed = await typedOf(req);
+        const input = ACTIONS[name].input;
+        if (input !== null && (typed?.trim() ?? "") === "") return refusal(400, `${name} needs the ${input} you type`, `POST ${path} with {"text": "<${input}>"}`, "input_missing");
+        return json(await deps.act(name, typed));
+      }
+      return refusal(404, `${path} is not part of the lab's dashboard`, "GET /", "not_found");
+    } catch (e) {
+      const f = toFailure(e);
+      return json(f.body, 500);
+    }
+  };
+}

@@ -689,14 +689,15 @@ norn skill list
 
 ##### `norn lab`
 
-Build or resume a throwaway lab repo where a stand-in agent plays a story in eight beats
+Build or resume a throwaway lab repo where a stand-in agent plays a story in eight beats, and serve its dashboard
 
 ```sh
-norn lab [--clean] [--tty]
+norn lab [--clean] [--port <n>] [--tty]
 ```
 
 - `--clean`: remove the lab and build it again, from beat 1
-- `--tty`: play the tour in the terminal: pause at each beat with its caption, and at each decision of yours print its exact command, which Enter runs or you run in another shell
+- `--port <n>`: serve the dashboard on this port of localhost (default: a free one); refused when it is taken
+- `--tty`: play the tour in the terminal instead of serving the dashboard: pause at each beat with its caption, and at each decision of yours print its exact command, which Enter runs or you run in another shell
 
 #### Background: run by a person, cron or a terminal multiplexer
 

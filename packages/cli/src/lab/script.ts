@@ -102,3 +102,11 @@ export function nextCommand(script: LabScript, beat: LabBeatScript, key: string 
   if (unit?.waiting?.next !== undefined) return unit.waiting.next;
   return (key !== null && unit !== null ? personCommand(beat, unit, key) : null) ?? script.act;
 }
+
+/** The git merge a person runs to land the story's branch: the last beat's own command, for one story. */
+export function labMerge(script: LabScript, key: string): string {
+  const run = script.beats.at(-1)?.you?.at(-1)?.run;
+  // the pack's own script: a last beat with no command of the person's is a broken build, never a person's mistake
+  if (run === undefined) throw new Error("the lab's last beat names no merge");
+  return forStory(run, key);
+}

@@ -20,7 +20,7 @@ const LAB_EXECUTOR_LINE = "# the stand-in agent; set this line to {harness: clau
 /** Who the lab's first commit is by. */
 const SEEDER = { name: "norn lab", email: "lab@norn.invalid" };
 const BASE = "main";
-const CHILD_TIMEOUT_MS = 120_000;
+export const CHILD_TIMEOUT_MS = 120_000;
 const CLEAN = "norn lab --clean";
 
 export interface LabView {
@@ -52,7 +52,7 @@ export interface LabRun {
 }
 
 /** The env every child of the lab runs with: the lab's norn home, and no launch env of a session above it. */
-function labEnv(paths: LabPaths): Record<string, string> {
+export function labEnv(paths: LabPaths): Record<string, string> {
   return { NORN_HOME_DIR: paths.home, HERDR_ENV: "", [RUN_ENV.unit]: "", [RUN_ENV.run]: "", [WRITES_ENV]: "" };
 }
 
@@ -85,7 +85,7 @@ async function build(lab: LabRun, script: LabScript): Promise<void> {
 }
 
 /** The executor init wrote, as the block YAML renders it. */
-const EXECUTOR_BLOCK = "executors:\n  lab:\n    harness: lab\n    runner: headless\n";
+export const EXECUTOR_BLOCK = "executors:\n  lab:\n    harness: lab\n    runner: headless\n";
 
 /**
  * The lab's executor as one line of its config, with a comment saying how to swap the stand-in for a
@@ -127,7 +127,8 @@ export async function openLab(lab: LabRun, opts: { clean: boolean }): Promise<La
     await run(lab, "remove the old lab", ["rm", "-rf", root], "/");
     await build(lab, script);
   }
-  return viewOf(lab, script, await storyState(lab), !exists);
+  const { key, unit } = await storyState(lab);
+  return placeInBeat(lab.paths, !exists, key, unit);
 }
 
 export interface TtyIo {
@@ -148,7 +149,7 @@ export async function playLab(lab: LabRun, opts: { clean: boolean }, io: TtyIo):
   const start = await openLab(lab, opts);
   io.say(labWhere(start).join("\n"));
   const shell = `norn() { ${lab.self.map(shellWord).join(" ")} "$@"; }`;
-  const end = await playTour(
+  const end: LabState = await playTour(
     script,
     lab.paths,
     {
@@ -162,18 +163,16 @@ export async function playLab(lab: LabRun, opts: { clean: boolean }, io: TtyIo):
     },
     start.built || start.story === null ? 0 : start.beat.n - 1,
   );
-  return viewOf(lab, script, end, start.built);
+  return placeInBeat(lab.paths, start.built, end.key, end.unit);
 }
 
-function viewOf(lab: LabRun, script: LabScript, { key, unit }: LabState, built: boolean): LabView {
-  const { root, repo, remote, home } = lab.paths;
+/** The lab as its story's state places it in its beat: the view `norn lab` prints and the dashboard shows. */
+export function placeInBeat(paths: LabPaths, built: boolean, key: string | null, unit: LabUnit | null): LabView {
+  const script = labScript();
   const beat: LabBeatScript = beatOf(script, unit);
   const said = (text: string) => (key === null ? text : forStory(text, key));
   return {
-    root,
-    repo,
-    remote,
-    home,
+    ...paths,
     built,
     story: key,
     beat: { n: beat.n, of: script.beats.length, title: beat.title, caption: said(beat.caption), look: said(beat.look) },
