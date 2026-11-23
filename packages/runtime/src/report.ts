@@ -84,6 +84,8 @@ export interface BriefShown {
   workflow?: string;
   step?: string;
   attempt?: number;
+  /** the run is a fresh session that replaces one which ended without reporting */
+  retry?: true;
 }
 
 /** The receipt id a report id records under: deterministic, so a retry finds the first. */
@@ -140,7 +142,10 @@ export async function briefOf(env: RuntimeEnv, unit: string, runId?: string): Pr
   const brief = briefInputsOf(record, live, { skills: doc?.skills ?? [], inputs: doc?.inputs ?? [], ...(doc?.model !== undefined && { model: doc.model }) }, grant);
   const input = await renderInputFrom(env, record, brief, live.run.id);
   if (!input.ok) return refuse(`cannot brief ${unit}: ${input.failure.message}`, "tell the person: the unit's workflow does not load", input.failure.code);
-  return { ok: true, value: { unit, run_id: live.run.id, workflow: brief.workflow, step: brief.step, attempt: brief.attempt, markdown: renderBrief(input.value) } };
+  return {
+    ok: true,
+    value: { unit, run_id: live.run.id, workflow: brief.workflow, step: brief.step, attempt: brief.attempt, ...(input.value.retry !== undefined && { retry: true }), markdown: renderBrief(input.value) },
+  };
 }
 
 function eventOf(runId: string, req: ReportRequest): HarnessEvent {

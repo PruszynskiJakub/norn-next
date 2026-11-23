@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { packProblems, stepRoles } from "@norn/plugin-api";
 import { parse } from "yaml";
-import { packSdlcPlugin, SDLC_PACK } from "../../src/index.ts";
+import { packSdlcPlugin, SDLC_LAB, SDLC_PACK } from "../../src/index.ts";
 
 const ASSETS = join(import.meta.dir, "..", "..", "assets");
 
@@ -20,6 +20,9 @@ function packFiles(): Record<string, string> {
   for (const [f, text] of Object.entries(SDLC_PACK.workflows)) out[`workflows/${f}`] = text;
   for (const [f, text] of Object.entries(SDLC_PACK.shared)) out[`workflows/shared/${f}`] = text;
   for (const [skill, files] of Object.entries(SDLC_PACK.skills)) for (const [f, text] of Object.entries(files)) out[`skills/${skill}/${f}`] = text;
+  out["lab/script.yaml"] = SDLC_LAB.script;
+  out["lab/agent.yaml"] = SDLC_LAB.agent;
+  for (const [f, text] of Object.entries(SDLC_LAB.app)) out[`lab/app/${f}`] = text;
   return out;
 }
 

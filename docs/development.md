@@ -36,12 +36,12 @@ packages/store-local      @norn/store-local      a store in the machine dir (run
 packages/store-refs       @norn/store-refs       a store on git refs (refs/norn/v2/…) shared through the remote
 packages/harness-claude   @norn/harness-claude   the Claude Code harness: hooks in .claude/settings.local.json, launch, normalize, respond
 packages/harness-pi       @norn/harness-pi       the pi harness: an extension pi loads, launch, normalize, respond
-packages/harness-lab      @norn/harness-lab      the lab harness: a scripted stand-in agent (`runLabAgent`, run as `norn lab-agent`) playing a beat script, launch, normalize, respond
+packages/harness-lab      @norn/harness-lab      the lab harness: a scripted stand-in agent (`runLabAgent`, run as `norn lab-agent`) playing a beat script, launch, normalize, respond; it honours a denied tool call (`denyTool`), so docs-only steps run on it, and a resumed session or a retry (`retry` in `norn brief --json`) plays its beat's `resumed` work
 packages/runner-headless  @norn/runner-headless  agents as detached processes, output to a log
 packages/runner-herdr     @norn/runner-herdr     agents in Herdr panes, one workspace per story and one tab per run, closed by `close` (plugin API 1.17) once the run's unit is done with; `focus`, `split` and `label` (plugin API 1.18) bring a run's pane in front, open the cockpit below a person's pane and write a story workspace's `$norn` sidebar token
-packages/pack-sdlc        @norn/pack-sdlc        the sdlc pack: workflows, shared files and skills, imported as text
+packages/pack-sdlc        @norn/pack-sdlc        the sdlc pack: workflows, shared files and skills, imported as text; beside the pack, `SDLC_LAB`: the lab's beat script with its captions, the stand-in's beats and the toy app (`assets/lab/`), which only `norn lab` reads
 packages/conformance      @norn/conformance      contract suites (store, tracker, forge, signal source, harness), in-memory fakes, recorded-session replay
-packages/cli              @norn/cli              wiring + commands, the layered config, plugin install and lock, init and doctor; bin `norn` → src/main.ts
+packages/cli              @norn/cli              wiring + commands, the layered config, plugin install and lock, init and doctor, `norn lab` (`src/lab/`); bin `norn` → src/main.ts
 ```
 
 Dependencies point one way only: `schema ← plugin-api ← kernel ← runtime ← cli`. A plugin package reads only `schema` and `plugin-api` (`pack-sdlc` only `plugin-api`), so a third-party plugin needs nothing a bundled one does not; `conformance` adds `kernel`, since its harness suite replays through the kernel's reducer; `cli` wires them all. `test/repo/repo.test.ts` enforces this: every `@norn/*` import must be allowed **and** declared in the package's `package.json`. Bun's isolated linker also hides undeclared packages.

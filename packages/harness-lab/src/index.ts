@@ -14,11 +14,12 @@ export const LAB_BEATS_ENV = "NORN_LAB_BEATS";
 /**
  * A deterministic stand-in for a coding agent: it runs no model and makes no network call. It
  * resumes its session to take an answer, and the answer comes in its resumed prompt, which is the
- * one way norn adds to a headless agent's context; nothing else of a real agent's hooks is modelled.
+ * one way norn adds to a headless agent's context. A tool call its hook denies is never made, so a
+ * docs-only step's guard holds for it; nothing else of a real agent's hooks is modelled.
  */
 export const labHarness: Harness = Object.freeze({
   name: LAB_HARNESS,
-  capabilities: Object.freeze({ blockStop: false, denyTool: false, injectContext: true, subagents: false, limits: false, paneInput: false, promptMarks: true, resume: true }),
+  capabilities: Object.freeze({ blockStop: false, denyTool: true, injectContext: true, subagents: false, limits: false, paneInput: false, promptMarks: true, resume: true }),
   install,
   uninstall,
   launch,

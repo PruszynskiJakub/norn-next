@@ -657,6 +657,16 @@ A person's command: refused in an agent's session (`person_only`).
 norn workflow confirm <name>
 ```
 
+##### `norn lab`
+
+Build or resume a throwaway lab repo where a stand-in agent plays a story in eight beats
+
+```sh
+norn lab [--clean]
+```
+
+- `--clean`: remove the lab and build it again, from beat 1
+
 #### Background: run by a person, cron or a terminal multiplexer
 
 ##### `norn watch`

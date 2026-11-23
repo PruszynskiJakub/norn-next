@@ -69,6 +69,14 @@ describe("reference render", () => {
     expect(headings).toEqual(["hook", "lab-agent"]);
   });
 
+  test("norn lab is among a person's commands, with --clean", () => {
+    const section = fresh.slice(fresh.indexOf("#### A person's commands"));
+    const own = section.slice(0, section.indexOf("\n#### ", 1));
+    expect(own).toContain("##### `norn lab`");
+    expect(own).toContain("norn lab [--clean]");
+    expect(own).toContain("- `--clean`: remove the lab and build it again, from beat 1");
+  });
+
   test("the shipped workflows and every exit code with its meaning", () => {
     for (const text of Object.values(SDLC_PACK.workflows)) expect(fresh).toMatch(new RegExp(`^- \`${(parse(text) as { name: string }).name}\`: \\S`, "m"));
     for (const [k, v] of Object.entries(ExitCode)) expect(fresh).toMatch(new RegExp(`^\\| ${v} \\| \`${k}\` \\| \\S`, "m"));

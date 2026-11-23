@@ -3,7 +3,7 @@ import { type Decision, type DecisionOf, renderBrief } from "@norn/kernel";
 import { deriveUlid } from "@norn/schema";
 import { layout } from "@norn/store-local";
 import { fail, ok } from "@norn/plugin-api";
-import { act, type AgentRunRequest, appendEvents, briefRenderInput, EventLogSessionSource, gatherFacts, nudgePromptId, readStepRun } from "../../src/index.ts";
+import { act, type AgentRunRequest, appendEvents, briefOf, briefRenderInput, EventLogSessionSource, gatherFacts, nudgePromptId, readStepRun } from "../../src/index.ts";
 import { decided, decisionOf, type Harnessed, has, harness, MINUTE, record, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
 
 const kinds = async (h: ReturnType<typeof harness>, unit: string) => (await record(h, unit)).receipts.map((r) => r.data.kind);
@@ -82,6 +82,21 @@ describe("agent runs", () => {
     await tickUntil(h, has("agent.died.retry"));
     expect(h.launcher.calls.slice(-2).map((c) => c.op)).toEqual(["stop", "start"]);
     expect(h.launcher.of("stop").at(-1)).toEqual([old]);
+  });
+
+  test("the brief of a retry says it is one, so an agent tells a fresh session that replaces a dead one from a first", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const first = await briefOf(h.env, "lt-1");
+    expect(first.ok && first.value.retry).toBeUndefined();
+    h.sessions.byUnit.set("lt-1", session("ended"));
+    await tickUntil(h, has("agent.died.retry"));
+    const retried = await briefOf(h.env, "lt-1");
+    if (!retried.ok) throw new Error(retried.refusal.error);
+    expect(retried.value).toMatchObject({ step: first.ok ? first.value.step : "", attempt: 1, retry: true });
+    expect(retried.value.run_id).not.toBe(first.ok ? first.value.run_id : "");
   });
 
   test("a run past its deadline is stopped once, the order on the record", async () => {
