@@ -187,6 +187,8 @@ function renderConfig(): string[] {
     "",
     `Beside \`use\`, ${open.map((k) => `\`${k}\``).join(", ")} take the keys of the plugin they name; that plugin checks them.`,
     "",
+    `\`kernel.mode\` is \`${JSON.stringify(d.mode)}\` when no file sets it, so a config written by hand launches no agent until a person runs \`norn run start\`. \`norn init\` writes \`"auto"\` with the headless runner, where nobody watches a pane and an agent step should start on its own, and \`"manual"\` with Herdr, where a person starts each run beside it. Every agent run in auto mode costs money on the harness's account: to start in manual mode, run \`norn config set kernel.mode manual\` (or \`norn init --mode manual\`).`,
+    "",
     "`evidence.publish` keeps an agent QA report's evidence on `refs/norn/evidence/<story>` of the remote and links it from the pull request body, so it is as visible as the repo; `false` keeps nothing and pushes nothing, and forge-none never publishes ([Evidence](#evidence)).",
   ];
 }

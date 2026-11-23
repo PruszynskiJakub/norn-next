@@ -5,7 +5,7 @@ description: Writes a story's pull request body — the smallest picture of the 
 
 # PR body
 
-The reviewer reads the body before the diff and should be able to judge it in a minute. Without this skill a body lists files, restates the spec and grows to pages. Give the shape of the change, the proof it works, and what could go wrong when it merges, in that order, and nothing else.
+The reviewer reads the body before the diff and should be able to judge it in a minute. Without this skill a body lists files, restates the spec and grows to pages. Give the shape of the change, the proof it works, which docs kept up with it, and what could go wrong when it merges, in that order, and nothing else.
 
 Write for the branch as it is now. Each time the PR is opened or updated its body is replaced with this file, so when you rewrite an earlier body, start over from the current diff, and never edit the body on the remote (`gh pr edit`, `glab mr update`): the next update overwrites it.
 
@@ -35,6 +35,8 @@ Write the body as Markdown to the file you were told to write it to, in exactly 
 - **<what the user story says, in a few words>**
   **Before:** <what happened before, or "did not exist">
   **After:** <what was observed, as the evidence says it>
+
+**Docs:** <the repo's docs this change touched, or why none needed to change>
 
 ## Merge danger
 
@@ -77,6 +79,10 @@ One entry per user story, in spec order, each at most three lines, headed by wha
   Never write a URL, a commit sha, a local path or a record path for evidence, nor a name the report did not list as published. Evidence a report did not publish (it lists none, or the file is missing from its list) stays on the machine that ran QA: describe it in words. Beyond evidence, link only what a reviewer can open already, such as a CI run.
 - For a test, name it and show what it asserts in one line of pseudocode, and that it failed before and passes now. Do not paste the test's setup.
 - A criterion that was not shown, that only a person could judge, or that could not be checked: say so, and say how to check it. Never dress it up as passed. Gaps the review accepted go in one line after the entries.
+
+### Docs
+
+One line after the evidence entries: name the repo's docs the change updated (the README, a docs folder, a reference page, contributor docs, a skill or help text the repo ships), by path, each with a few words on what changed in it. When it touched none, say why: no behaviour a person or agent can notice changed (a refactor, tests only), or the docs already said it. A visible behaviour change with no docs and no reason is what a reviewer looks for here, so never leave the line out or write a bare `none`.
 
 ### Merge danger
 

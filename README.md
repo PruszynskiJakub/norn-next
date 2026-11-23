@@ -75,7 +75,9 @@ A plugin that does not ship with norn is one command: `norn plugin add <npm spec
 
 ## Run a first story
 
-On GitHub, an issue labelled `norn` and assigned to you is a story; with the local tracker, `norn story create` makes one:
+On GitHub, an issue labelled `norn` and assigned to you is a story; with the local tracker, `norn story create` makes one.
+
+Before you start `norn watch`: in auto mode, which `norn init` writes with the headless runner, each agent step launches an agent on its own, and every agent run costs money on your harness's account. To start in manual mode instead, where nothing launches until you say so, run `norn config set kernel.mode manual` first; then `norn status` shows each agent step waiting and `norn run start <unit>` starts it. `norn watch` runs the ticks for you, one after another, so a story moves on by itself until something waits for you; a hand `norn tick` moves it one small step and stops.
 
 ```sh
 gh issue create --label norn --assignee @me --title "Add CSV export of orders"

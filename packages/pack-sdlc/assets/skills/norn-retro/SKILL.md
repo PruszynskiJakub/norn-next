@@ -69,6 +69,7 @@ Go through every unit and every round. For each finding, keep the evidence as yo
 5. **Criteria a machine could not check.** `unverified` verdicts in a criteria report and their `reason`: a missing capability. `person` verdicts on criteria an agent could check given a tool, a seed script or a fixture.
 6. **Checks that failed for environment reasons**, not code: `exit` 126 or 127, a check stopped at its `timeout`, a service not running, a port in use, a missing secret or remote, or a flaky test that passed on the next run with no change in between. Read the check's output where it is still kept, and the text of the report that followed.
 7. **Review findings that recur.** The same point across slices' review reports (their `run.reported` findings or text, or the handoff where the reviewer wrote them), or found again after rework.
+8. **User docs that misled.** Where the repo's user docs (the README, a docs folder, a reference page, a command's help) sent a person or an agent the wrong way: an `ask` or a `stuck` whose text quotes or follows a doc that turned out wrong or stale, a person's `answer.sent` or `gate.decided` reason that corrects what a doc said, a run that tried a command, flag or key the docs named and the code no longer has. Name the doc and the passage.
 
 Rank the findings by what they cost: a person pulled in to unblock or redo work, then a rework loop, then a lost session, then a wait for an answer, then a manual check a machine could have made. A finding that recurs across slices outranks a one-off. Leave out what went smoothly.
 
@@ -91,6 +92,7 @@ For each finding, suggest ONE concrete change, small enough to review in a minut
 | a workflow, `.agents/workflows/<name>.yaml` | a missing check before review (lint, type check), a counter's `max`, a check's command or `timeout`, a step's `deadline`, `nudges` or `retries`, what an outcome hands back |
 | a workflow's `defaults:`, or the norn config | the limits (`deadline`, `nudges`, `retries`, `stalled`) for every step of a workflow; the executors a role or one step runs on (`bind:`), an executor's `model` or `args` under `executors`, and the runner for each attendance (`runners:`) in the person's config |
 | contributor docs: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, coding standards | a repo fact an agent asked for or got wrong; a judgement call review kept finding |
+| user docs: the README, the repo's docs folder, a reference page, a command's help text | where the docs misled a person or agent: the passage that was wrong, stale or missing, rewritten as it should read |
 | the spec template: `SKILL.md` and `EXAMPLE.md` of the refine skill, `norn-refine` | asks and rejects that trace back to a gap in how specs are written |
 
 Choose where the change belongs:
