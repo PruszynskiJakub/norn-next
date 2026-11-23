@@ -39,6 +39,8 @@ A criterion that passed as written but that a person may read differently stays 
 
 Write the reports to the run's out folder, `$NORN_OUT` (the brief names it, and where each report goes), unless told where: norn collects them from there when you report, and the folder is ignored by git, so QA files never reach the branch. Evidence goes in `$NORN_OUT/evidence/`, and a verdict's `evidence` names its file there.
 
+**Your evidence is published.** When you report, norn keeps every file in `$NORN_OUT/evidence/` on the repo's remote and links it from the pull request body, so everyone who can see the repo sees it: redact secrets in screenshots and logs before you report. A file still over 10 MB once compressed is not kept: `norn done` names it, and you shrink it and report again.
+
 - `$NORN_OUT/criteria.json`, the criteria report, one entry per criterion. Required: `evidence` for `pass`, `repro` for `fail`, `how` for `person`, `reason` and `how` for `unverified`; `evidence` and `note` (for a person) may go on any.
 
   ```json

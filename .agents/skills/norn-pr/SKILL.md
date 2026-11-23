@@ -70,7 +70,11 @@ Keep only the names a reviewer needs to place the change.
 One entry per user story, in spec order, each at most three lines, headed by what the story says in a few words, never by a number. A spec without user stories (an issue mirrored as it was filed) gets one entry per point of its Wanted section, headed the same way.
 
 - What was observed beats a test name. For a visible change, say what the before and after screens show.
-- Quote what the evidence shows (the output line, the response, what the page showed) rather than linking it. The evidence files QA wrote stay on the machine that ran QA, outside the repo, and norn keeps no copy, so never link an evidence file by a local path, a record path or a branch URL. Link only what a reviewer can open already, such as a CI run.
+- Quote what the evidence shows (the output line, the response, what the page showed). The `record` input lists, under each criteria report, the evidence files it published, by the name QA wrote. Cite only those, and only by that name, which norn turns into a link a reviewer can open when it opens the PR:
+  - a published screenshot inline: `![<what it shows>](evidence:<name>)`, e.g. `![the help page after the change](evidence:AC2.png)`;
+  - any other published file as a link: `[<what it holds>](evidence:<name>)`, e.g. `[the full output](evidence:AC1.md)`.
+
+  Never write a URL, a commit sha, a local path or a record path for evidence, nor a name the report did not list as published. Evidence a report did not publish (it lists none, or the file is missing from its list) stays on the machine that ran QA: describe it in words. Beyond evidence, link only what a reviewer can open already, such as a CI run.
 - For a test, name it and show what it asserts in one line of pseudocode, and that it failed before and passes now. Do not paste the test's setup.
 - A criterion that was not shown, that only a person could judge, or that could not be checked: say so, and say how to check it. Never dress it up as passed. Gaps the review accepted go in one line after the entries.
 
