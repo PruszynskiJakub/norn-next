@@ -1,0 +1,11 @@
+// usage: bun hashes.ts <tree root>; prints each bundled pack workflow's pinned hash, loaded as the cli loads it
+const root = process.argv[2];
+const { BUNDLED_PLUGINS } = await import(`${root}/packages/cli/src/plugins/bundled.ts`);
+const rt = await import(`${root}/packages/runtime/src/index.ts`);
+const { DEFAULT_KERNEL_CONFIG } = await import(`${root}/packages/kernel/src/index.ts`);
+const packs = BUNDLED_PLUGINS.flatMap((p: any) => Object.values(p.provides.packs ?? {}).flat());
+const pack: any = packs[0];
+const kinds = rt.collectStepKinds(BUNDLED_PLUGINS);
+const signals = rt.collectSignals(BUNDLED_PLUGINS);
+const loads = rt.loadPackWorkflows(pack, kinds.value, DEFAULT_KERNEL_CONFIG, rt.signalDeclarations(signals.value));
+for (const [n, l] of Object.entries<any>(loads.value ?? loads)) console.log(n.padEnd(11), l.ok ? l.workflow.graph.hash : `NOT OK ${JSON.stringify(l.errors).slice(0,200)}`);

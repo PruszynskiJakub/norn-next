@@ -1,5 +1,0 @@
-{"action":"approve","command":"norn story approve lt-1","exit":3,"output":"**Refused (not_at_gate):** lt-1 is not at a gate: lt-1 at implement\n\nDo instead: norn story view lt-1"}
-{"action":"reject","command":"norn story reject lt-1 --reason 'QA reason'","exit":3,"output":"**Refused (not_at_gate):** lt-1 is not at a gate: lt-1 at implement\n\nDo instead: norn story view lt-1"}
-{"action":"rerun","command":"norn run rerun lt-1","exit":0,"output":"Recorded a rerun of implement on lt-1. The next tick stops run 01M84H3S188D73BA6DB3GG8C4Z first, then applies "}
-{"action":"round","command":"norn story round lt-1 --workflow quick","exit":3,"output":"**Refused (round_unfinished):** lt-1's quick round is still under way at implement\n\nDo instead: norn story rou"}
-{"action":"merge","command":"git merge --no-ff --no-edit norn/lt-1 && git push -q origin main","exit":0,"output":"Merge made by the 'ort' strategy.\n greet.sh | 2 +-\n test.sh  | 2 +-\n 2 files changed, 2 insertions(+), 2 delet"}

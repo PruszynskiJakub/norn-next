@@ -1,7 +1,0 @@
-$ norn workflow show hotfix --json | jq .hash   # with when:
-f39ca4773805fcc53aa8dd0c33396eba3dfa354938dbdf3b5281f3d0501e7e8d
---- removed when: from hotfix.yaml
-0
-$ norn workflow show hotfix --json | jq "{hash, when}"   # without when:
-{"hash":"f39ca4773805fcc53aa8dd0c33396eba3dfa354938dbdf3b5281f3d0501e7e8d","when":null,"state":"ok"}
-| `hotfix` | repo (.agents/workflows/hotfix.yaml) | ok | Patch production fast. |

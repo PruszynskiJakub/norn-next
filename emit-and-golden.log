@@ -3,14 +3,17 @@ $ bun packages/cli/scripts/docs-emit.ts
 {"emitted":["docs/reference.md","docs/workflows.md","CONTRIBUTING.md"]}
 $ bun run schema:emit
 $ bun packages/schema/scripts/emit.ts
-{"emitted":15,"dir":"<worktree>/packages/schema/json"}
+{"emitted":15,"dir":"/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-517/packages/schema/json"}
 $ bun run golden
++ check-exhausted-039
++ check-exhausted-040
++ gate-rejected-015
 + gate-rejected-017
 + gate-rejected-038
 + gate-rejected-065
 + gate-rejected-066
 25 case(s) added
-$ git status --short
+$ git status --short (excluding .agents/)
 ?? packages/kernel/test/golden/check-exhausted-008.json
 ?? packages/kernel/test/golden/check-exhausted-022.json
 ?? packages/kernel/test/golden/check-exhausted-038.json
@@ -36,8 +39,4 @@ $ git status --short
 ?? packages/kernel/test/golden/story-journey-069.json
 ?? packages/kernel/test/golden/story-journey-071.json
 ?? packages/kernel/test/golden/story-journey-072.json
-(end)
-$ bun run golden -- --update
-$ bun packages/kernel/scripts/golden.ts --update
-no case changed
-(end of status)
+[end git status]
