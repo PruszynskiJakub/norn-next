@@ -9,10 +9,11 @@ import { parseJson } from "@norn/plugin-api";
 import { shellQuote } from "@norn/runtime";
 import { Type } from "@sinclair/typebox";
 import { ruleCaption } from "../captions.ts";
-import { toFailure } from "../output.ts";
+import { ExitCode, toFailure } from "../output.ts";
 import { STANDING } from "../tick-report.ts";
 import type { StoryView } from "../views.ts";
 import { nodeId, workflowMermaid } from "../workflows-page.ts";
+import { BREAK_NAMES, type BreakName, BREAKS, isBreak } from "./break-it.ts";
 import type { LabView } from "./lab.ts";
 
 /** One receipt as the store keeps it: its place in the unit's record and what it says. */
@@ -88,6 +89,8 @@ export interface LabActionView {
   command: string;
   /** what the person types before pressing it */
   input: "reason" | "answer" | null;
+  /** `person`: a command a person runs; `break`: a switch that breaks the lab on purpose */
+  group: "person" | "break";
 }
 
 export interface LabState {
@@ -171,11 +174,16 @@ function graph(w: LabSources["workflow"], live: string | null): LabState["graph"
   return { workflow: w.name, mermaid: lines.join("\n"), live, steps: Object.keys(w.loaded.graph.steps) };
 }
 
-export const LAB_ACTION_NAMES = ["approve", "reject", "answer", "rerun", "merge", "round", "reset"] as const;
+export const LAB_PERSON_ACTIONS = ["approve", "reject", "answer", "rerun", "merge", "round", "reset"] as const;
+export const LAB_ACTION_NAMES = [...LAB_PERSON_ACTIONS, ...BREAK_NAMES] as const;
 export type LabActionName = (typeof LAB_ACTION_NAMES)[number];
+type PersonActionName = (typeof LAB_PERSON_ACTIONS)[number];
 
-/** What a button runs: a norn command (run on the lab's own build), a shell line, or the lab's own reset. */
-export type LabCommand = { kind: "norn"; args: string[] } | { kind: "shell"; line: string } | { kind: "reset" };
+/**
+ * What a button runs: a norn command (run on the lab's own build), a shell line, the lab's own reset,
+ * or a break-it switch, whose shell line is planned from the lab as it is when pressed.
+ */
+export type LabCommand = { kind: "norn"; args: string[] } | { kind: "shell"; line: string } | { kind: "reset" } | { kind: "break"; name: BreakName; key: string };
 
 const PLACEHOLDER = { reason: "<reason>", answer: "<answer>" } as const;
 
@@ -186,7 +194,7 @@ interface ActionSpec {
 }
 
 /** The person's buttons: each runs the real command a person types, and nothing else. */
-const ACTIONS: Readonly<Record<LabActionName, ActionSpec>> = {
+const PERSON_ACTIONS: Readonly<Record<PersonActionName, ActionSpec>> = {
   approve: { label: "Approve the gate", input: null, command: ({ key }) => ({ kind: "norn", args: ["story", "approve", key] }) },
   reject: { label: "Reject the gate", input: "reason", command: ({ key }, reason) => ({ kind: "norn", args: ["story", "reject", key, "--reason", reason] }) },
   answer: { label: "Answer the question", input: "answer", command: ({ key }, answer) => ({ kind: "norn", args: ["story", "answer", key, answer] }) },
@@ -196,12 +204,20 @@ const ACTIONS: Readonly<Record<LabActionName, ActionSpec>> = {
   reset: { label: "Reset the lab", input: null, command: () => ({ kind: "reset" }) },
 };
 
+const breakSpec = (name: BreakName): ActionSpec => ({ label: BREAKS[name].label, input: null, command: ({ key }) => ({ kind: "break", name, key }) });
+
+const ACTIONS: Readonly<Record<LabActionName, ActionSpec>> = {
+  ...PERSON_ACTIONS,
+  ...(Object.fromEntries(BREAK_NAMES.map((n) => [n, breakSpec(n)])) as Record<BreakName, ActionSpec>),
+};
+
 export const LAB_RESET_COMMAND = "norn lab --clean";
 
 /** The command as a person reads it. */
 export function commandText(c: LabCommand): string {
   if (c.kind === "norn") return `norn ${shellQuote(c.args)}`;
   if (c.kind === "shell") return c.line;
+  if (c.kind === "break") return BREAKS[c.name].preview;
   return LAB_RESET_COMMAND;
 }
 
@@ -228,7 +244,7 @@ function actionViews(c: LabActionContext | null): LabActionView[] {
   return LAB_ACTION_NAMES.map((name) => {
     const spec = ACTIONS[name];
     const command = c === null ? (name === "reset" ? LAB_RESET_COMMAND : "(the lab has no story yet)") : commandText(spec.command(c, spec.input === null ? "" : PLACEHOLDER[spec.input]));
-    return { name, label: spec.label, command, input: spec.input };
+    return { name, label: spec.label, command, input: spec.input, group: isBreak(name) ? "break" : "person" };
   });
 }
 
@@ -248,12 +264,13 @@ export function dashboardState(s: LabSources, merge: (key: string) => string): L
   };
 }
 
-/** What a pressed button answers: the command it ran and how it went. */
+/** What a pressed button answers: the command it ran and how it went, and for a break-it switch the way out of what it did. */
 export interface LabActAnswer {
   action: LabActionName;
   command: string;
   exit: number;
   output: string;
+  way_out: string | null;
 }
 
 export interface LabHandlerDeps {
@@ -307,7 +324,7 @@ export function labHandler(deps: LabHandlerDeps): (req: Request) => Promise<Resp
       return refusal(404, `${path} is not part of the lab's dashboard`, "GET /", "not_found");
     } catch (e) {
       const f = toFailure(e);
-      return json(f.body, 500);
+      return json(f.body, f.exit === ExitCode.refused ? 409 : 500);
     }
   };
 }

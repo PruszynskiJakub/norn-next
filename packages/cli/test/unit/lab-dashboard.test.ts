@@ -11,7 +11,7 @@ import { RULE_CAPTIONS } from "../../src/captions.ts";
 import { configPaths } from "../../src/config/paths.ts";
 import { BUNDLED_PLUGINS } from "../../src/index.ts";
 import { runLabCommand } from "../../src/lab/act.ts";
-import { buttonCommand, dashboardState, LAB_ACTION_NAMES, LAB_RESET_COMMAND, type LabActAnswer, type LabActionName, labHandler, type LabSources, type LabState } from "../../src/lab/dashboard.ts";
+import { buttonCommand, dashboardState, LAB_PERSON_ACTIONS, LAB_RESET_COMMAND, type LabActAnswer, type LabActionName, labHandler, type LabSources, type LabState } from "../../src/lab/dashboard.ts";
 import { EXECUTOR_BLOCK, type LabRun, placeInBeat } from "../../src/lab/lab.ts";
 import { LAB_PAGE } from "../../src/lab/page.ts";
 import { labPaths } from "../../src/lab/paths.ts";
@@ -155,7 +155,7 @@ describe("the dashboard's state", () => {
 
   test("each button shows the command it runs before it is pressed, what the person types shown as a placeholder", async () => {
     const s = await stateOf(sources());
-    expect(Object.fromEntries(s.actions.map((a) => [a.name, a.command]))).toEqual({
+    expect(Object.fromEntries(s.actions.filter((a) => a.group === "person").map((a) => [a.name, a.command]))).toEqual({
       approve: `norn story approve ${KEY}`,
       reject: `norn story reject ${KEY} --reason '<reason>'`,
       answer: `norn story answer ${KEY} '<answer>'`,
@@ -178,7 +178,7 @@ describe("the dashboard's routes", () => {
     state: async () => dashboardState(sources(), merge),
     act: async (name, typed) => {
       pressed.push({ name, typed });
-      return { action: name, command: `ran ${name}`, exit: 0, output: "" };
+      return { action: name, command: `ran ${name}`, exit: 0, output: "", way_out: null };
     },
   });
   const post = (path: string, body?: unknown) => handle(new Request(`http://127.0.0.1${path}`, { method: "POST", ...(body === undefined ? {} : { body: JSON.stringify(body) }) }));
@@ -194,7 +194,7 @@ describe("the dashboard's routes", () => {
 
   test("a button with what it needs reaches its command; one missing its input, an unknown one or a GET is refused before anything runs", async () => {
     pressed.length = 0;
-    expect(await (await post("/api/act/reject", { text: "Name it in the README." })).json()).toEqual({ action: "reject", command: "ran reject", exit: 0, output: "" });
+    expect(await (await post("/api/act/reject", { text: "Name it in the README." })).json()).toEqual({ action: "reject", command: "ran reject", exit: 0, output: "", way_out: null });
     const missing = await post("/api/act/answer", { text: "  " });
     expect(missing.status).toBe(400);
     expect(await missing.json()).toMatchObject({ code: "input_missing" });
@@ -235,7 +235,7 @@ describe("the dashboard's buttons over a lab", () => {
     const { exec, press } = lab();
     const typed: Partial<Record<LabActionName, string>> = { reject: "Name the greeting in the README too.", answer: "Keep the comma." };
     const answers: LabActAnswer[] = [];
-    for (const name of LAB_ACTION_NAMES.filter((n) => n !== "reset")) answers.push(await press(name, typed[name]));
+    for (const name of LAB_PERSON_ACTIONS.filter((n) => n !== "reset")) answers.push(await press(name, typed[name]));
     expect(answers.map((a) => [a.action, a.command, a.exit])).toEqual([
       ["approve", `norn story approve ${KEY}`, 0],
       ["reject", `norn story reject ${KEY} --reason 'Name the greeting in the README too.'`, 0],
@@ -267,7 +267,7 @@ describe("the dashboard's buttons over a lab", () => {
 
   test("AC10: every button runs in the lab's repo with the lab's own norn home, and writes only under the lab's folder", async () => {
     const { exec, files, press } = lab();
-    for (const name of LAB_ACTION_NAMES) await press(name, "typed");
+    for (const name of LAB_PERSON_ACTIONS) await press(name, "typed");
     for (const c of exec.calls) {
       expect(c.opts.env?.NORN_HOME_DIR).toBe(paths.home);
       if (c.argv[0] === "rm") expect(c.argv).toEqual(["rm", "-rf", paths.root]);
