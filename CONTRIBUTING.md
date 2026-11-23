@@ -22,11 +22,11 @@ Picked by the issue label `norn:wf:<name>`; each workflow's When says when to pi
 | `norn:wf:fix` | fix | For a bug whose fix looks small and settled: one round reproduces it, then fixes it behind a regression test. A merged PR ends the story; a bug that would not reproduce ends the round. |
 | `norn:wf:quick` | quick | For refactors, docs, chores and other small changes, and the fix of a bug a reproduce round confirmed. A merged PR ends the story. |
 | `norn:wf:refinement` | refinement | For a story that needs a spec and a plan before code. No gate: starting the next round (`norn story round <story> --workflow story\|quick`) approves the plan; `--workflow refinement --at plan` reworks it. |
-| `norn:wf:release` | release | For the release story a person starts with /release-start (label norn:wf:release). The person judges the version and changelog at ready and merges; CI tags and publishes on the merge. A red check means the base is broken: fix it in its own story, then `norn run rerun gh-N --step sync`. |
+| `norn:wf:release` | release | Write the changelog and propose the version, open the draft PR, wait for its CI, and let a person judge it at ready. |
 | `norn:wf:reproduce` | reproduce | For a bug whose cause a person wants before anyone fixes it; label it norn:wf:reproduce, or start it after triage. Next round: `fix` or `quick` (implement turns the red loop into a failing test first), or `refinement`. |
 | — | slice | Runs on each slice a story workflow cuts; the story's qa checks the slice's criteria, once. |
 | `norn:wf:story` | story | For a story a refinement round planned; start it with `norn story round <story> --workflow story`. A merged PR ends the story. |
-| `norn:wf:triage` | triage | norn's own default round for a new issue; a bug starts in reproduce instead. Next round: the one its outcome names (`norn story round <story> --workflow refinement\|quick\|reproduce\|fix`); after close, a person closes it. |
+| `norn:wf:triage` | triage | Check an issue still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it. |
 
 <!-- norn:workflows:end -->
 

@@ -1,8 +1,7 @@
+# norn's own default round for a new issue; a bug starts in reproduce instead. Next round: the one its
+# outcome names (`norn story round <story> --workflow refinement|quick|reproduce|fix`); after close, a person closes it.
 name: triage
 description: Check an issue still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it.
-when: >-
-  norn's own default round for a new issue; a bug starts in reproduce instead. Next round: the one its
-  outcome names (`norn story round <story> --workflow refinement|quick|reproduce|fix`); after close, a person closes it.
 start: explore
 steps:
   explore:

@@ -276,14 +276,14 @@ export const CONTRIBUTING_MARKERS: MarkerPair = {
   end: "<!-- norn:workflows:end -->",
 };
 
-/** CONTRIBUTING.md's workflow table, markers included: one row per workflow a repo can start, by label. */
+/** CONTRIBUTING.md's workflow table, markers included: one row per workflow a repo can start, by label; a workflow with no `when:` shows its description, so no row is blank. */
 export function renderWorkflowTable(workflows: readonly CatalogWorkflow[]): string {
   return [
     CONTRIBUTING_MARKERS.start,
     "",
     "| Label | Workflow | When |",
     "|---|---|---|",
-    ...workflows.map((w) => `| ${w.label === null ? "—" : `\`${w.label}\``} | ${w.name} | ${tableCell(w.when)} |`),
+    ...workflows.map((w) => `| ${w.label === null ? "—" : `\`${w.label}\``} | ${w.name} | ${tableCell(w.when || w.description)} |`),
     "",
     CONTRIBUTING_MARKERS.end,
   ].join("\n");

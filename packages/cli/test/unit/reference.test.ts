@@ -185,14 +185,16 @@ describe("CONTRIBUTING.md's workflow table", () => {
   const block = freshContributing();
   const repo = repoWorkflowTexts();
 
-  test("is this repo's workflows, the pack overlaid with .agents/workflows, as Label, Workflow, When rows", () => {
+  test("is this repo's workflows, the pack overlaid with .agents/workflows, as Label, Workflow, When rows; a file with no when: shows its description", () => {
     expect(block.startsWith(CONTRIBUTING_MARKERS.start) && block.endsWith(CONTRIBUTING_MARKERS.end)).toBe(true);
     expect(block).toContain("| Label | Workflow | When |");
     const names = new Set([...Object.keys(SDLC_PACK.workflows), ...Object.keys(repo.workflows)].map((f) => f.replace(/\.ya?ml$/, "")));
     expect(names.has("release")).toBe(true);
     for (const name of names) {
       const text = repo.workflows[`${name}.yaml`] ?? SDLC_PACK.workflows[`${name}.yaml`];
-      const when = tableCell(oneLine((parse(text as string) as { when: string }).when));
+      const doc = parse(text as string) as { when?: string; description: string };
+      const when = tableCell(oneLine(doc.when ?? doc.description));
+      expect(when, name).not.toBe("");
       const label = name === DEFAULT_KERNEL_CONFIG.sliceWorkflow ? "—" : `\`${DEFAULT_KERNEL_CONFIG.intakeWorkflowLabelPrefix}${name}\``;
       expect(block, name).toContain(`| ${label} | ${name} | ${when} |`);
     }
