@@ -692,10 +692,11 @@ norn skill list
 Build or resume a throwaway lab repo where a stand-in agent plays a story in eight beats
 
 ```sh
-norn lab [--clean]
+norn lab [--clean] [--tty]
 ```
 
 - `--clean`: remove the lab and build it again, from beat 1
+- `--tty`: play the tour in the terminal: pause at each beat with its caption, and at each decision of yours print its exact command, which Enter runs or you run in another shell
 
 #### Background: run by a person, cron or a terminal multiplexer
 

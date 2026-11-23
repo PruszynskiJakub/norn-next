@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Pack } from "@norn/plugin-api";
 import { collectStepKinds, findProvided, loadPackWorkflows } from "@norn/runtime";
 import { BUNDLED_PLUGINS } from "../../src/index.ts";
-import { beatOf, forStory, labAgentBeats, labScript, type LabUnit, nextCommand } from "../../src/lab/script.ts";
+import { beatOf, forStory, labAgentBeats, labScript, type LabUnit, nextCommand, personCommand } from "../../src/lab/script.ts";
 
 const script = labScript();
 
@@ -68,5 +68,18 @@ describe("the lab's beat script", () => {
     expect(at(unit({ step: "merge" }))).toBe("git merge --no-ff --no-edit norn/lt-1 && git push -q origin main");
     expect(at(unit({ step: "merge", ended: "done" }))).toBeNull();
     expect(forStory("branch norn/{key}", "lt-7")).toBe("branch norn/lt-7");
+  });
+
+  test("names the person's own command at each beat that needs them, and none elsewhere", () => {
+    const at = (u: LabUnit) => personCommand(beatOf(script, u), u, "lt-1");
+    const gate = { for: "gate", text: "ready?", next: "norn story approve lt-1" };
+    expect(at(unit({ step: "implement", counters: spent("check.fail"), waiting: { for: "answer", text: "comma?" } }))).toBe('norn story answer lt-1 "Keep the comma."');
+    expect(at(unit({ step: "ready", waiting: gate }))).toBe('norn story reject lt-1 --reason "Name the greeting in the README too."');
+    expect(at(unit({ step: "ready", waiting: gate, counters: spent("land.rejected") }))).toBe("norn story approve lt-1");
+    expect(at(unit({ step: "merge" }))).toBe("git merge --no-ff --no-edit norn/lt-1 && git push -q origin main");
+    expect(at(unit({ step: "implement", counters: spent("check.fail") }))).toBeNull();
+    expect(at(unit({ step: "implement", counters: spent("land.rejected") }))).toBeNull();
+    expect(at(unit({ step: "merge", ended: "done" }))).toBeNull();
+    expect(at(unit({ step: "sync" }))).toBeNull();
   });
 });

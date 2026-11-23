@@ -41,6 +41,8 @@ export interface CliIo {
   sleep?(ms: number, signal?: AbortSignal): Promise<void>;
   /** a line for a person on stderr; never data */
   log?(line: string): void;
+  /** stdin line by line, for a command that waits on a person's Enter; absent, its input has ended */
+  lines?(): AsyncIterable<string>;
   /** the person's terminal, taken over by `status --watch` until it quits */
   terminal?(): Terminal;
   /** how this binary is invoked, so a launched agent's hooks call the same build: `[bun, main.ts]` or `[norn]` */
