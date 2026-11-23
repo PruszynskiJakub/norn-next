@@ -1,6 +1,6 @@
 # Reference
 
-Every command and flag, every config key, the signals a workflow can route, the inputs an agent step can name, the workflows the bundled pack ships and the exit codes. The lists between the two marker comments below are generated from the CLI itself (`bun run docs:emit`), so they match the release this file ships with. What the terms mean is in [Concepts](concepts.md).
+Every command and flag, every config key, the signals a workflow can route, the inputs an agent step can name, the workflows and skills the bundled pack ships (each step with the skills it uses) and the exit codes. The lists between the two marker comments below are generated from the CLI itself (`bun run docs:emit`), so they match the release this file ships with. What the terms mean is in [Concepts](concepts.md).
 
 ## Output and exit codes
 
@@ -857,17 +857,179 @@ Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner`, `ru
 
 `evidence.publish` keeps an agent QA report's evidence on `refs/norn/evidence/<story>` of the remote and links it from the pull request body, so it is as visible as the repo; `false` keeps nothing and pushes nothing, and forge-none never publishes ([Evidence](#evidence)).
 
-### Shipped workflows
+### Workflow catalog
 
-The `sdlc` pack's workflows, each drawn as a graph in [Workflows](workflows.md):
+The `sdlc` pack's workflows, each drawn as a graph in [Workflows](workflows.md). An issue's `norn:wf:<name>` label picks the workflow its first round runs; a person starts each later round with `norn story round`, and each workflow's When names the rounds that follow it. A repo's own `.agents/workflows/` file replaces the pack's of the same name. Each step lists the skills its agent loads.
 
-- `fix`: Reproduce a bug and confirm its cause, fix it test-first, review it, open the draft PR, wait for CI.
-- `quick`: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
-- `refinement`: Agree a story's spec and plan with a person, against the current base; no code.
-- `reproduce`: Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.
-- `slice`: Build one slice test-first, check and review it, and integrate it into the story branch.
-- `story`: Slice a planned story against the current base, run the slices, verify the story, open the draft PR, wait for CI.
-- `triage`: Check an issue still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it.
+#### `fix`
+
+Label `norn:wf:fix` · starts at `sync`
+
+Reproduce a bug and confirm its cause, fix it test-first, review it, open the draft PR, wait for CI.
+
+**When:** For a bug whose fix looks small and settled: one round reproduces it, then fixes it behind a regression test. A merged PR ends the story; a bug that would not reproduce ends the round.
+
+| Step | Kind | Skills |
+|---|---|---|
+| `sync` | update-branch | — |
+| `sync-resolve` | agent (builder) | `norn-merge` |
+| `reproduce` | agent (investigator) | `norn-diagnose` |
+| `implement` | agent (builder) | `norn-implement` |
+| `check` | check | — |
+| `review` | agent (reviewer) | `norn-review` |
+| `update` | update-branch | — |
+| `resolve` | agent (builder) | `norn-merge` |
+| `test` | check | — |
+| `test-merge` | check | — |
+| `test-resolution` | check | — |
+| `resolution-review` | agent (reviewer) | `norn-review` |
+| `describe` | agent (writer) | `norn-pr` |
+| `open-pr` | open-pr | — |
+| `checks` | await-checks | — |
+| `ready` | gate | — |
+| `merge` | await-merge | — |
+
+#### `quick`
+
+Label `norn:wf:quick` · starts at `sync`
+
+Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
+
+**When:** For refactors, docs, chores and other small changes, and the fix of a bug a reproduce round confirmed. A merged PR ends the story.
+
+| Step | Kind | Skills |
+|---|---|---|
+| `sync` | update-branch | — |
+| `sync-resolve` | agent (builder) | `norn-merge` |
+| `implement` | agent (builder) | `norn-implement` |
+| `check` | check | — |
+| `review` | agent (reviewer) | `norn-review` |
+| `update` | update-branch | — |
+| `resolve` | agent (builder) | `norn-merge` |
+| `test` | check | — |
+| `test-merge` | check | — |
+| `test-resolution` | check | — |
+| `resolution-review` | agent (reviewer) | `norn-review` |
+| `describe` | agent (writer) | `norn-pr` |
+| `open-pr` | open-pr | — |
+| `checks` | await-checks | — |
+| `ready` | gate | — |
+| `merge` | await-merge | — |
+
+#### `refinement`
+
+Label `norn:wf:refinement` · starts at `sync`
+
+Agree a story's spec and plan with a person, against the current base; no code.
+
+**When:** For a story that needs a spec and a plan before code. No gate: starting the next round (`norn story round <story> --workflow story|quick`) approves the plan; `--workflow refinement --at plan` reworks it.
+
+| Step | Kind | Skills |
+|---|---|---|
+| `sync` | update-branch | — |
+| `sync-resolve` | agent (builder) | `norn-merge` |
+| `refine` | agent (writer) | `norn-refine` |
+| `clarify` | agent (writer) | `norn-clarify` |
+| `plan` | agent (writer) | `norn-plan` |
+
+#### `reproduce`
+
+Label `norn:wf:reproduce` · starts at `reproduce`
+
+Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.
+
+**When:** For a bug whose cause a person wants before anyone fixes it; label it norn:wf:reproduce, or start it after triage. Next round: `fix` or `quick` (implement turns the red loop into a failing test first), or `refinement`.
+
+| Step | Kind | Skills |
+|---|---|---|
+| `reproduce` | agent (investigator) | `norn-diagnose` |
+
+#### `slice`
+
+No label: a story's `slices` step runs it on each slice · starts at `implement`
+
+Build one slice test-first, check and review it, and integrate it into the story branch.
+
+**When:** Runs on each slice a story workflow cuts; the story's qa checks the slice's criteria, once.
+
+| Step | Kind | Skills |
+|---|---|---|
+| `implement` | agent (builder) | `norn-implement` |
+| `check` | check | — |
+| `review` | agent (reviewer) | `norn-review` |
+| `integrate` | integrate | — |
+| `merge` | agent (builder) | `norn-merge` |
+
+#### `story`
+
+Label `norn:wf:story` · starts at `sync`
+
+Slice a planned story against the current base, run the slices, verify the story, open the draft PR, wait for CI.
+
+**When:** For a story a refinement round planned; start it with `norn story round <story> --workflow story`. A merged PR ends the story.
+
+| Step | Kind | Skills |
+|---|---|---|
+| `sync` | update-branch | — |
+| `sync-resolve` | agent (builder) | `norn-merge` |
+| `slice` | agent (writer) | `norn-slice` |
+| `approve-slices` | gate | — |
+| `slices` | slices | — |
+| `update` | update-branch | — |
+| `resolve` | agent (builder) | `norn-merge` |
+| `test` | check | — |
+| `test-merge` | check | — |
+| `test-resolution` | check | — |
+| `resolution-review` | agent (reviewer) | `norn-review` |
+| `qa` | agent (qa) | `norn-qa` |
+| `human-qa` | gate | — |
+| `implement` | agent (builder) | `norn-implement` |
+| `check` | check | — |
+| `review` | agent (reviewer) | `norn-review` |
+| `describe` | agent (writer) | `norn-pr` |
+| `open-pr` | open-pr | — |
+| `checks` | await-checks | — |
+| `ready` | gate | — |
+| `merge` | await-merge | — |
+
+#### `triage`
+
+Label `norn:wf:triage` · starts at `explore`
+
+Check an issue still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it.
+
+**When:** The first round of a new issue. Next round: the one its outcome names (`norn story round <story> --workflow refinement|quick|reproduce|fix`); after close, a person closes the issue.
+
+| Step | Kind | Skills |
+|---|---|---|
+| `explore` | agent (investigator) | `norn-triage` |
+
+### Skills
+
+The `sdlc` pack's skills. A skill marked (a person's) is one only a person runs, never a workflow step.
+
+| Skill | Use when |
+|---|---|
+| `norn` | Use when the `NORN_UNIT` environment variable is set, when told to run `norn brief`, or when asked to continue a norn step. |
+| `norn-clarify` | Use when a spec's Open questions need a person's decisions, or when asked to clarify or go through them. |
+| `norn-codebase-design` | Use when designing or restructuring a module's interface, judging whether a module is shallow, or deciding where a seam goes. Not for planning how a spec gets built; use norn-plan. |
+| `norn-diagnose` | Use when asked to diagnose or debug a failure. Not for QA against criteria; use norn-qa. |
+| `norn-fsd` (a person's) | Use when a person asks to take named stories through every round to a ready or merged PR. Never a workflow step. |
+| `norn-fsd-round` | Use when asked to supervise, deliver or babysit named stories through their current round. Not for chaining rounds; use `/norn-fsd`. |
+| `norn-implement` | Use when asked to implement, build or rework code against acceptance criteria or review findings. |
+| `norn-interview` | Use when asked to interview or grill someone about an idea. Not for writing a spec; use norn-refine. |
+| `norn-merge` | Use when git stopped on conflicts or a branch must take in its base. Not for merging a pull request. |
+| `norn-plan` | Use when asked to plan a spec or story before it is sliced or built. |
+| `norn-pr` | Use when asked to write, describe or rewrite a pull request or merge request body. |
+| `norn-prototype` | Use when a decision depends on how something looks or feels, or on a state model hard to judge on paper. |
+| `norn-qa` | Use when asked to QA, verify or acceptance-test a change. Not for finding a bug's cause; use norn-diagnose. QA alongside a person is norn-qa-person. |
+| `norn-qa-person` | Use when a person QAs a change with an agent at their side; QA on your own is norn-qa. |
+| `norn-refine` | Use when asked to refine, spec out or write requirements for a story. Not for settling an existing spec's open questions; use norn-clarify. |
+| `norn-retro` | Use when a person asks for a retro or retrospective on a story, usually after its pull request merges. |
+| `norn-review` | Use when asked to review a diff, branch, pull request or slice against its acceptance criteria. |
+| `norn-slice` | Use when asked to slice, split or break a planned spec into deliverable pieces. |
+| `norn-tdd` | Use for TDD or test-first work, or when another skill builds code test-first. Not for a failure that won't reproduce; use norn-diagnose. |
+| `norn-triage` | Use when asked to triage an issue or check whether it still applies. |
 
 ### Exit codes
 
