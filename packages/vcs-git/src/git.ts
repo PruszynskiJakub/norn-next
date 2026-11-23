@@ -14,9 +14,9 @@ export const GIT_ENV: Readonly<Record<string, string>> = { GIT_TERMINAL_PROMPT: 
 export const REMOTE_TIMEOUT_MS = 120_000;
 const REMOTE_COMMANDS: ReadonlySet<string> = new Set(["fetch", "push"]);
 
-export function git(ctx: HostContext, cwd: string, args: string[], input?: string): Promise<ExecOutput> {
+export function git(ctx: HostContext, cwd: string, args: string[], input?: string, env?: Record<string, string>): Promise<ExecOutput> {
   const remote = REMOTE_COMMANDS.has(args[0] ?? "");
-  return ctx.exec(["git", ...args], { cwd, env: { ...GIT_ENV }, ...(remote ? { timeoutMs: REMOTE_TIMEOUT_MS } : {}), ...(input === undefined ? {} : { input }) });
+  return ctx.exec(["git", ...args], { cwd, env: { ...GIT_ENV, ...env }, ...(remote ? { timeoutMs: REMOTE_TIMEOUT_MS } : {}), ...(input === undefined ? {} : { input }) });
 }
 
 export const lines = (s: string): string[] => s.split("\n").filter((l) => l.length > 0);
@@ -30,6 +30,24 @@ export function said(out: ExecOutput): string {
 
 export function gitFailure<T = never>(out: ExecOutput, what: string, code: PluginFailureCode = "unknown"): PluginResult<T> {
   return fail(out.timedOut ? "unavailable" : code, `git ${what}: ${said(out)}`);
+}
+
+const WORDS_MAX = 300;
+
+/**
+ * A failed call named whole: which git call, in which folder, how it ended and everything git said
+ * past its hints. A snapshot that fails ends as a park, and the person reading it has only this line
+ * to go on, so a bare exit code or a first line that is a hint leaves them nothing to act on.
+ */
+export function failedIn<T = never>(out: ExecOutput, what: string, cwd: string): PluginResult<T> {
+  const said = out.stderr
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "" && !l.startsWith("hint:"))
+    .join(" / ");
+  const words = said.length > WORDS_MAX ? `${said.slice(0, WORDS_MAX - 1)}…` : said;
+  const ended = out.timedOut ? "timed out" : `exited ${out.code}`;
+  return fail(out.timedOut ? "unavailable" : "unknown", `git ${what} in ${cwd} ${ended}${words ? `: ${words}` : " and said nothing"}`);
 }
 
 /** The trimmed output of a call that must succeed. */

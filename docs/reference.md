@@ -77,6 +77,24 @@ runners: { person: herdr, agent: headless, none: headless }
 - **An executor with a `runner:` of its own** runs every step there, whatever its attendance, as configs written before `runners:` do; an attended step on it parks `agent.no_presence` unless that runner has presence.
 - A run's record names its executor and runner together: `deep@person` is executor `deep` in the runner `runners.person` picks.
 
+### Worktree setup
+
+`setup:` is the command that readies a unit's worktree before anything runs in it, such as installing its dependencies, so neither a check nor an agent installs by hand:
+
+```yaml
+setup:
+  command: bun install --frozen-lockfile   # run with sh -c in the unit's worktree
+  inputs: [bun.lock, package.json, "packages/*/package.json"]
+  timeout: 15m                             # default 15m
+```
+
+- **When it runs.** Once in each new worktree, and again before an agent step's run or a check runs there when its digest changed: sha256 over the command and the content of each file `inputs` names, a missing one counted as missing. Editing the command runs it again; with no `inputs` it runs once per worktree. A step kind (`vcs.*`, `forge.*`) never waits on it.
+- **Inputs** are paths relative to the worktree; `*` matches within one path segment. A leading `/`, a `..` segment and `**` are refused.
+- **While it runs** the step waits: no intent is written, so it spends no retry and no counter, and the next tick looks again. It runs detached, as a check does, and is stopped at `timeout`.
+- **A failure** (a non-zero exit, a timeout, a setup that ended without recording its exit or could not start) parks the unit `worktree.setup.failed`. `norn status` shows the command, how it exited, the worktree, the log and its last line, and names `norn run rerun <unit>`, which runs it again once the command or its files are fixed.
+- **Its record** (what last ran, its digest and its log) is machine-local, under the machine dir's `runtime/setup/`. A worktree made again runs setup again; a finished story, `norn tidy` and a worktree `norn story update-branch` removes take the record with them.
+- **Trust** is that of `checks.*`: the config comes from the main checkout, so a branch's edit to it applies once it merges. The setup should leave the worktree clean: a file it writes that git does not ignore is the agent's to explain.
+
 ## Steps
 
 A step is written with thirteen keys, and the set never grows: what an actor needs beyond them goes under `with:`, and a step kind is named by value.
@@ -309,7 +327,7 @@ A step that may change no code (`code:read`) runs under the docs-only guard: its
 
 ### Detection, as receipted effects
 
-Before the agent of a step that may not keep code starts, norn writes the run's intent and then a `run.snapshot` receipt: HEAD, the tracked tree as the worktree holds it, the repo's refs (all but the remote-tracking ones and norn's own), its git config (all but the tracking keys `branch.<name>.remote` and `.merge`, which git writes and removes as other units' branches come and go, and which no push norn makes reads) and hooks, and the remote's copy of the story branch. A retry is checked against its visit's first snapshot. A snapshot that cannot be taken (a vcs without one, git failing) parks the unit `stuck` (`run.snapshot.failed`) and the agent never starts.
+Before the agent of a step that may not keep code starts, norn writes the run's intent and then a `run.snapshot` receipt: HEAD, the tracked tree as the worktree holds it, the repo's refs (all but the remote-tracking ones and norn's own), its git config (all but the tracking keys `branch.<name>.remote` and `.merge`, which git writes and removes as other units' branches come and go, and which no push norn makes reads) and hooks, and the remote's copy of the story branch. A retry is checked against its visit's first snapshot. vcs-git takes the tree through a throwaway index in the worktree's git dir and never writes the worktree's index or a ref, so a file touched without a change (an editor, an install) moves nothing; a checkout with unmerged paths, a merge stopped on its conflicts, gives no snapshot. A snapshot that cannot be taken (a vcs without one, git failing) parks the unit `stuck` (`run.snapshot.failed`) and the agent never starts: the park names the git call, the worktree, how it exited and what git said, and `norn status` names `norn run rerun <unit>` once the checkout is fixed.
 
 `norn done` compares at once and refuses what the level does not allow, saying what changed and how to put it back. Before the report routes, the next tick's `agent.check` stops the run's processes, so a write left running in the background cannot land after the check (the headless runner kills the run's process group, even once the agent itself has exited; see [Limitations](limitations.md) for the Herdr runner), compares again, and resets what the level resets under a `run.checking` intent and a `run.checked` receipt, safe to run again after a crash. A change only this check finds (it landed after `norn done`), or a check that cannot be done, refuses the report and parks the unit `stuck` (`run.check.refused`, `run.check.failed`): it never passes. At either level a moved remote story branch, a changed git config or a changed hook refuses too; another ref that moved (a sibling unit's branch, a person's tag) is only noted, as norn cannot tell who moved it.
 
@@ -778,6 +796,9 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `kernel.counters.agent_back` | integer ≥ 1 | `3` |
 | `trace.retain` | duration or `"keep"` | `"7d"` |
 | `checks.<name>` | string | derived: `checks.test` is "bun test", which the shipped workflows' test steps run; init detects the repo's own |
+| `setup.command` | string | none |
+| `setup.inputs` | list of strings | derived: none: the setup runs once per worktree |
+| `setup.timeout` | duration | `"15m"` |
 | `sources.<name>` | string | none |
 | `policy.stand_in.attended` | list of strings | derived: none: a supervisor answers no step's questions |
 | `policy.stand_in.gates` | list of strings | derived: none: every gate is the person's |

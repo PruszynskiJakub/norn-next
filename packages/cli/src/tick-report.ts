@@ -28,11 +28,23 @@ export function outcomeLine(o: Outcome): string {
 export const STANDING: ReadonlySet<string> = new Set(["noop", "notify", "flush", "renew_claim"]);
 
 /**
+ * Whether the outcome only kept its story where it is: a standing kind, or a launch that waited on its
+ * worktree's setup, which decide asks for again every tick the setup runs. A launch whose setup failed
+ * wrote the park, so it moved something.
+ */
+export function standing(o: Outcome): boolean {
+  if (!o.ok) return false;
+  if (STANDING.has(o.decision.kind)) return true;
+  const detail = o.detail as { waiting?: unknown } | undefined;
+  return detail?.waiting === "setup";
+}
+
+/**
  * A tick in one line for a person watching: its time and each action that moved something or failed,
  * then problems not said on the tick before (`said`); null for a tick of only waiting.
  */
 export function watchLine(r: TickReport, time: string, said: ReadonlySet<string>): string | null {
-  const acts = r.outcomes.filter((o) => !o.ok || !STANDING.has(o.decision.kind)).map((o) => {
+  const acts = r.outcomes.filter((o) => !standing(o)).map((o) => {
     const base = `${who(o.decision)} ${o.decision.rule} → ${o.decision.kind}`;
     return o.ok ? base : `${base} FAILED: ${o.error}`;
   });

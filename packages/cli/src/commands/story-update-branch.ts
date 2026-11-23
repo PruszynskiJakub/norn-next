@@ -16,7 +16,7 @@
 import { outcomeReceiptId, type ReceiptDataOf, type UnitJournal } from "@norn/kernel";
 import { type ChangeRequest, fail, ok, parseUnitId, type Vcs } from "@norn/plugin-api";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, baseRefOf, branchOf, ensureWorktree, newTickId, type RuntimeEnv, type TickLock } from "@norn/runtime";
+import { acquireTickLock, baseRefOf, branchOf, dropSetupRecord, ensureWorktree, newTickId, type RuntimeEnv, type TickLock } from "@norn/runtime";
 import { defineCommand, opt } from "../command.ts";
 import { busyError, corruptError, failure, refuse, rendered } from "../output.ts";
 import { syncStore, unitsOf } from "./person-support.ts";
@@ -316,6 +316,7 @@ export const storyUpdateBranchCommand = defineCommand({
         if (!existed) {
           const removed = await vcs.worktree.remove(key);
           if (!removed.ok) problems.push(`could not remove the worktree of ${key} again: ${removed.failure.message}`);
+          else await dropSetupRecord(env.ctx, key);
         }
         throw e;
       }

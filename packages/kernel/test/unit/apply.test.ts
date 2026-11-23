@@ -255,6 +255,12 @@ describe("applyReceipts: parks", () => {
     expect(apply(fresh(), journal(1, { kind: "unit.parked", reason: "gate.park", step: "test", attempt: 1 })).rejected[0]?.reason).toBe("stale: written for step test, the unit is at implement");
     expect(apply(parked.state, journal(2, { kind: "answer.sent", input_id: "q1", text: "yes", by: "ann" })).state.parked).toBeUndefined();
   });
+
+  test("a unit.parked receipt that carries a text keeps it on the park for the person to read", () => {
+    const text = "the worktree setup `bun install` exited 1 in /wt (log: /log): lockfile out of date";
+    const parked = apply(fresh(), journal(1, { kind: "unit.parked", reason: "worktree.setup.failed", text, step: "implement", attempt: 1 }));
+    expect(parked.state.parked).toEqual({ reason: "worktree.setup.failed", since: iso(1), text });
+  });
 });
 
 describe("applyReceipts: refusals", () => {
@@ -587,8 +593,8 @@ describe("applyReceipts: detection of a run that may not keep code", () => {
   });
 
   test("a snapshot that could not be taken parks the unit stuck, saying why; it never passes", () => {
-    const res = apply(fresh(), journal(1, started("a1", { code: "scratch" }), { kind: "run.snapshot", run_id: "a1", failed: "git stash: fatal: index file corrupt" }));
-    expect(res.state.parked).toEqual({ reason: "run.snapshot.failed", since: iso(2), text: "the snapshot run a1 is checked against could not be taken: git stash: fatal: index file corrupt" });
+    const res = apply(fresh(), journal(1, started("a1", { code: "scratch" }), { kind: "run.snapshot", run_id: "a1", failed: "git ls-files --stage in /wt exited 128: fatal: index file corrupt" }));
+    expect(res.state.parked).toEqual({ reason: "run.snapshot.failed", since: iso(2), text: "the snapshot run a1 is checked against could not be taken: git ls-files --stage in /wt exited 128: fatal: index file corrupt" });
   });
 
   test("a snapshot of another run is refused", () => {

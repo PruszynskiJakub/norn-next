@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { memoryHost, type ScriptedAnswer, scriptedExec } from "@norn/conformance";
-import type { HostContext, Vcs } from "@norn/plugin-api";
+import { memoryFiles, memoryHost, type ScriptedAnswer, scriptedExec } from "@norn/conformance";
+import type { ExecOptions, HostContext, Vcs } from "@norn/plugin-api";
 import { createGitVcs } from "../../src/index.ts";
 
 const ROOT = "/repo";
 const DATA = "/machine/repo";
 
 /** Answers git calls by their argv after `git`, the first matching prefix winning; anything else is unscripted. */
-function gitHost(table: Array<[string, ScriptedAnswer]>): { ctx: HostContext; calls: string[][]; cwds: (string | undefined)[] } {
+function gitHost(table: Array<[string, ScriptedAnswer]>): { ctx: HostContext; calls: string[][]; cwds: (string | undefined)[]; opts: ExecOptions[] } {
   const exec = scriptedExec((argv) => {
     const line = argv.slice(1).join(" ");
     return table.find(([prefix]) => line.startsWith(prefix))?.[1];
@@ -20,6 +20,9 @@ function gitHost(table: Array<[string, ScriptedAnswer]>): { ctx: HostContext; ca
     },
     get cwds() {
       return exec.calls.map((c) => c.opts.cwd);
+    },
+    get opts() {
+      return exec.calls.map((c) => c.opts);
     },
   };
 }
@@ -552,15 +555,89 @@ describe("git vcs deleteBranch", () => {
 });
 
 describe("git vcs snapshots", () => {
-  test("a snapshot git cannot take is a failure naming the call, never a partial snapshot", async () => {
+  const SNAPSHOT_READS: Array<[string, ScriptedAnswer]> = [
+    ["rev-parse --path-format=absolute --git-common-dir", { stdout: "/repo/.git\n" }],
+    ["rev-parse --path-format=absolute --git-path norn-snapshot-index", { stdout: "/wt/.git/norn-snapshot-index\n" }],
+    ["rev-parse --verify --quiet --end-of-options HEAD^{commit}", { stdout: `${SHA}\n` }],
+  ];
+  /** The subcommand of a git argv, past its `-c` settings and top-level options. */
+  const subcommand = (argv: string[]): string => {
+    const rest = argv.slice(1);
+    for (let i = 0; i < rest.length; i++) {
+      if (rest[i] === "-c") i++;
+      else if (!rest[i]?.startsWith("-")) return rest[i] as string;
+    }
+    return "";
+  };
+  const callOf = (h: ReturnType<typeof gitHost>, name: string): number[] => h.calls.flatMap((argv, i) => (subcommand(argv) === name ? [i] : []));
+
+  test("a snapshot git cannot take is a failure naming the call, the folder and git's words, never a partial snapshot", async () => {
+    const h = gitHost([...SNAPSHOT_READS, ["--no-optional-locks -c advice.sparseIndexExpanded=false ls-files", { code: 128, stderr: "fatal: index file corrupt\n" }]]);
+    const r = await vcsOf(h.ctx).snapshot?.("/wt");
+    expect(r?.ok ? null : r?.failure.message).toBe("git ls-files --stage in /wt exited 128: fatal: index file corrupt");
+    expect(h.cwds.every((c) => c === "/wt")).toBe(true);
+  });
+
+  test("a tree git will not write and says nothing about names the call and that git said nothing", async () => {
     const h = gitHost([
-      ["rev-parse --path-format=absolute --git-common-dir", { stdout: "/repo/.git\n" }],
-      ["rev-parse --verify --quiet --end-of-options HEAD^{commit}", { stdout: `${SHA}\n` }],
-      ["stash create", { code: 128, stderr: "fatal: index file corrupt" }],
+      ...SNAPSHOT_READS,
+      ["--no-optional-locks -c advice.sparseIndexExpanded=false ls-files", { stdout: `100644 ${SHA} 0\ta.txt\0` }],
+      ["--no-optional-locks -c advice.sparseIndexExpanded=false diff-files", { stdout: "" }],
+      ["-c core.splitIndex=false -c index.sparse=false -c core.sparseCheckout=false -c core.fsmonitor=false update-index", {}],
+      ["-c core.splitIndex=false -c index.sparse=false -c core.sparseCheckout=false -c core.fsmonitor=false write-tree", { code: 1 }],
     ]);
     const r = await vcsOf(h.ctx).snapshot?.("/wt");
-    expect(r?.ok ? null : r?.failure.message).toBe("git stash: fatal: index file corrupt");
-    expect(h.cwds.every((c) => c === "/wt")).toBe(true);
+    expect(r?.ok ? null : r?.failure.message).toBe("git write-tree in /wt exited 1 and said nothing");
+  });
+
+  test("the tree is built in a throwaway index of its own, the worktree's index read and never written", async () => {
+    const files = memoryFiles();
+    const exec = scriptedExec((argv) => {
+      const line = argv.slice(1).join(" ");
+      const known = SNAPSHOT_READS.find(([prefix]) => line.startsWith(prefix));
+      if (known) return known[1];
+      switch (subcommand(argv)) {
+        case "ls-files":
+          return { stdout: `100644 ${SHA} 0\ta.txt\x00100644 ${SHA} 0\tb.txt\0` };
+        case "diff-files":
+          return { stdout: "b.txt\0" };
+        case "update-index":
+          return {};
+        case "write-tree":
+          return { stdout: `${"b".repeat(40)}\n` };
+        case "for-each-ref":
+          return { stdout: "" };
+        case "config":
+          return { code: 1 };
+        default:
+          return undefined;
+      }
+    });
+    const ctx = memoryHost({ exec, files, repo: { root: ROOT, dataDir: DATA } });
+    const r = await createGitVcs(ctx, {}).snapshot?.("/wt");
+    expect(r?.ok ? r.value.tree : r?.failure.message).toBe("b".repeat(40));
+    const argvs = exec.calls.map((c) => c.argv);
+    const index = (i: number): string | undefined => exec.calls[i]?.opts.env?.GIT_INDEX_FILE;
+    const named = (name: string): number[] => argvs.flatMap((argv, i) => (subcommand(argv) === name ? [i] : []));
+    const temp = [...named("update-index"), ...named("write-tree")];
+    expect(temp).toHaveLength(3);
+    for (const i of temp) expect(index(i)).toStartWith("/wt/.git/norn-snapshot-index.");
+    expect(new Set(temp.map(index)).size).toBe(1);
+    for (const i of [...named("ls-files"), ...named("diff-files")]) expect(index(i)).toBeUndefined();
+    expect(exec.calls[named("update-index")[0] as number]?.opts.input).toBe(`100644 ${SHA} 0\ta.txt\x00100644 ${SHA} 0\tb.txt\0`);
+    expect(exec.calls[named("update-index")[1] as number]?.opts.input).toBe("b.txt\0");
+    expect(argvs.some((argv) => argv.some((a) => a === "stash" || a === "--refresh" || a === "add"))).toBe(false);
+    expect(Object.keys(files.snapshot()).filter((p) => p.includes("norn-snapshot-index"))).toEqual([]);
+  });
+
+  test("a checkout with unmerged paths gives a conflict and no throwaway index is written", async () => {
+    const h = gitHost([
+      ...SNAPSHOT_READS,
+      ["--no-optional-locks -c advice.sparseIndexExpanded=false ls-files", { stdout: `100644 ${SHA} 1\tx.txt\x00100644 ${SHA} 2\tx.txt\x00100644 ${SHA} 3\tx.txt\x00100644 ${SHA} 0\ty.txt\0` }],
+    ]);
+    const r = await vcsOf(h.ctx).snapshot?.("/wt");
+    expect(r?.ok ? null : r?.failure).toEqual({ code: "conflict", message: "git: /wt has unmerged paths, a merge stopped on its conflicts: x.txt", retryable: false });
+    expect(callOf(h, "update-index")).toEqual([]);
   });
 
   test("a tree or commit git would read as an option is refused before git runs", async () => {

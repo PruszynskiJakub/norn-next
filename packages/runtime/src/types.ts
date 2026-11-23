@@ -57,6 +57,8 @@ export interface RuntimeConfig {
   traceRetainMs?: number | null;
   /** the commands a check step names as `{checks.<name>}`, over DEFAULT_CHECKS */
   checks?: Record<string, string>;
+  /** what readies a unit's worktree before an agent or a check runs in it (setup.ts); absent: nothing does */
+  setup?: SetupConfig;
   /** whether QA's evidence files are kept and pushed for the pull request (`evidence.publish`); absent: true */
   evidencePublish?: boolean;
   /**
@@ -65,6 +67,14 @@ export interface RuntimeConfig {
    * person's step to the floor a workflow is checked against. Absent: nothing is granted.
    */
   standIn?: StandIn;
+}
+
+/** The worktree setup: `command` runs with `sh -c` in a new worktree, and again once it or an input changed. */
+export interface SetupConfig {
+  command: string;
+  /** paths relative to the worktree, `*` within one segment, whose content the setup's digest covers */
+  inputs: readonly string[];
+  timeoutMs: number;
 }
 
 export interface StandIn {

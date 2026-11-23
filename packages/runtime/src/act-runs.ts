@@ -7,7 +7,6 @@
  */
 import { type DecisionOf, docsOnlyGrant, type ReceiptData, type ReceiptIntent, type RunInfo } from "@norn/kernel";
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
-import { ensureWorktree } from "./branches.ts";
 import { stopDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
 import { appendEvents } from "./events/log.ts";
@@ -15,6 +14,7 @@ import { hookDigest, noteSnapshot } from "./detect.ts";
 import { clearOut } from "./inputs.ts";
 import { nudgePromptId } from "./launcher.ts";
 import { unitInFacts } from "./record.ts";
+import { prepareWorktree } from "./setup.ts";
 import { readStepRun } from "./step-runs.ts";
 
 const unitOf = (d: { unit: string | null; rule: string }): string => {
@@ -61,8 +61,11 @@ async function endUnlaunched(t: TickContext, unit: string, runId: string, why: s
 
 async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"retry_run">): Promise<PluginResult<unknown>> {
   const unit = unitOf(d);
-  const worktree = await ensureWorktree(t.env, unit);
-  if (!worktree.ok) return worktree;
+  const prepared = await prepareWorktree(t, unit);
+  if (!prepared.ok) return prepared;
+  // before the intent: a launch that waits on its worktree's setup spends no retry and writes nothing
+  if (prepared.value.waiting) return ok({ performed: false, waiting: prepared.value.waiting });
+  const worktree = prepared.value.path;
   // a grant that may change no code is guarded as a docs-only step is, whatever its pin says
   const writes = docsOnlyGrant(d.brief.grant ?? null) ? "docs" : unitInFacts(t.facts, unit)?.state?.workflow.doc.steps[d.brief.step]?.writes;
   const request = {
@@ -71,7 +74,7 @@ async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"r
     step: d.brief.step,
     executor: d.executor,
     attended: d.attended,
-    worktree: worktree.value,
+    worktree,
     brief: d.brief,
     ...(d.kind === "start_run" && d.resume !== undefined ? { resume: d.resume } : {}),
     ...(writes !== undefined && { writes }),
@@ -81,22 +84,22 @@ async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"r
     perform: async () => {
       // noted before the agent starts, so nothing it does can land before what it is checked against
       if (d.intent.data.kind === "run.started" && d.intent.data.code !== undefined) {
-        const noted = await noteSnapshot(t.env, unit, worktree.value, d.intent);
+        const noted = await noteSnapshot(t.env, unit, worktree, d.intent);
         if (!noted.ok) return noted;
       }
-      await clearOut(t.env.ctx.files, worktree.value);
+      await clearOut(t.env.ctx.files, worktree);
       const started = await t.env.launcher.start(request);
       if (!started.ok) {
         await endUnlaunched(t, unit, d.run_id, started.failure.message);
         return started;
       }
-      return ok({ handle: started.value.handle, hooks: await hookDigest(t.env, d.executor, worktree.value) });
+      return ok({ handle: started.value.handle, hooks: await hookDigest(t.env, d.executor, worktree) });
     },
     outcome: (v) => launched(d.intent, v.handle, v.hooks),
     next: () => null,
   });
   if (!acted.ok) return acted;
-  return ok({ performed: acted.value.performed, handle: acted.value.value?.handle ?? null, worktree: worktree.value });
+  return ok({ performed: acted.value.performed, handle: acted.value.value?.handle ?? null, worktree });
 }
 
 export async function startRun(t: TickContext, d: DecisionOf<"start_run">): Promise<PluginResult<unknown>> {

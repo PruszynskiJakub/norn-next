@@ -4,7 +4,7 @@
  * and never a guess at what the writer meant.
  */
 import type { KernelReceipt, ReceiptData, ReceiptDataOf } from "../model/receipts.ts";
-import { ASKED_PARK, type RunState } from "../model/run-state.ts";
+import { ASKED_PARK, type RunState, SNAPSHOT_FAILED_PARK } from "../model/run-state.ts";
 import { type CompiledStep, OVERRIDABLE_OUTCOMES, type WorkflowGraph } from "../workflow/graph.ts";
 import { endStuck, enterStep, takeRoute, type Taken } from "./route.ts";
 
@@ -62,7 +62,7 @@ export function applyOne(state: RunState, r: KernelReceipt, graph: WorkflowGraph
     case "supervisor.escalated":
       return escalated(state, d);
     case "unit.parked":
-      return { state: { ...state, parked: { reason: d.reason, since: r.at } } };
+      return { state: { ...state, parked: { reason: d.reason, since: r.at, ...(d.text !== undefined && { text: d.text }) } } };
     case "nudge.sent":
       return runBound(state, d.run_id) ?? nudged(state, r.at);
     case "run.resumed":
@@ -139,9 +139,6 @@ function runStarted(state: RunState, d: ReceiptDataOf<"run.started">, step: Comp
   const retries_used = state.retries_used + (d.retry_of !== undefined ? 1 : 0);
   return { state: { ...unparked(state), run, retries_used } };
 }
-
-/** The park of a unit whose run's snapshot could not be taken: nothing would check what its agent changed. */
-export const SNAPSHOT_FAILED_PARK = "run.snapshot.failed";
 
 function snapshotted(state: RunState, d: ReceiptDataOf<"run.snapshot">, at: string): OneApplied {
   if (d.failed === undefined) return d.snapshot === undefined ? { reject: "a snapshot names what it noted, or why it failed" } : { state };

@@ -58,6 +58,12 @@ export type RunInfo = Static<typeof RunInfo>;
 export const ASKED_PARK = "agent.asked";
 
 /**
+ * The park of a unit whose run's snapshot could not be taken: nothing would check what its agent
+ * changed, so it never starts. A person fixes the checkout and reruns the step.
+ */
+export const SNAPSHOT_FAILED_PARK = "run.snapshot.failed";
+
+/**
  * Why a unit waits for a person, and since when; a parked unit takes no action until a receipt moves
  * it. `reason` is a code or a short reason; `text` is what the agent asked, shown and never decided on.
  */

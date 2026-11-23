@@ -163,6 +163,8 @@ describe("kernel schemas", () => {
     expect(samples.map((s) => s.kind).sort()).toEqual([...RECEIPT_KINDS].sort());
     for (const s of samples) expect({ kind: s.kind, errors: errorsOf(validateReceiptData(s)) }).toEqual({ kind: s.kind, errors: [] });
     expect(validateReceiptData({ kind: "run.guessed", run_id: "r" }).ok).toBe(false);
+    expect(errorsOf(validateReceiptData({ kind: "unit.parked", reason: "worktree.setup.failed", text: "the setup exited 1" }))).toEqual([]);
+    expect(validateReceiptData({ kind: "unit.parked", reason: "worktree.setup.failed", text: "" }).ok).toBe(false);
     expect(validateReceiptData({ kind: "gate.decided", outcome: "approved", by: "p" }).ok).toBe(false);
     expect(validateReceiptData({ kind: "step.moved", to: "work", by: "p", reset: ["work.back", "work.back"] }).ok).toBe(false);
     expect(validateReceiptData({ kind: "claim.taken", to: "machine-b", by: "machine-b" }).ok).toBe(false);

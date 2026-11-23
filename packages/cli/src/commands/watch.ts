@@ -25,7 +25,7 @@ import { durationMs } from "../config/derive.ts";
 import { gitVersionRefusal } from "../git-version.ts";
 import { Duration } from "../config/schema.ts";
 import { rendered, toFailure, usageError } from "../output.ts";
-import { failedCount, STANDING, tickLines, watchLine } from "../tick-report.ts";
+import { failedCount, standing, tickLines, watchLine } from "../tick-report.ts";
 import { floorRefusal } from "../version-guard.ts";
 import { wireRuntime, wiringSources } from "../wiring.ts";
 
@@ -153,7 +153,7 @@ const progress = (r: TickReport) => ({
  * an interval later, never at once: what failed now (an outage) most likely fails again now. A standing
  * action does not count, or every pause would be followed by a burst of ticks that change nothing.
  */
-const acted = (r: TickReport): boolean => r.outcomes.some((o) => o.ok && !STANDING.has(o.decision.kind));
+const acted = (r: TickReport): boolean => r.outcomes.some((o) => o.ok && !standing(o));
 
 /** The wall-clock time of day a line is stamped with, as a person reads it beside their terminal's clock. */
 const clock = (iso: string): string => new Date(iso).toTimeString().slice(0, 8);

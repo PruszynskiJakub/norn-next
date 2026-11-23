@@ -89,6 +89,30 @@ export const KernelKnobs = Type.Object(
 export const Checks = Type.Record(Name, NonEmpty, closed);
 
 /**
+ * A path a setup's inputs name, relative to the unit's worktree; `*` matches within one path segment.
+ * Never absolute, never out through `..`, and never `**`: the hash reads only files inside the worktree,
+ * one folder level per `*`.
+ */
+export const SetupInput = Type.String({ minLength: 1, pattern: "^(?!/)(?!(.*/)?\\.\\.(/|$))(?!.*\\*\\*).+$" });
+
+/**
+ * What makes a unit's worktree ready before an agent or a check runs in it, such as installing its
+ * dependencies: `command` runs with `sh -c` in the worktree once it is made, and again once the
+ * command or a file `inputs` names changed.
+ */
+export const Setup = Type.Object(
+  {
+    command: NonEmpty,
+    /** the files whose content decides when the setup runs again; absent: once per worktree */
+    inputs: Type.Optional(Type.Array(SetupInput, { uniqueItems: true })),
+    /** how long the setup may run before it is stopped and parks the unit; absent: DEFAULT_SETUP_TIMEOUT */
+    timeout: Type.Optional(Duration),
+  },
+  closed,
+);
+export const DEFAULT_SETUP_TIMEOUT = "15m";
+
+/**
  * Where this machine keeps each workflow source, by the name the workflow gives it: an absolute path,
  * or one relative to the repo's root. The key takes the workflow's own pattern for a source name, so
  * every source a workflow may name can be bound.
@@ -153,6 +177,8 @@ export const NornConfig = Type.Object(
     trace: Type.Optional(TraceKnobs),
     /** the commands a workflow's check step names as `{checks.<name>}`; the shipped test steps name `test` */
     checks: Type.Optional(Checks),
+    /** what readies a unit's worktree before an agent or a check runs in it */
+    setup: Type.Optional(Setup),
     /** where this machine keeps the sources a workflow names, which win over a workflow's own `path:` */
     sources: Type.Optional(Sources),
     /** what the person lets stand in for them; the user's file grants it, a repo file only narrows it */
@@ -200,6 +226,7 @@ export const ConfigLayer = Type.Object(
     kernel: Type.Optional(KernelKnobs),
     trace: Type.Optional(TraceKnobs),
     checks: Type.Optional(Checks),
+    setup: Type.Optional(partial(Setup, "closed")),
     sources: Type.Optional(Sources),
     policy: Type.Optional(Policy),
     evidence: Type.Optional(EvidenceKnobs),

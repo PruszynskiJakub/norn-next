@@ -52,12 +52,12 @@ describe("the snapshot a run that may not keep code is checked against", () => {
 
   test("a snapshot that fails starts no agent and parks the unit stuck, saying why", async () => {
     const h = harness({ workflow: "granted", roles: ROLES });
-    h.checkouts.snapshot["/machine/repo/worktrees/lt-1"] = "git stash: fatal: index file corrupt";
+    h.checkouts.snapshot["/machine/repo/worktrees/lt-1"] = "git ls-files --stage in /wt exited 128: fatal: index file corrupt";
     h.items.push(trackerItem(1));
     await tickUntil(h, has("agent.start"));
     expect(h.launcher.calls.filter((c) => c.op === "start")).toEqual([]);
     await tickUntil(h, has("receipts.apply"));
-    expect((await record(h, UNIT)).state?.parked).toMatchObject({ reason: "run.snapshot.failed", text: "the snapshot run " + (await record(h, UNIT)).state?.run?.id + " is checked against could not be taken: git stash: fatal: index file corrupt" });
+    expect((await record(h, UNIT)).state?.parked).toMatchObject({ reason: "run.snapshot.failed", text: "the snapshot run " + (await record(h, UNIT)).state?.run?.id + " is checked against could not be taken: git ls-files --stage in /wt exited 128: fatal: index file corrupt" });
     await tickUntil(h, has("unit.parked"));
   });
 
@@ -214,10 +214,10 @@ describe("the check after a run that may not keep code reports", () => {
   test("a check that cannot read the checkout parks the unit stuck; it never passes", async () => {
     const { h, runId } = await live("granted");
     expect((await done(h, runId, "approve")).ok).toBe(true);
-    h.checkouts.snapshot[WT] = "git stash: fatal: index file corrupt";
+    h.checkouts.snapshot[WT] = "git ls-files --stage in /wt exited 128: fatal: index file corrupt";
     await tickUntil(h, has("agent.check"));
     await tickUntil(h, has("receipts.apply"));
-    expect((await record(h, UNIT)).state?.parked).toMatchObject({ reason: "run.check.failed", text: `the check after run ${runId} reported could not be done: git stash: fatal: index file corrupt` });
+    expect((await record(h, UNIT)).state?.parked).toMatchObject({ reason: "run.check.failed", text: `the check after run ${runId} reported could not be done: git ls-files --stage in /wt exited 128: fatal: index file corrupt` });
   });
 });
 

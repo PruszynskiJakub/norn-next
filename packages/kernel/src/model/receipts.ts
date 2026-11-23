@@ -230,8 +230,11 @@ const KINDS = [
     reason: Type.Optional(NonEmpty),
   }),
   kind("unit.marked", { ended: Ended, reason: Type.Optional(NonEmpty) }),
-  /** the unit waits for a person; `reason` names the rule that parked it, or why, and becomes the state's park */
-  kind("unit.parked", { reason: NonEmpty }),
+  /**
+   * the unit waits for a person; `reason` names the rule that parked it, or why, and becomes the state's
+   * park; `text` is what the person reads about it, shown and never decided on
+   */
+  kind("unit.parked", { reason: NonEmpty, text: Type.Optional(NonEmpty) }),
   kind("mode.changed", { mode: Mode, by: NonEmpty }),
   /**
    * a person starts the agent of a step manual mode holds, once: it lifts the park for this visit to

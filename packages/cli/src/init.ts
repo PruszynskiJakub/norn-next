@@ -1,6 +1,6 @@
 /**
  * What `norn init` detects and chooses. Detection only reads (git's remote and branches, the build
- * files that name the test command, which tools answer `--version`); every choice can be given as a flag instead, and a flag always wins. The herdr
+ * files that name the test command and its setup, which tools answer `--version`); every choice can be given as a flag instead, and a flag always wins. The herdr
  * runner is offered, never taken unasked: agents in panes are a person's choice, so it takes
  * `--runner herdr` or `--yes`. The executor is claude unless only pi is on PATH; pi beside claude is
  * offered, since which agent does the work is a person's choice too.
@@ -108,10 +108,18 @@ export function offerLine(offer: string, c: Choices): string {
   return `- offered: this shell runs inside ${offer}; norn config set executors.${c.executor}.runner ${offer} runs agents in its panes`;
 }
 
+export interface DetectedSetup {
+  command: string;
+  /** the files whose change runs it again, relative to the worktree */
+  inputs: string[];
+}
+
 export interface DetectedTestCommand {
   command: string;
   /** the file it was read from, such as `package.json` */
   from: string;
+  /** what installs the dependencies the command needs, run once in each new worktree as `setup` */
+  setup?: DetectedSetup;
 }
 
 /** The part of package.json init reads; a malformed one names no test script. */
@@ -123,11 +131,14 @@ const NPM_NO_TEST = /no test specified/;
 /** a package.json script that runs bun */
 const RUNS_BUN = /(^|[\s;&|(])(bun|bunx)(\s|$)/;
 
+const js = (command: string, setup: string, input: string): DetectedTestCommand => ({ command, from: "package.json", setup: { command: setup, inputs: [input] } });
+
 /**
- * The repo's test command from its build files, or null when nothing says. A check runs in a fresh
- * worktree with no installed dependencies, so a JS command installs first. With no lockfile the
- * install is told not to write one: it would be left untracked in the unit's worktree and hold back
- * the next agent's `norn done`. `bun` says whether bun is on PATH.
+ * The repo's test command from its build files, or null when nothing says. A unit's worktree is
+ * fresh, with no installed dependencies, so a JS command comes with the install as its `setup`:
+ * norn runs it once in each new worktree and again when its lockfile changes, never on every
+ * check. With no lockfile the install is told not to write one: it would be left untracked in the
+ * unit's worktree and hold back the next agent's `norn done`. `bun` says whether bun is on PATH.
  */
 export async function detectTestCommand(files: HostFiles, root: string, opts: { bun?: boolean } = {}): Promise<DetectedTestCommand | null> {
   const read = (f: string) => files.read(join(root, f));
@@ -138,17 +149,16 @@ export async function detectTestCommand(files: HostFiles, root: string, opts: { 
     const scripts = pkg.ok ? (pkg.value.scripts ?? {}) : {};
     const script = scripts.test;
     const hasScript = typeof script === "string" && !NPM_NO_TEST.test(script);
-    const from = "package.json";
     const bunTest = hasScript ? "bun run test" : "bun test";
-    if ((await has("bun.lock")) || (await has("bun.lockb"))) return { command: `bun install --frozen-lockfile && ${bunTest}`, from };
+    for (const lock of ["bun.lock", "bun.lockb"]) if (await has(lock)) return js(bunTest, "bun install --frozen-lockfile", lock);
     if (hasScript) {
-      if (await has("pnpm-lock.yaml")) return { command: "pnpm install --frozen-lockfile && pnpm test", from };
-      if (await has("yarn.lock")) return { command: "yarn install && yarn test", from };
-      if (await has("package-lock.json")) return { command: "npm ci && npm test", from };
+      if (await has("pnpm-lock.yaml")) return js("pnpm test", "pnpm install --frozen-lockfile", "pnpm-lock.yaml");
+      if (await has("yarn.lock")) return js("yarn test", "yarn install", "yarn.lock");
+      if (await has("package-lock.json")) return js("npm test", "npm ci", "package-lock.json");
     }
     const usesBun = Object.values(scripts).some((v) => typeof v === "string" && RUNS_BUN.test(v));
-    if (opts.bun === true && usesBun) return { command: `bun install --no-save && ${bunTest}`, from };
-    if (hasScript) return { command: "npm install --no-package-lock && npm test", from };
+    if (opts.bun === true && usesBun) return js(bunTest, "bun install --no-save", "package.json");
+    if (hasScript) return js("npm test", "npm install --no-package-lock", "package.json");
   }
   if (await has("Cargo.toml")) return { command: "cargo test", from: "Cargo.toml" };
   if (await has("go.mod")) return { command: "go test ./...", from: "go.mod" };
@@ -167,6 +177,12 @@ export function testLine(test: DetectedTestCommand | null): string {
   return `- test: none detected, so the checks run ${DEFAULT_CHECKS.test}; norn config set checks.test "<command>" names yours`;
 }
 
+/** init's line on the worktree setup, when the test command needs one. */
+export function setupLine(test: DetectedTestCommand | null): string | null {
+  if (!test?.setup) return null;
+  return `- setup: ${test.setup.command}, run once in each new worktree and again when ${test.setup.inputs.join(", ")} changes`;
+}
+
 export const INTAKE_LABEL = "norn";
 
 /** The config file init writes: every slot named, so a person reads what was chosen in one place. */
@@ -181,6 +197,7 @@ export function initLayer(c: Choices, test: DetectedTestCommand | null = null): 
     base: c.base,
     kernel: { mode: c.mode },
     ...(test && { checks: { test: test.command } }),
+    ...(test?.setup && { setup: { command: test.setup.command, inputs: test.setup.inputs } }),
   };
 }
 

@@ -15,6 +15,7 @@ import { ok, type PluginResult, parseUnitId } from "@norn/plugin-api";
 import { branchHome, dropUnitBranch } from "./branch-cleanup.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { closeUnitRuns } from "./run-panes.ts";
+import { dropSetupRecord } from "./setup-record.ts";
 
 export interface TidyRemoved {
   story: string;
@@ -108,6 +109,8 @@ async function tidyUnit(env: RuntimeEnv, story: string, unit: string, dryRun: bo
       out.kept.push({ story, unit, reason: `worktree: ${gone.failure.message}` });
       return ok(undefined);
     }
+    // a setup record outliving its worktree would read a worktree made again as set up
+    await dropSetupRecord(env.ctx, unit);
   }
   const fate = home.value === null ? null : await dropUnitBranch(env, unit, { dryRun });
   let branch: string | null = null;
