@@ -137,6 +137,12 @@ signals: { vcs.stale: { when: conflict, verify: test } }   # when: conflict (def
 entries: { update-branch: update }
 ```
 
+A workflow may say when to pick it, and what round comes next, in a top-level `when:`. It is optional, the catalog's text, and kept out of the pinned workflow, so writing or changing it moves no hash and disturbs no running unit:
+
+```yaml
+when: For refactors, docs, chores and other small changes. A merged PR ends the story.
+```
+
 ### Workflow floor and confirmation
 
 **The floor.** A workflow loads only when a person stands before every effect they cannot take back. A step kind declares such effects: `outward` (it reaches past the repo and its story branch: a deploy, a release), `cost` (it spends money) and `forge-write` (it changes what a forge lets others merge: `forge.await-merge` marks the draft ready). Every path to such a step, from `start` and from the entry `norn story update-branch` re-enters, must pass a `by: person` step that no policy grant delegates ([Policy](#policy)). A file that breaks it is refused at that step, with the path that reaches it, as a refusal in `norn doctor` and when a round would start on it:

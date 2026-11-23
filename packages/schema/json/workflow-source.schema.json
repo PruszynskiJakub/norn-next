@@ -2285,6 +2285,11 @@
         }
       }
     },
+    "when": {
+      "minLength": 1,
+      "description": "When to pick this workflow, for the catalog; kept out of the pinned workflow and its hash",
+      "type": "string"
+    },
     "signals": {
       "additionalProperties": false,
       "description": "A signal's settings for the whole workflow, written once",

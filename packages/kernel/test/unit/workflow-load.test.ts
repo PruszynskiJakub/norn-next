@@ -552,3 +552,55 @@ describe("loading: copies, limits and hashes", () => {
     expect(w.graph.counters["test.fail"]).toEqual({ max: 9, reset_on: [] });
   });
 });
+
+describe("when", () => {
+  test("a workflow with a top-level when: loads, as one without it does", () => {
+    expect(loadWorkflow(wf({ build: agent({ done: "$done" }) }, { when: "Pick it for a small change." }), opts()).ok).toBe(true);
+    expect(loadWorkflow(wf({ build: agent({ done: "$done" }) }), opts()).ok).toBe(true);
+  });
+
+  test("when: is a string", () => {
+    expect(errorsOf(loadWorkflow(wf({ build: agent({ done: "$done" }) }, { when: 3 }), opts())).map((e) => e.path)).toEqual(["/when"]);
+  });
+
+  test("when: stays out of the pinned document, so the hash and graph are those of the workflow without it", () => {
+    const without = loaded(loadWorkflow(wf({ build: agent({ done: "$done" }) }), opts()));
+    const withIt = loaded(loadWorkflow(wf({ build: agent({ done: "$done" }) }, { when: "Pick it for a small change." }), opts()));
+    expect(withIt.pinned).toEqual(without.pinned);
+    expect(withIt.graph).toEqual(without.graph);
+  });
+
+  test("a shipped workflow with its when: removed pins the same hash", () => {
+    const { workflows, shared } = shipped();
+    for (const [file, doc] of Object.entries(workflows)) {
+      const { when: _when, ...rest } = doc as Record<string, unknown>;
+      const a = loaded(loadWorkflow(doc, opts({ sharedFiles: shared })));
+      const b = loaded(loadWorkflow(rest, opts({ sharedFiles: shared })));
+      expect([file, a.pinned.hash]).toEqual([file, b.pinned.hash]);
+    }
+  });
+});
+
+describe("included", () => {
+  test("each step a shared file brought in names that file; the workflow's own steps name none", () => {
+    const shared = { start: "go", steps: { go: agent({ done: "fin" }), fin: agent({ done: { exit: "done" } }) } };
+    const w = loaded(loadWorkflow(wf({ build: agent({ done: "p" }), p: { use: "p", outcomes: { done: "$done" } } }), opts({ sharedFiles: { p: shared } })));
+    expect(w.included).toEqual({ go: "p", fin: "p" });
+  });
+
+  test("a workflow without shared files includes nothing", () => {
+    expect(loaded(loadWorkflow(wf({ build: agent({ done: "$done" }) }), opts())).included).toEqual({});
+  });
+
+  test("included stays out of the pinned document, so a pinned document loads again to the same hash", () => {
+    const w = loadShippedQuick();
+    expect(Object.keys(w.included ?? {}).length).toBeGreaterThan(0);
+    expect(JSON.stringify(w.pinned.doc)).not.toContain('"included"');
+    expect(loaded(loadWorkflow(structuredClone(w.pinned.doc), opts())).pinned.hash).toBe(w.pinned.hash);
+  });
+});
+
+function loadShippedQuick(): LoadedWorkflow {
+  const { workflows, shared } = shipped();
+  return loaded(loadWorkflow(workflows["quick.yaml"], opts({ sharedFiles: shared })));
+}

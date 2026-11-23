@@ -1,8 +1,9 @@
-# For the release story a person starts with /release-start (label norn:wf:release). The person
-# judges the version and changelog at ready and merges; CI tags and publishes on the merge. A red
-# check means the base is broken: fix it in its own story, then `norn run rerun gh-N --step sync`.
 name: release
 description: Write the changelog and propose the version, open the draft PR, wait for its CI, and let a person judge it at ready.
+when: >-
+  For the release story a person starts with /release-start (label norn:wf:release). The person
+  judges the version and changelog at ready and merges; CI tags and publishes on the merge. A red
+  check means the base is broken: fix it in its own story, then `norn run rerun gh-N --step sync`.
 start: catch-up
 steps:
   # the changelog covers every commit on the base, so the release starts from the current base

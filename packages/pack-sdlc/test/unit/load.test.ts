@@ -246,7 +246,12 @@ describe("how the pack's workflows bring in their shared files", () => {
     expect(stale("quick.yaml").land).toEqual({ max: DEFAULT_KERNEL_CONFIG.counterDefaults.stale, reset_on: [] });
   });
 
-  test("a workflow file's header says when to use it and what comes next, in a few lines, without restating the pack it ships in", () => {
+  test.each(files)("%s says when to pick it and what comes next in its when:, the text a catalog shows", (file) => {
+    const when = (parse(SDLC_PACK.workflows[file] as string) as { when?: unknown }).when;
+    expect({ file, when: typeof when === "string" && when.trim().length > 0 }).toEqual({ file, when: true });
+  });
+
+  test("a file's header comment, where it has one, is a few lines, without restating the pack it ships in", () => {
     const all = { ...Object.fromEntries(files.map((f) => [f, SDLC_PACK.workflows[f] as string])), ...Object.fromEntries(Object.entries(SDLC_PACK.shared).map(([f, t]) => [`shared/${f}`, t])) };
     const long = Object.entries(all).flatMap(([file, text]) => {
       const header = text.split("\n").findIndex((l) => !l.startsWith("#"));

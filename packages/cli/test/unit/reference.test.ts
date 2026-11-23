@@ -8,7 +8,7 @@ import { parse } from "yaml";
 import { freshReference, ROOT } from "../../scripts/docs-emit.ts";
 import { COMMANDS, NOUNS } from "../../src/commands/index.ts";
 import { KernelKnobs } from "../../src/config/schema.ts";
-import { configKeys, currentReference, durationText, KEY_DEFAULTS, REFERENCE_END, REFERENCE_FILE, REFERENCE_START, replaceReference } from "../../src/reference.ts";
+import { configKeys, currentReference, durationText, KEY_DEFAULTS, REFERENCE_END, REFERENCE_FILE, REFERENCE_MARKERS, REFERENCE_START, replaceReference } from "../../src/reference.ts";
 
 const fresh = freshReference();
 
@@ -71,13 +71,24 @@ describe("reference render", () => {
 describe("the generated block in the file", () => {
   test("replaceReference keeps the prose around the markers and replaces only the block", () => {
     const doc = `# Reference\n\nprose before\n\n${REFERENCE_START}\nold\n${REFERENCE_END}\n\nprose after\n`;
-    const out = replaceReference(doc, `${REFERENCE_START}\nnew\n${REFERENCE_END}`);
+    const out = replaceReference(doc, `${REFERENCE_START}\nnew\n${REFERENCE_END}`, REFERENCE_MARKERS);
     expect(out).toBe(`# Reference\n\nprose before\n\n${REFERENCE_START}\nnew\n${REFERENCE_END}\n\nprose after\n`);
-    expect(() => replaceReference("# no markers", "x")).toThrow("no generated block");
+    expect(() => replaceReference("# no markers", "x", REFERENCE_MARKERS)).toThrow("no generated block");
+  });
+
+  test("the block helpers take a marker pair, so one file holds two generated blocks, each kept apart", () => {
+    const other = { start: "<!-- other:start -->", end: "<!-- other:end -->" };
+    const doc = `${REFERENCE_START}\nref\n${REFERENCE_END}\nprose\n${other.start}\nold\n${other.end}\n`;
+    const out = replaceReference(doc, `${other.start}\nnew\n${other.end}`, other);
+    expect(out).toBe(`${REFERENCE_START}\nref\n${REFERENCE_END}\nprose\n${other.start}\nnew\n${other.end}\n`);
+    expect(currentReference(out, other)).toBe(`${other.start}\nnew\n${other.end}`);
+    expect(currentReference(out, REFERENCE_MARKERS)).toBe(`${REFERENCE_START}\nref\n${REFERENCE_END}`);
+    expect(currentReference("# none", other)).toBeUndefined();
+    expect(() => replaceReference("# none", "x", other)).toThrow(other.start);
   });
 
   test(`${REFERENCE_FILE} is up to date (bun run docs:emit)`, () => {
-    const block = currentReference(readFileSync(join(ROOT, REFERENCE_FILE), "utf8"));
+    const block = currentReference(readFileSync(join(ROOT, REFERENCE_FILE), "utf8"), REFERENCE_MARKERS);
     expect(block, `${REFERENCE_FILE} is stale: run \`bun run docs:emit\` and commit the result`).toBe(fresh);
   });
 });
