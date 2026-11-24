@@ -1,6 +1,7 @@
 /**
- * `norn lab --tty`: the lab's tour in the terminal. It ticks the lab's story on, and at each beat it
- * reaches says the beat's caption and pauses for Enter. At a beat that needs the person it prints
+ * `norn lab --tty`: the lab's tour in the terminal. It ticks the lab's story on, and once the story
+ * is past a beat says that beat's caption and pauses for Enter, the story held where the caption
+ * left it. At a beat that needs the person it prints
  * their exact command, with the lab's repo and norn home, and waits: Enter runs that command, or the
  * person runs it in another shell, which the tour sees in the story's state and moves on. Every state
  * is read from `norn status --json`, never from prose.
@@ -99,11 +100,13 @@ export async function playTour(script: LabScript, paths: LabPaths, io: TourIo, s
     const beat = beatOf(script, unit);
     // a decision on its way (a receipt the next tick applies) is not asked for again
     const you = (unit.pending_receipts ?? 0) === 0 ? personCommand(beat, unit, key) : null;
-    while (shown < beat.n) {
+    // a caption says what happened, so a beat is told once the story is past it; the beat a decision
+    // is due at is told as it waits on that decision, which it then waits on alone
+    const due = unit.ended !== undefined ? of : you !== null ? beat.n : beat.n - 1;
+    while (shown < due) {
       shown++;
       tell(io, script.beats[shown - 1] as LabBeatScript, of, key);
-      // the beat a decision is due at waits on that decision alone
-      if (shown < beat.n || (you === null && unit.ended === undefined)) {
+      if (shown < due || (you === null && unit.ended === undefined)) {
         io.say("Press Enter to go on.");
         await line(io);
         if (io.signal?.aborted) return st;

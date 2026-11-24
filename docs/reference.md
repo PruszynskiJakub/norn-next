@@ -697,7 +697,7 @@ norn lab [--clean] [--port <n>] [--tty]
 
 - `--clean`: remove the lab and build it again, from beat 1
 - `--port <n>`: serve the dashboard on this port of localhost (default: a free one); refused when it is taken
-- `--tty`: play the tour in the terminal instead of serving the dashboard: pause at each beat with its caption, and at each decision of yours print its exact command, which Enter runs or you run in another shell
+- `--tty`: play the tour in the terminal instead of serving the dashboard: pause once each beat has happened, with its caption, and at each decision of yours print its exact command, which Enter runs or you run in another shell
 
 #### Background: run by a person, cron or a terminal multiplexer
 

@@ -124,6 +124,53 @@ describe("norn lab --tty", () => {
     expect(t.said.at(-1)).toContain("ended `done`");
   });
 
+  test("AC4: a beat is told only once what it narrates shows in the story's state, which holds while the tour pauses on it", async () => {
+    const w = world();
+    let ticks = 0;
+    const tick = async () => {
+      ticks++;
+      await w.tick();
+    };
+    const told: { n: number; unit: LabUnit | null }[] = [];
+    const held: boolean[] = [];
+    const t = terminal((line, enter) => {
+      if (!line.startsWith("Press Enter")) return enter();
+      // a pause holds the story where its caption put it: no tick, no change, until Enter
+      void w.state().then((before) => {
+        const n = ticks;
+        setTimeout(() => {
+          void w.state().then((after) => {
+            held.push(ticks === n && JSON.stringify(after.unit) === JSON.stringify(before.unit));
+            enter();
+          });
+        }, 5);
+      });
+    });
+    const say = (line: string) => {
+      const m = /^## Beat (\d+) of/.exec(line);
+      if (m) void w.state().then((s) => told.push({ n: Number(m[1]), unit: s.unit }));
+      t.say(line);
+    };
+    await playTour(script, paths, { ...w, tick, say, input: t.input, sleep: tick0 }, 0);
+    const at = (n: number) => told.find((b) => b.n === n)?.unit;
+    // beat 1 says the story was claimed and synced: the unit is past sync
+    expect(at(1)?.step).toBe("implement");
+    // beat 2 says the check failed and the work went back to implement, where check.fail is 1
+    expect(at(2)).toMatchObject({ step: "implement", counters: { "check.fail": { value: 1 } } });
+    // beat 3 says the agent asked: the unit waits for an answer
+    expect(at(3)?.waiting?.for).toBe("answer");
+    // beat 4 says review approved on the rework: the unit is past review
+    expect(at(4)?.step).toBe("describe");
+    expect(at(4)?.counters["review.changes_requested"]?.value).toBe(1);
+    // beat 5 says the describe agent's retry reported done: the unit is past describe
+    expect(at(5)?.step).toBe("open-pr");
+    expect(at(6)?.step).toBe("ready");
+    expect(at(7)?.waiting?.for).toBe("gate");
+    expect(at(8)?.step).toBe("merge");
+    expect(held.length).toBeGreaterThan(0);
+    expect(held.every(Boolean)).toBe(true);
+  });
+
   test("AC9: once the story ended it ticks on until the story's claim is given up, and says the end once", async () => {
     const w = world();
     const t = terminal();
