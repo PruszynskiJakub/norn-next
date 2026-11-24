@@ -1,7 +1,7 @@
 # For refactors, docs, chores and other small changes, and the fix of a bug a reproduce round
 # confirmed. A merged PR ends the story.
 name: quick
-description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
+description: "For a refactor, docs, a chore or another small change, or the fix of a bug a reproduce round confirmed: make it, check and review it, open the draft PR, wait for CI."
 start: catch-up
 steps:
   catch-up:

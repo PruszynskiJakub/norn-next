@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "$id": "https://norn.dev/schema/skill-list.json",
+  "title": "SkillList",
+  "type": "object",
+  "required": [
+    "repo",
+    "skills"
+  ],
+  "properties": {
+    "repo": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "title": "SkillListEntry",
+        "type": "object",
+        "required": [
+          "name",
+          "use_when",
+          "description",
+          "source",
+          "path"
+        ],
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "use_when": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "title": "SkillOrigin",
+            "anyOf": [
+              {
+                "const": "pack",
+                "type": "string"
+              },
+              {
+                "const": "repo",
+                "type": "string"
+              },
+              {
+                "const": "harness",
+                "type": "string"
+              }
+            ]
+          },
+          "path": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "harness": {
+            "minLength": 1,
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

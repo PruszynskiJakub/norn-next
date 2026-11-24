@@ -45,13 +45,7 @@ Use the `norn-diagnose` loop only when the symptom does not show on the first tr
 
 Recommend exactly one, and never act on it yourself: a person decides.
 
-| Recommend | When |
-|---|---|
-| `refinement` | new behaviour, or a rule to settle or change first: it needs a spec and a plan agreed with a person before anyone builds it |
-| `quick` | a refactor, docs, a chore or a small change with no open design question; also a rule change that is small and settled |
-| `reproduce` | it is a bug whose fix is not yet clear: its cause is confirmed, and the fix decided, before anyone builds it; a specific report you could not make happen may still go here |
-| `fix` | it is a bug whose fix looks small and settled: one round confirms its cause with a red loop, then fixes it behind a regression test |
-| `close` | it no longer applies, is a duplicate, or is out of scope (name the issue, PR or rule that says so); a bug you could not make happen, with what you tried |
+Pick the next round from the workflow catalog, never from a list of your own: each workflow's description says when to pick it and what it does. Your instructions name the workflows you may recommend; in a norn repo the catalog is norn's reference (its Workflow catalog section), with any workflow the repo's `.agents/workflows/` adds or replaces. Recommend `close` instead when the issue no longer applies, is a duplicate, or is out of scope (name the issue, PR or rule that says so), or for a bug you could not make happen, with what you tried.
 
 Judge one of each set. Your instructions name the label for each value (for example `<prefix>kind:bug`); without them, write the bare value (`bug`) and add no label.
 

@@ -23,6 +23,18 @@ You give a story to a coding agent and switch to something else. Forty minutes l
 
 norn is a small kernel and plugins. Where stories come from (GitHub issues, or markdown files on your machine), where changes are reviewed (GitHub pull requests, or plain git), where run data lives, which agent tool works (Claude Code, pi) and where it runs (headless, or a Herdr pane) are each a plugin you pick in the config; `norn init` picks them for you.
 
+## Try this
+
+Once norn is [installed](#install), see a whole story go through in a few minutes, for free and offline:
+
+```sh
+norn lab
+```
+
+`norn lab` builds a throwaway repo under your temp directory, with its own norn home, a toy app and a stand-in agent, so no real agent runs and nothing of yours is touched. A story plays through the `quick` workflow in eight beats: taken in, a failing check, a question for you, a review loop, a dead agent retried, a pull request, a gate you reject and approve, and a merge. It prints the URL of a dashboard on localhost (it opens no browser): the workflow drawn left to right along its main path, with the shared part that holds the live step opened and that step lit, each decision in plain words, the receipts in the order they were written, what needs you, the story's documents and the agent's session. Its buttons run the real commands (`norn story answer`, `norn story approve`, the git merge) and show each one. Its break-it switches break the lab on purpose: kill the agent, make the check fail, move the base so the update needs a resolve, edit a run-state file to see `corrupt`, and expire the claim. Each shows the command it ran and the way out (for example `norn story take` for an expired claim), and changes only the lab's own repo, remote and norn home. The dashboard answers only its own page: a button pressed from another site, or a request that reaches it under another host name, is refused, and its buttons wait until the lab is built. `norn lab --clean` or the Reset button starts it again from beat 1; `--port <n>` picks the port. `norn lab --tty` plays the same tour in the terminal instead, pausing once each beat has happened and printing each command of yours.
+
+![norn lab playing its eight beats](docs/assets/norn-lab.gif)
+
 ## Is norn for you?
 
 **A good fit today:** one person, Claude Code or pi, a test suite you trust, and stories big enough to plan. GitHub works out of the box; a repository with no code host works too, with the local tracker and no forge. Several stories can run in parallel on one machine, started by you (manual mode) or by norn (auto mode).
@@ -75,7 +87,9 @@ A plugin that does not ship with norn is one command: `norn plugin add <npm spec
 
 ## Run a first story
 
-On GitHub, an issue labelled `norn` and assigned to you is a story; with the local tracker, `norn story create` makes one:
+On GitHub, an issue labelled `norn` and assigned to you is a story; with the local tracker, `norn story create` makes one. `norn workflow list` shows every workflow you can start and when to pick it, `norn workflow show <name>` one workflow as norn runs it, and `norn skill list` every skill an agent here can use; all three work before `norn init` too, on the pack alone.
+
+Before you start `norn watch`: in auto mode, which `norn init` writes with the headless runner, each agent step launches an agent on its own, and every agent run costs money on your harness's account. To start in manual mode instead, where nothing launches until you say so, run `norn config set kernel.mode manual` first; then `norn status` shows each agent step waiting and `norn run start <unit>` starts it. `norn watch` runs the ticks for you, one after another, so a story moves on by itself until something waits for you; a hand `norn tick` moves it one small step and stops.
 
 ```sh
 gh issue create --label norn --assignee @me --title "Add CSV export of orders"
@@ -98,6 +112,7 @@ norn status    # in another terminal: every story, what needs you first
 |---|---|
 | [Concepts](docs/concepts.md) | how norn works: the kernel and its plugins, stories, units, workflows, steps, gates, modes, one tick, the agent's worktree, config, and the glossary |
 | [Reference](docs/reference.md) | every command, flag and config key, the workflows the bundled pack ships, and the exit codes |
+| [Workflows](docs/workflows.md) | every workflow the bundled pack ships, drawn as a graph: its steps, outcomes, limits and gates |
 | [Recipes](docs/recipes.md) | what to do when an agent asks or dies, a gate waits, you want your own workflow or plugin, or you run without GitHub |
 | [Limitations](docs/limitations.md) | what is not built, not proven in real use, or out of scope by design |
 | [Contributing](CONTRIBUTING.md) | how norn is built with norn, and how to propose a change |

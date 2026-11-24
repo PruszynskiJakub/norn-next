@@ -34,6 +34,7 @@ packages/store-local      @norn/store-local      store: run data in the machine 
 packages/store-refs       @norn/store-refs       store: run data on git refs shared through the remote
 packages/harness-claude   @norn/harness-claude   harness: Claude Code (hooks, launch, events)
 packages/harness-pi       @norn/harness-pi       harness: pi (extension, launch, events)
+packages/harness-lab      @norn/harness-lab      harness: the lab's scripted stand-in agent (beats, launch, events)
 packages/runner-headless  @norn/runner-headless  runner: the agent as a detached process
 packages/runner-herdr     @norn/runner-herdr     runner: the agent in a Herdr pane
 packages/pack-sdlc        @norn/pack-sdlc        pack: the shipped workflows, shared files and skills
@@ -41,7 +42,7 @@ packages/conformance      @norn/conformance      contract suites for the slots, 
 packages/cli              @norn/cli              wiring + commands, config layers, plugin install; bin `norn` → src/main.ts
 ```
 
-Dependencies point one way only: `schema ← plugin-api ← kernel ← runtime ← cli`. Every plugin package (`host-node`, `vcs-git`, `tracker-local`, `plugin-github`, `forge-none`, `store-local`, `store-refs`, `harness-claude`, `harness-pi`, `runner-headless`, `runner-herdr`) reads only `schema` and `plugin-api`; `pack-sdlc` reads only `plugin-api`; `conformance` adds `kernel`; `cli` wires them all. `test/repo/repo.test.ts` enforces it: every `@norn/*` import must be allowed **and** declared in the package's `package.json`. Each package in full: [Development › Layout](docs/development.md#layout).
+Dependencies point one way only: `schema ← plugin-api ← kernel ← runtime ← cli`. Every plugin package (`host-node`, `vcs-git`, `tracker-local`, `plugin-github`, `forge-none`, `store-local`, `store-refs`, `harness-claude`, `harness-pi`, `harness-lab`, `runner-headless`, `runner-herdr`) reads only `schema` and `plugin-api`; `pack-sdlc` reads only `plugin-api`; `conformance` adds `kernel`; `cli` wires them all. `test/repo/repo.test.ts` enforces it: every `@norn/*` import must be allowed **and** declared in the package's `package.json`. Each package in full: [Development › Layout](docs/development.md#layout).
 
 ## Process
 
@@ -61,6 +62,7 @@ Dependencies point one way only: `schema ← plugin-api ← kernel ← runtime �
 - **Receipts before effects, state last.** The kernel's journal writes every receipt before the effect it records and commits a unit's state last, by compare-and-swap, as the commit point; a commit that lost a race is read again, never forced. Every record is validated on read; one that fails makes the unit `corrupt`, never a guess.
 - **One IO boundary.** Only `@norn/host-node` writes files and starts processes, behind the `HostContext` every plugin receives; its writes are atomic (temp file, fsync, rename). Every JSON read is validated against a schema.
 - **The kernel is pure; plugins never decide.** No `node:fs`, `Bun.spawn`, `Date.now()` or `Math.random` in `@norn/kernel`; use `facts.now` and `deriveUlid`. A plugin reports facts and performs one effect per call; a step kind performs and reports, and never picks the next step.
+- **Docs.** A change a person or agent can notice (a command, flag, config key, output, refusal, workflow step, skill or brief that reads or acts differently) updates the doc that describes it in the same PR, and the PR says which docs it touched or why none. It covers only behaviour someone can notice: a refactor, a test-only change or an internal rename with no visible change needs no doc and draws no finding. A visible behaviour change with no docs diff and no reason given is a breach of this rule.
 - **Comments say why, never what or when**: an invariant, an ordering that must hold, a hazard. No issue numbers, spec item ids or history.
 - **Code style.** TypeScript strict ESM, `.ts` import suffixes inside a package, `@norn/<pkg>` across packages, no default exports, small modules; tests in their tier's folder, never in `src/`. Never commit trace data or run state. The rules in full: [Development › Code rules](docs/development.md#code-rules).
 

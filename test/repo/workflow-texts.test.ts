@@ -83,3 +83,30 @@ describe("agent step texts", () => {
     expect(row).toContain("Merge nothing");
   });
 });
+
+describe("triage recommends from the workflow catalog", () => {
+  const workflowNames = readdirSync(DIRS[0] as string)
+    .filter((f) => f.endsWith(".yaml"))
+    .map((f) => f.replace(/\.yaml$/, ""));
+  const texts: Array<[string, string]> = [
+    ["packages/pack-sdlc/assets/skills/norn-triage/SKILL.md", readFileSync(join(ROOT, "packages", "pack-sdlc", "assets", "skills", "norn-triage", "SKILL.md"), "utf8")],
+    ...agentSteps()
+      .filter((s) => s.skills.includes("norn-triage"))
+      .map((s): [string, string] => [s.where, s.text]),
+  ];
+  // a table whose rows open with workflow names is a copy of the catalog that drifts from it
+  const copiedRows = (text: string) => text.split("\n").filter((l) => new RegExp(`^\\|\\s*\`?(${workflowNames.join("|")})\`?\\s*\\|`).test(l));
+
+  test("the triage skill and every triage step carry no table of workflows of their own", () => {
+    expect(texts.length).toBeGreaterThanOrEqual(3);
+    expect(texts.flatMap(([where, text]) => copiedRows(text).map((row) => `${where}: ${row}`))).toEqual([]);
+  });
+
+  test("the lint finds a copied table", () => {
+    expect(copiedRows("| Recommend | When |\n|---|---|\n| `quick` | a small change |")).toEqual(["| `quick` | a small change |"]);
+  });
+
+  test("the triage skill and every triage step point at the workflow catalog", () => {
+    expect(texts.filter(([, text]) => !/workflow catalog/i.test(text)).map(([where]) => where)).toEqual([]);
+  });
+});

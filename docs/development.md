@@ -10,7 +10,7 @@ bun run test        # the unit tier, in seconds: your loop after each change; a 
 bun run test:integration  # the integration tier (packages/*/test/integration/), 6 workers: CI runs it in shards, never a local check
 bun run typecheck   # tsc --noEmit over every package and scripts/
 bun run schema:emit # regenerate packages/schema/json/*.schema.json after changing a schema
-bun run docs:emit   # regenerate docs/reference.md's generated block after changing a command, flag, config key or the pack's workflows
+bun run docs:emit   # regenerate the generated blocks of docs/reference.md, docs/workflows.md and CONTRIBUTING.md after changing a command, flag, config key, or a workflow or skill of the pack or .agents/workflows/
 bun run build       # dist/npm/: one bundled norn.js + package.json; build:bin [<target>…] builds the binaries
 bun run golden -- --update  # behaviour change: re-decide every golden case, rewrite only its decisions
 bun run golden      # add the golden cases the scenarios in packages/kernel/scripts/golden/ produce
@@ -27,7 +27,7 @@ packages/schema           @norn/schema           JSON Schemas (TypeBox) + types 
 packages/plugin-api       @norn/plugin-api       the plugin contract: defineNornPlugin, the slots, HostContext, PluginResult, harness events, story keys, the plugin API version
 packages/kernel           @norn/kernel           pure: workflow loader and counters, the model (facts, actions, receipts, run state), decide, the journal's write rules, the session reducer and classifier, the brief
 packages/runtime          @norn/runtime          the host: tick (lock, gather facts, decide, act, trace), slot resolution, the launcher (executor = harness + runner), hook ingest and event log, inputs and skills in worktrees, detached checks, the open-pr, await-checks and await-merge step kinds
-packages/host-node        @norn/host-node        the HostContext over Bun and node: atomic file writes, exec with a bound, detached processes
+packages/host-node        @norn/host-node        the HostContext over Bun and node: atomic file writes, exec with a bound, detached processes; beside it, `serveHttp`, the loopback HTTP server the lab dashboard is served by
 packages/vcs-git          @norn/vcs-git          the vcs slot over git (worktrees, merge, push, refs) and the update-branch, integrate, push and verify-base step kinds
 packages/tracker-local    @norn/tracker-local    a tracker over one markdown file per item
 packages/plugin-github    @norn/plugin-github    a tracker over issues and a forge over pull requests, through gh
@@ -36,11 +36,12 @@ packages/store-local      @norn/store-local      a store in the machine dir (run
 packages/store-refs       @norn/store-refs       a store on git refs (refs/norn/v2/…) shared through the remote
 packages/harness-claude   @norn/harness-claude   the Claude Code harness: hooks in .claude/settings.local.json, launch, normalize, respond
 packages/harness-pi       @norn/harness-pi       the pi harness: an extension pi loads, launch, normalize, respond
+packages/harness-lab      @norn/harness-lab      the lab harness: a scripted stand-in agent (`runLabAgent`, run as `norn lab-agent`) playing a beat script, launch, normalize, respond; it honours a denied tool call (`denyTool`), so docs-only steps run on it, and a resumed session or a retry (`retry` in `norn brief --json`) plays its beat's `resumed` work
 packages/runner-headless  @norn/runner-headless  agents as detached processes, output to a log
 packages/runner-herdr     @norn/runner-herdr     agents in Herdr panes, one workspace per story and one tab per run, closed by `close` (plugin API 1.17) once the run's unit is done with; `focus`, `split` and `label` (plugin API 1.18) bring a run's pane in front, open the cockpit below a person's pane and write a story workspace's `$norn` sidebar token
-packages/pack-sdlc        @norn/pack-sdlc        the sdlc pack: workflows, shared files and skills, imported as text
+packages/pack-sdlc        @norn/pack-sdlc        the sdlc pack: workflows, shared files and skills, imported as text; beside the pack, `SDLC_LAB`: the lab's beat script with its captions, the stand-in's beats and the toy app (`assets/lab/`), which only `norn lab` reads
 packages/conformance      @norn/conformance      contract suites (store, tracker, forge, signal source, harness), in-memory fakes, recorded-session replay
-packages/cli              @norn/cli              wiring + commands, the layered config, plugin install and lock, init and doctor; bin `norn` → src/main.ts
+packages/cli              @norn/cli              wiring + commands, the layered config, plugin install and lock, init and doctor, `norn lab` (`src/lab/`); bin `norn` → src/main.ts
 ```
 
 Dependencies point one way only: `schema ← plugin-api ← kernel ← runtime ← cli`. A plugin package reads only `schema` and `plugin-api` (`pack-sdlc` only `plugin-api`), so a third-party plugin needs nothing a bundled one does not; `conformance` adds `kernel`, since its harness suite replays through the kernel's reducer; `cli` wires them all. `test/repo/repo.test.ts` enforces this: every `@norn/*` import must be allowed **and** declared in the package's `package.json`. Bun's isolated linker also hides undeclared packages.
@@ -51,7 +52,7 @@ A plugin is one value made with `defineNornPlugin({ name, api, provides })`; `ap
 
 | Slot | Contract | Bundled |
 |---|---|---|
-| `harness` | the agent tool: install its hooks in a worktree, launch it, normalize its hook payloads into harness events, render norn's answer back | `claude`, `pi` |
+| `harness` | the agent tool: install its hooks in a worktree, launch it, normalize its hook payloads into harness events, render norn's answer back | `claude`, `pi`, `lab` |
 | `tracker` | where stories come from: list items, intake label, comments, close | `github`, `local` |
 | `forge` | changes for review: open or update a change, read its state and checks, and (`checkReport`, optional, plugin API 1.27) each failed check with its link and whether the change conflicts with its base, which `forge.await-checks` reads, and (`fileUrl`, optional, plugin API 1.28) where it serves a commit's file, as an image or a link, for a forge that reports `raw_urls` | `github`, `none` |
 | `store` | run data: numbered receipts, state by compare-and-swap, claims, mailbox, artifacts | `local`, `refs` |
@@ -78,9 +79,9 @@ The unit tier (`bun run test`) and the type check must pass before you hand work
 - the docs lint in `test/repo/docs.test.ts` (doc set in `test/support/docs.ts`);
 - the repo's skills in `test/repo/process.test.ts`.
 
-The docs lint fails on a rules file coming back, a link or anchor that does not resolve, a `norn` command or flag the CLI does not have, a version named outside the README badge and the changelog, and a handoff tracked in the repo outside a spec folder's `handoffs/`. A test also fails if the emitted JSON schemas or the generated block of `docs/reference.md` (`packages/cli/test/unit/reference.test.ts`) are stale.
+The docs lint fails on a rules file coming back, a link or anchor that does not resolve, a `norn` command or flag the CLI does not have, a version named outside the README badge and the changelog, and a handoff tracked in the repo outside a spec folder's `handoffs/`. A test also fails if the emitted JSON schemas or the generated blocks of `docs/reference.md` (`packages/cli/test/unit/reference.test.ts`) and `docs/workflows.md` (`packages/cli/test/unit/workflows-page.test.ts`) are stale.
 
-CI (`.github/workflows/ci.yml`) runs the unit tier and the type check on every PR. Once they pass, it runs the integration tier in four shards, and builds the npm package and a binary and checks both with `scripts/smoke.sh`. The release run tests only the unit tier and the type check, since the release PR's CI ran every tier.
+CI (`.github/workflows/ci.yml`) runs the unit tier and the type check on every PR. Once they pass, it runs the integration tier in four shards, except the lab suites (the `lab*.test.ts` files in `packages/cli/test/integration/`), which each run alone on a runner, as the check `integration (<suite>)`: each plays a whole lab of real processes, and a lab next to other suites on one runner pushes every suite there past its timeout. It also builds the npm package and a binary and checks both with `scripts/smoke.sh`. The release run tests only the unit tier and the type check, since the release PR's CI ran every tier.
 
 ## Writing a test
 
@@ -94,7 +95,7 @@ Take ref names and shapes from the code, never by hand: story keys and unit ids 
 
 ## Golden cases
 
-`packages/kernel/test/unit/golden.test.ts` replays every case in `packages/kernel/test/golden/` through `decide` and wants exactly the decisions recorded. The corpus fires every rule id in `RULE_IDS` at least once; `packages/kernel/test/unit/parity.test.ts` holds `packages/kernel/test/parity.md`, the map from the old engine's rules to the kernel's, to that list.
+`packages/kernel/test/unit/golden.test.ts` replays every case in `packages/kernel/test/golden/` through `decide` and wants exactly the decisions recorded. The corpus fires every rule id in `RULE_IDS` at least once; `packages/kernel/test/unit/parity.test.ts` holds `packages/kernel/test/parity.md`, the map from the old engine's rules to the kernel's, to that list. A new rule id also needs its plain-word caption in `RULE_CAPTIONS` (`packages/cli/src/captions.ts`), which `norn tick` prints beside it; `packages/cli/test/unit/captions.test.ts` holds that map to `RULE_IDS` both ways.
 
 A change that keeps behaviour leaves the corpus alone. For an intended change in what decide decides, run `bun run golden -- --update`. It decides each existing case again and rewrites only its `decisions` (names, facts, workflows and config stay), printing the decisions that went and came per case, so the diff is exactly the behaviour change; review it.
 

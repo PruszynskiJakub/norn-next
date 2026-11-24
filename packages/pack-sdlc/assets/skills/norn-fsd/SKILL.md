@@ -1,6 +1,6 @@
 ---
 name: norn-fsd
-description: Supervise the stories a person names across rounds, from issue to a ready or merged PR — norn-fsd-round for each round, plus recommending the next workflow with its evidence when one ends. Never a workflow step.
+description: Supervise the stories a person names across rounds, from issue to a ready or merged PR — norn-fsd-round for each round, plus recommending the next workflow with its evidence when one ends. Use when a person asks to take named stories through every round to a ready or merged PR. Never a workflow step.
 disable-model-invocation: true
 ---
 

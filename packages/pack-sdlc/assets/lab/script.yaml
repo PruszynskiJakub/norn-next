@@ -1,0 +1,81 @@
+# The norn lab's script: one story through `quick`, in eight beats. Each beat says what norn did and
+# where to look. `when` places a story in a beat from its state alone (`norn status --json`): the
+# lab is at the highest beat whose `when` holds, with `steps` the unit's step, `counters` a counter
+# it has spent, and `ended` a unit that ended. The top `act` is the next command when nothing waits on the
+# person; `you` is the person's own command at the beat, the first whose match holds (`for` what the
+# unit waits on, `steps` its step, `unspent` a counter it has not spent), which `norn lab --tty`
+# prints and runs on Enter; `{key}` is the story's key.
+workflow: quick
+check: sh test.sh
+story:
+  title: Greet the world
+  body: >-
+    greet.sh prints `hello`. Make it greet the world: it prints `hello, world`, and test.sh
+    expects that.
+act: norn watch --interval 5s
+beats:
+  - n: 1
+    title: The story is taken in
+    caption: >-
+      The tick took the story in from the local tracker: it claimed the story for this machine, cut
+      its branch norn/{key} and made a worktree for it under the lab's norn home, then synced the
+      branch with its base.
+    look: "`norn status --json`: the story's `claim`; `git worktree list` and `git branch` in the repo"
+    when: { steps: [sync] }
+  - n: 2
+    title: A check fails and loops back
+    caption: >-
+      Implement wrote a greeting without its comma and reported done. The check ran `sh test.sh`,
+      which failed, so the work went back to implement, spending one of the check counter's tries.
+    look: "`norn status --json`: the unit's `counters`, where `check.fail` is 1"
+    when: { steps: [implement, check] }
+  - n: 3
+    title: The agent asks you
+    caption: >-
+      Implement asked a question with `norn ask`. The story waits for your answer; once you give it,
+      the next tick resumes the same agent session with it, and implement goes on.
+    look: "`norn status --json`: the unit's `waiting`, for an answer, with the command that gives it"
+    when: { counters: [check.fail] }
+    you:
+      - { for: answer, run: 'norn story answer {key} "Keep the comma."' }
+  - n: 4
+    title: Review asks for changes, then approves
+    caption: >-
+      Review reported `changes_requested` with findings it wrote to `$NORN_OUT/findings.json`. norn
+      handed them to implement as its rework, and review reported `approve` on the rework.
+    look: "`norn story view {key}`: the review's findings; `norn status --json`: `review.changes_requested` in the unit's `counters`"
+    when: { steps: [review], counters: [review.changes_requested] }
+  - n: 5
+    title: The agent dies, and norn retries
+    caption: >-
+      The describe agent exited without reporting. The next tick found its process gone and retried
+      the step in a fresh session, whose brief says the one before it died; that agent wrote pr.md
+      and reported done.
+    look: "`norn tick` output: the rule `agent.died.retry`; `.agents/specs/{key}/pr.md` in the story's worktree"
+    when: { steps: [update, test, test-merge, describe] }
+  - n: 6
+    title: The pull request opens on forge none
+    caption: >-
+      open-pr pushed the story's branch to the lab's bare remote and opened change 1 on forge none,
+      which needs no code host. With no CI, its checks passed at once.
+    look: "`norn status --json`: the story's `change`; `git ls-remote origin` in the repo"
+    when: { steps: [open-pr, checks] }
+  - n: 7
+    title: The gate waits for you
+    caption: >-
+      The `ready` gate waits for your decision. Reject it once with a reason: the reason goes back to
+      implement as its rework, and the story comes back to the gate. Then approve it.
+    look: "`norn status --json`: the unit's `waiting`, for the gate; `land.rejected` in its `counters` after a reject"
+    when: { steps: [ready], counters: [land.rejected] }
+    you:
+      - { for: gate, unspent: land.rejected, run: 'norn story reject {key} --reason "Name the greeting in the README too."' }
+      - { for: gate, run: "norn story approve {key}" }
+  - n: 8
+    title: You merge, and the story ends
+    caption: >-
+      Past the gate, the story waits for its change to merge. Merge it with git: forge none sees the
+      story's branch in the base, the story ends `done`, and its claim is released.
+    look: "`norn status --json`: the unit's `ended`, and the story's `claim`, which is null"
+    when: { steps: [merge], ended: true }
+    you:
+      - { steps: [merge], run: "git merge --no-ff --no-edit norn/{key} && git push -q origin main" }

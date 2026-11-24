@@ -188,7 +188,7 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
 
   const pinned = pin(written, flat.flat, read, routes, derived.counters);
   const graph = compile(pinned, read, routes, derived.counters, opts.config);
-  return { ok: true, workflow: { pinned, graph } };
+  return { ok: true, workflow: { pinned, graph, included: { ...included } } };
 }
 
 /** Every route goes to a step, `$done` or `$stuck`; the counters, `start` and `base` name what exists. */

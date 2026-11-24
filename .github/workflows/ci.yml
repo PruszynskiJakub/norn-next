@@ -29,7 +29,9 @@ jobs:
       - run: bun run test
       - run: bun run typecheck
 
-  # bun shards by file; the only place the integration tier runs, so no local check waits on it
+  # bun shards by file; the only place the integration tier runs, so no local check waits on it. The
+  # lab suites run in the lab job instead. The flags replace the integration config's ignore patterns,
+  # so they repeat them before the lab's.
   integration:
     needs: unit
     runs-on: ubuntu-latest
@@ -50,7 +52,31 @@ jobs:
           git config --global user.name "norn ci"
           git config --global user.email "ci@norn.invalid"
           git config --global init.defaultBranch main
-          bun run test:integration --shard=${{ matrix.shard }}/4
+          bun run test:integration --shard=${{ matrix.shard }}/4 --path-ignore-patterns='packages/*/test/*.ts' --path-ignore-patterns='packages/*/test/{[!i]*,i[!n]*}/**' --path-ignore-patterns='packages/cli/test/integration/lab*.test.ts'
+
+  # one runner per lab suite: each plays a whole lab of real processes, and a lab beside other suites
+  # on one runner starves every suite there past its timeout
+  lab:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [lab]
+    name: integration (${{ matrix.suite }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
+      - name: Integration tier, one lab suite
+        run: |
+          git config --global user.name "norn ci"
+          git config --global user.email "ci@norn.invalid"
+          git config --global init.defaultBranch main
+          bun run test:integration packages/cli/test/integration/${{ matrix.suite }}.test.ts
 
   package:
     needs: unit

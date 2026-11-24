@@ -1,0 +1,257 @@
+{
+  "scenario": "parallel-tools-ask",
+  "description": "Several tool calls run in parallel with an AskUserQuestion among them; the ask keeps one id while the others come and go.",
+  "derived_from": "Derived, not recorded: the claude recording of this scenario, each event it normalizes to fired as the lab agent's hook for it (packages/harness-lab/src/protocol.ts), at the same instants.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "lab-run-1"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_p1",
+        "kind": "other",
+        "tool": "Read",
+        "detail": "/repo/.worktrees/gh-12/src/a.ts"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_ask9",
+        "kind": "ask",
+        "tool": "AskUserQuestion"
+      }
+    },
+    {
+      "hook": "ask",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_ask9",
+        "question": "Keep the old flag as an alias?",
+        "options": [
+          "yes",
+          "no"
+        ]
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_p2",
+        "kind": "other",
+        "tool": "Grep",
+        "detail": "decide"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "id": "toolu_p1",
+        "ok": true
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:00:12.000Z",
+      "payload": {
+        "id": "toolu_p2",
+        "ok": true
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:13.000Z",
+      "payload": {
+        "id": "toolu_p3",
+        "kind": "other",
+        "tool": "Glob",
+        "detail": "**/*.ts"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:00:14.000Z",
+      "payload": {
+        "id": "toolu_p3",
+        "ok": true
+      }
+    },
+    {
+      "hook": "answer",
+      "at": "2026-11-17T10:20:00.000Z",
+      "payload": {
+        "id": "toolu_ask9",
+        "by": "pane"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:20:00.000Z",
+      "payload": {
+        "id": "toolu_ask9",
+        "ok": true
+      }
+    },
+    {
+      "hook": "stop",
+      "at": "2026-11-17T10:20:10.000Z",
+      "payload": {
+        "last_message": "Kept the alias."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 3,
+      "now": "2026-11-17T10:00:10.000Z",
+      "expect": {
+        "activity": "awaiting_tools"
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T10:00:10.000Z",
+      "expect": {
+        "activity": "asking",
+        "ask": {
+          "id": "toolu_ask9",
+          "question": "Keep the old flag as an alias?",
+          "options": [
+            "yes",
+            "no"
+          ]
+        },
+        "pending_tools": 2
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:00:10.000Z",
+      "expect": {
+        "activity": "asking",
+        "ask": {
+          "id": "toolu_ask9",
+          "question": "Keep the old flag as an alias?",
+          "options": [
+            "yes",
+            "no"
+          ]
+        },
+        "pending_tools": 3
+      }
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T10:00:11.000Z",
+      "expect": {
+        "activity": "asking",
+        "ask": {
+          "id": "toolu_ask9",
+          "question": "Keep the old flag as an alias?",
+          "options": [
+            "yes",
+            "no"
+          ]
+        },
+        "pending_tools": 2
+      }
+    },
+    {
+      "after": 8,
+      "now": "2026-11-17T10:00:12.000Z",
+      "expect": {
+        "activity": "asking",
+        "ask": {
+          "id": "toolu_ask9",
+          "question": "Keep the old flag as an alias?",
+          "options": [
+            "yes",
+            "no"
+          ]
+        },
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 9,
+      "now": "2026-11-17T10:00:13.000Z",
+      "expect": {
+        "activity": "asking",
+        "ask": {
+          "id": "toolu_ask9",
+          "question": "Keep the old flag as an alias?",
+          "options": [
+            "yes",
+            "no"
+          ]
+        },
+        "pending_tools": 2
+      }
+    },
+    {
+      "after": 10,
+      "now": "2026-11-17T10:00:14.000Z",
+      "expect": {
+        "activity": "asking",
+        "ask": {
+          "id": "toolu_ask9",
+          "question": "Keep the old flag as an alias?",
+          "options": [
+            "yes",
+            "no"
+          ]
+        },
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 10,
+      "now": "2026-11-17T10:18:20.000Z",
+      "expect": {
+        "activity": "asking",
+        "silent": false,
+        "ask": {
+          "id": "toolu_ask9",
+          "question": "Keep the old flag as an alias?",
+          "options": [
+            "yes",
+            "no"
+          ]
+        }
+      }
+    },
+    {
+      "after": 12,
+      "now": "2026-11-17T10:20:01.000Z",
+      "expect": {
+        "activity": "working",
+        "pending_tools": 0,
+        "pane_answers": 1
+      }
+    },
+    {
+      "after": 13,
+      "now": "2026-11-17T10:20:11.000Z",
+      "expect": {
+        "activity": "turn_ended"
+      }
+    }
+  ]
+}

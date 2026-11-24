@@ -14,6 +14,8 @@ import { doneCommand } from "./done.ts";
 import { helpCommand } from "./help.ts";
 import { hookCommand } from "./hook.ts";
 import { initCommand } from "./init.ts";
+import { labCommand } from "./lab.ts";
+import { labAgentCommand } from "./lab-agent.ts";
 import { pluginAddCommand } from "./plugin-add.ts";
 import { pluginListCommand } from "./plugin-list.ts";
 import { pluginRemoveCommand } from "./plugin-remove.ts";
@@ -22,6 +24,7 @@ import { runAttachCommand } from "./run-attach.ts";
 import { runRerunCommand } from "./run-rerun.ts";
 import { runStartCommand } from "./run-start.ts";
 import { runStopCommand } from "./run-stop.ts";
+import { skillListCommand } from "./skill-list.ts";
 import { statusCommand } from "./status.ts";
 import { storyAnswerCommand } from "./story-answer.ts";
 import { storyApproveCommand } from "./story-approve.ts";
@@ -38,6 +41,8 @@ import { tickCommand } from "./tick.ts";
 import { tidyCommand } from "./tidy.ts";
 import { watchCommand } from "./watch.ts";
 import { workflowConfirmCommand } from "./workflow-confirm.ts";
+import { workflowListCommand } from "./workflow-list.ts";
+import { workflowShowCommand } from "./workflow-show.ts";
 
 export const COMMANDS: readonly Command[] = [
   helpCommand,
@@ -47,17 +52,20 @@ export const COMMANDS: readonly Command[] = [
   tickCommand,
   watchCommand,
   tidyCommand,
+  labCommand,
   briefCommand,
   doneCommand,
   askCommand,
   stuckCommand,
   hookCommand,
+  labAgentCommand,
 ];
 
 export const NOUNS: readonly Noun[] = [
   defineNoun({ name: "story", summary: "Stories: list, view, create, the person's decisions, the next round, taking one to this machine, and updating a finished one's branch", verbs: [storyListCommand, storyViewCommand, storyCreateCommand, storyApproveCommand, storyRejectCommand, storyAnswerCommand, storyRoundCommand, storyTakeCommand, storyUpdateBranchCommand, storyCloseCommand] }),
   defineNoun({ name: "run", summary: "Runs: start one manual mode holds, stop a live one, run a step again, bring one's pane in front", verbs: [runStartCommand, runStopCommand, runRerunCommand, runAttachCommand] }),
-  defineNoun({ name: "workflow", summary: "Workflows: confirm a repo workflow held for the person", verbs: [workflowConfirmCommand] }),
+  defineNoun({ name: "workflow", summary: "Workflows: list the ones this repo can start, show one as norn runs it, confirm a repo workflow held for the person", verbs: [workflowListCommand, workflowShowCommand, workflowConfirmCommand] }),
+  defineNoun({ name: "skill", summary: "Skills: list every skill an agent in this repo can use", verbs: [skillListCommand] }),
   defineNoun({ name: "config", summary: "Read and change the config", verbs: [configGetCommand, configSetCommand, configShowCommand] }),
   defineNoun({ name: "plugin", summary: "Install, list, update and remove plugins", verbs: [pluginAddCommand, pluginListCommand, pluginRemoveCommand, pluginUpdateCommand] }),
 ];

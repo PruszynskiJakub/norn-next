@@ -6,6 +6,7 @@
 export { NOT_STARTED_CODE, nodeExec, TIMEOUT_CODE } from "./exec.ts";
 export { nodeFiles, TEMP_SUFFIX } from "./files.ts";
 export { createNodeHost } from "./host.ts";
+export { type HttpServer, LOOPBACK, type ServeHttp, type ServeOptions, type ServeResult, serveHttp } from "./serve.ts";
 export { type NodeHostOptions } from "./options.ts";
 export { nodeProcesses, type Probe, probeMatches, readStartProbe, startMarker } from "./spawn.ts";
 export { type AncestorProcess, ancestorPids, chainOf, envFromEnviron, nodeAncestry, parentFromStat, readParents, readPsEnvs } from "./ancestry.ts";

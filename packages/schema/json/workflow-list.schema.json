@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "$id": "https://norn.dev/schema/workflow-list.json",
+  "title": "WorkflowList",
+  "type": "object",
+  "required": [
+    "repo",
+    "workflows"
+  ],
+  "properties": {
+    "repo": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "workflows": {
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "title": "WorkflowListEntry",
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "source",
+          "state",
+          "file"
+        ],
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "title": "WorkflowOrigin",
+            "anyOf": [
+              {
+                "const": "pack",
+                "type": "string"
+              },
+              {
+                "const": "repo",
+                "type": "string"
+              },
+              {
+                "const": "replaces-pack",
+                "type": "string"
+              }
+            ]
+          },
+          "state": {
+            "title": "WorkflowState",
+            "anyOf": [
+              {
+                "const": "ok",
+                "type": "string"
+              },
+              {
+                "const": "held",
+                "type": "string"
+              },
+              {
+                "const": "invalid",
+                "type": "string"
+              }
+            ]
+          },
+          "file": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "confirm": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "problem": {
+            "minLength": 1,
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

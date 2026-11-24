@@ -15,6 +15,7 @@ const ALLOWED: Record<string, string[]> = {
   kernel: ["schema", "plugin-api"],
   "harness-claude": ["schema", "plugin-api"],
   "harness-pi": ["schema", "plugin-api"],
+  "harness-lab": ["schema", "plugin-api"],
   conformance: ["schema", "plugin-api", "kernel"],
   "plugin-github": ["schema", "plugin-api"],
   "tracker-local": ["schema", "plugin-api"],
@@ -41,6 +42,7 @@ const ALLOWED: Record<string, string[]> = {
     "store-refs",
     "harness-claude",
     "harness-pi",
+    "harness-lab",
     "runner-headless",
     "runner-herdr",
     "pack-sdlc",
@@ -328,13 +330,34 @@ describe("test layout (AGENTS.md)", () => {
     expect(["integration", "package"].map((n) => ({ n, needs: needs(jobs[n]) }))).toEqual(["integration", "package"].map((n) => ({ n, needs: ["unit"] })));
     const integration = jobs.integration;
     expect({ failFast: integration?.strategy?.["fail-fast"], shards: integration?.strategy?.matrix?.shard }).toEqual({ failFast: false, shards: [1, 2, 3, 4] });
-    expect(integration && runs(integration)).toContain("bun run test:integration --shard=${{ matrix.shard }}/4");
+    expect(integration && runs(integration).some((r) => r.startsWith("bun run test:integration --shard=${{ matrix.shard }}/4 "))).toBe(true);
     const identity = ["integration", "package"].map((n) => ({
       n,
       name: runs(jobs[n] as CiJob).some((r) => r.startsWith("git config --global user.name")),
       email: runs(jobs[n] as CiJob).some((r) => r.startsWith("git config --global user.email")),
     }));
     expect(identity).toEqual(["integration", "package"].map((n) => ({ n, name: true, email: true })));
+  });
+
+  test("ci.yml runs each lab suite alone in a lab job and the rest of the integration tier in the shards, so every integration suite runs exactly once", () => {
+    const jobs = ciJobs("ci.yml");
+    const LAB_GLOB = "packages/cli/test/integration/lab*.test.ts";
+    const labFiles = testFilesUnder(ROOT).filter((f) => new Bun.Glob(LAB_GLOB).match(f));
+    expect(labFiles.length).toBeGreaterThan(0);
+
+    const lab = jobs.lab as CiJob & { strategy?: { matrix?: { suite?: string[] } } };
+    expect([lab?.needs ?? []].flat()).toEqual(["unit"]);
+    expect(lab?.strategy?.["fail-fast"]).toBe(false);
+    const suites = lab?.strategy?.matrix?.suite ?? [];
+    expect(suites.map((s) => `packages/cli/test/integration/${s}.test.ts`).sort()).toEqual(labFiles);
+    expect(runs(lab)).toContain("bun run test:integration packages/cli/test/integration/${{ matrix.suite }}.test.ts");
+    expect(runs(lab).some((r) => r.startsWith("git config --global user.email"))).toBe(true);
+
+    // the flags replace the integration config's ignore patterns, so the shard repeats them and adds the lab's
+    const shard = runs(jobs.integration as CiJob).find((r) => r.startsWith("bun run test:integration --shard=")) ?? "";
+    const ignored = [...shard.matchAll(/--path-ignore-patterns='([^']+)'/g)].map((m) => m[1]);
+    expect(ignored).toEqual([...(bunfig("bunfig.integration.toml").pathIgnorePatterns ?? []), LAB_GLOB]);
+    expect(tierSelection("bunfig.integration.toml").filter((f) => !labFiles.includes(f)).length).toBeGreaterThan(0);
   });
 
   test("the latest released norn loads every PR's tree but a release's, in a workflow of its own so a story's ci check never waits on it", () => {

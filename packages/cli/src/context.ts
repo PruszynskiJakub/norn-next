@@ -4,6 +4,7 @@
  * with the CliError of the first piece that does not resolve.
  */
 import { hostname } from "node:os";
+import type { ServeHttp } from "@norn/host-node";
 import type { HostContext } from "@norn/plugin-api";
 import type { Runtime, RuntimeEnv } from "@norn/runtime";
 import type { LoadedConfig } from "./config/load.ts";
@@ -41,8 +42,12 @@ export interface CliIo {
   sleep?(ms: number, signal?: AbortSignal): Promise<void>;
   /** a line for a person on stderr; never data */
   log?(line: string): void;
+  /** stdin line by line, for a command that waits on a person's Enter; absent, its input has ended */
+  lines?(): AsyncIterable<string>;
   /** the person's terminal, taken over by `status --watch` until it quits */
   terminal?(): Terminal;
+  /** serves a local page on 127.0.0.1, such as the lab's dashboard; absent where nothing may listen */
+  serve?: ServeHttp;
   /** how this binary is invoked, so a launched agent's hooks call the same build: `[bun, main.ts]` or `[norn]` */
   self: readonly string[];
   /** this binary's version; the entry passes the package's */

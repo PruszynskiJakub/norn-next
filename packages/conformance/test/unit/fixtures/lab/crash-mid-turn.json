@@ -1,0 +1,68 @@
+{
+  "scenario": "crash-mid-turn",
+  "description": "Claude Code dies in the middle of a shell call. It sends no hook for that, so the host records the end it detected.",
+  "derived_from": "Derived, not recorded: the claude recording of this scenario, each event it normalizes to fired as the lab agent's hook for it (packages/harness-lab/src/protocol.ts), at the same instants.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "lab-run-1"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_01",
+        "kind": "shell",
+        "tool": "Bash",
+        "detail": "bun run build"
+      }
+    },
+    {
+      "host": {
+        "type": "session.ended",
+        "reason": "crash"
+      },
+      "at": "2026-11-17T10:02:00.000Z"
+    }
+  ],
+  "checks": [
+    {
+      "after": 3,
+      "now": "2026-11-17T10:01:00.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 4,
+      "now": "2026-11-17T10:02:01.000Z",
+      "expect": {
+        "activity": "ended",
+        "silent": false,
+        "pending_tools": 0
+      }
+    },
+    {
+      "after": 4,
+      "now": "2026-11-17T12:00:00.000Z",
+      "expect": {
+        "activity": "ended",
+        "silent": false,
+        "pending_tools": 0,
+        "subagents": 0
+      }
+    }
+  ]
+}

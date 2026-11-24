@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
 import { ok, PLUGIN_API_VERSION, type StoreFactory } from "@norn/plugin-api";
 import { localStoreFactory } from "@norn/store-local";
+import { RULE_CAPTIONS } from "../../src/captions.ts";
 import { CliContext, configPaths, ExitCode, machineDir, machineId, type PluginImporter, runCli } from "../../src/index.ts";
 import { COMMON, HOME, LOCAL_CONFIG, machine, ROOT, type TestMachine } from "./support.ts";
 import { AGENT_STEP, configured, envOf, GATE_STEP, seedUnit, UNIT } from "./units.ts";
@@ -38,6 +39,17 @@ describe("norn tick", () => {
     const r = await runCli(["tick"], m.io);
     expect(r.exit).toBe(ExitCode.ok);
     expect(r.stdout).toContain("- lt-1  intake.story → intake_story");
+  });
+
+  test("each decision reads rule → kind: caption in markdown, while --json carries no caption", async () => {
+    const m = repo();
+    await addItem(m, "First");
+    expect((await runCli(["tick"], m.io)).stdout).toContain(`- lt-1  intake.story → intake_story: ${RULE_CAPTIONS["intake.story"]}`);
+    expect((await runCli(["tick"], m.io)).stdout).toContain(`claim.pending → noop: ${RULE_CAPTIONS["claim.pending"]}`);
+    const body = (await runCli(["tick", "--json"], m.io)).stdout;
+    const decisions = json(body).decisions as { rule: string }[];
+    expect(decisions.length).toBeGreaterThan(0);
+    for (const d of decisions) expect(body).not.toContain(RULE_CAPTIONS[d.rule] as string);
   });
 
   test("a failed action exits 1 with the whole report", async () => {

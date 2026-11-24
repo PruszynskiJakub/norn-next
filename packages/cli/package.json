@@ -9,6 +9,7 @@
     "@norn/forge-none": "workspace:*",
     "@norn/harness-claude": "workspace:*",
     "@norn/harness-pi": "workspace:*",
+    "@norn/harness-lab": "workspace:*",
     "@norn/host-node": "workspace:*",
     "@norn/kernel": "workspace:*",
     "@norn/pack-sdlc": "workspace:*",

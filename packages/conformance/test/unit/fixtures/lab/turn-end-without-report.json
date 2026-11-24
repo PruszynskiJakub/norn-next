@@ -1,0 +1,66 @@
+{
+  "scenario": "turn-end-without-report",
+  "description": "The agent ends its turn without reporting; the session stays turn_ended, never working or silent.",
+  "derived_from": "Derived, not recorded: the claude recording of this scenario, each event it normalizes to fired as the lab agent's hook for it (packages/harness-lab/src/protocol.ts), at the same instants.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "lab-run-1"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_01",
+        "kind": "write",
+        "tool": "Edit",
+        "detail": "/repo/.worktrees/gh-12/src/a.ts"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "id": "toolu_01",
+        "ok": true
+      }
+    },
+    {
+      "hook": "stop",
+      "at": "2026-11-17T10:00:20.000Z",
+      "payload": {
+        "last_message": "I've made the change."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 5,
+      "now": "2026-11-17T10:00:21.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "silent": false,
+        "last_message": "I've made the change."
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T11:00:00.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "silent": false
+      }
+    }
+  ]
+}

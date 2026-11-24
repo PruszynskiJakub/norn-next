@@ -1,0 +1,228 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "$id": "https://norn.dev/schema/workflow-show.json",
+  "title": "WorkflowShow",
+  "type": "object",
+  "required": [
+    "repo",
+    "name",
+    "description",
+    "source",
+    "state",
+    "file",
+    "hash",
+    "start",
+    "steps",
+    "counters",
+    "gates"
+  ],
+  "properties": {
+    "repo": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "name": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source": {
+      "title": "WorkflowOrigin",
+      "anyOf": [
+        {
+          "const": "pack",
+          "type": "string"
+        },
+        {
+          "const": "repo",
+          "type": "string"
+        },
+        {
+          "const": "replaces-pack",
+          "type": "string"
+        }
+      ]
+    },
+    "state": {
+      "title": "WorkflowState",
+      "anyOf": [
+        {
+          "const": "ok",
+          "type": "string"
+        },
+        {
+          "const": "held",
+          "type": "string"
+        },
+        {
+          "const": "invalid",
+          "type": "string"
+        }
+      ]
+    },
+    "file": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "confirm": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "problem": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "hash": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "start": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "title": "WorkflowShowStep",
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "role",
+          "skills",
+          "outcomes"
+        ],
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "kind": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "outcome",
+                "to",
+                "counter"
+              ],
+              "properties": {
+                "outcome": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "to": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "counter": {
+                  "anyOf": [
+                    {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "counters": {
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "max",
+          "reset_on"
+        ],
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "max": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "reset_on": {
+            "type": "array",
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      }
+    }
+  }
+}

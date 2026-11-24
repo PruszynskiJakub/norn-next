@@ -383,6 +383,15 @@ describe("a step written with by: in the workflow-source and workflow-shared sch
   });
 });
 
+describe("the workflow-source schema", () => {
+  const wf = { name: "quick", start: "review", steps: { review: { gate: "Approve?", outcomes: { approve: "$done" } } } };
+  test("has no when: key; a workflow says when to pick it in its description", () => {
+    expect(validate("workflow-source", { ...wf, when: "Pick it for a small change." }).ok).toBe(false);
+    const json = toJsonSchema("workflow-source") as { properties: Record<string, unknown> };
+    expect(json.properties.when).toBeUndefined();
+  });
+});
+
 describe("like steps in the workflow-source and workflow-shared schemas", () => {
   const check = { check: "bun test", timeout: "5m", outcomes: { pass: "$done" } };
   test("a like step holds the known step keys loosely; an unknown key is refused; the strict schema refuses it", () => {

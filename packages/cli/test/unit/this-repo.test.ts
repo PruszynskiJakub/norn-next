@@ -78,6 +78,7 @@ describe("this repo's workflow files, as written", () => {
   test("a workflow sets its stale signal under signals: and its entries under entries:, never base:", () => {
     expect(written.filter(({ doc }) => "base" in doc).map(({ file }) => file)).toEqual([]);
   });
+
 });
 
 /** A workflow as written, its shared files flattened in: the doc the loader pins. */

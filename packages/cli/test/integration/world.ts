@@ -58,7 +58,7 @@ let belowAgent: Promise<string | null> | undefined;
  * running the tier) has the CLI refuse each person-only command; asking the CLI's own rule, for a
  * real person-only command, keeps the two from drifting apart.
  */
-function personOnlyBlocked(): Promise<string | null> {
+export function personOnlyBlocked(): Promise<string | null> {
   belowAgent ??= (async () => {
     const approve = findCommand("story approve");
     if (!approve?.personOnly) throw new Error("world: `story approve` is no longer a person-only command; name one that is");

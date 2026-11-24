@@ -1,3 +1,4 @@
+export * from "./catalog.ts";
 export * from "./claim.ts";
 export * from "./cli.ts";
 export * from "./common.ts";

@@ -1,0 +1,122 @@
+{
+  "scenario": "elicitation-answered",
+  "description": "An MCP tool raises an elicitation dialog; the person answers it in the pane and the agent carries on to the end of its turn.",
+  "derived_from": "Derived, not recorded: the claude recording of this scenario, each event it normalizes to fired as the lab agent's hook for it (packages/harness-lab/src/protocol.ts), at the same instants.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "lab-run-1"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_m1",
+        "kind": "other",
+        "tool": "mcp__github__create_issue",
+        "detail": "{\"title\":\"Flaky test\",\"body\":\"...\"}"
+      }
+    },
+    {
+      "hook": "ask",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "id": "input-762147b5",
+        "question": "MCP server github requests input"
+      }
+    },
+    {
+      "hook": "answer",
+      "at": "2026-11-17T10:20:00.000Z",
+      "payload": {
+        "by": "pane"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:20:01.000Z",
+      "payload": {
+        "id": "toolu_m1",
+        "ok": true
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:20:05.000Z",
+      "payload": {
+        "id": "toolu_b1",
+        "kind": "shell",
+        "tool": "Bash",
+        "detail": "bun run test"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:20:30.000Z",
+      "payload": {
+        "id": "toolu_b1",
+        "ok": true
+      }
+    },
+    {
+      "hook": "stop",
+      "at": "2026-11-17T10:20:35.000Z",
+      "payload": {
+        "last_message": "Filed #42 and the tests pass."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 4,
+      "now": "2026-11-17T10:15:00.000Z",
+      "expect": {
+        "activity": "asking",
+        "silent": false,
+        "ask": {
+          "question": "MCP server github requests input"
+        },
+        "pending_tools": 1
+      },
+      "why": "a dialog waits on the person, so the session is not silent"
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T10:20:00.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pane_answers": 1,
+        "pending_tools": 1
+      },
+      "why": "the answer in the dialog closes the ask; the tool it was raised in still runs"
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T10:20:06.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pane_answers": 1,
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 9,
+      "now": "2026-11-17T10:20:36.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "last_message": "Filed #42 and the tests pass."
+      }
+    }
+  ]
+}

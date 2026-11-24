@@ -1,0 +1,105 @@
+{
+  "scenario": "context-compaction",
+  "description": "Claude Code compacts the context in the middle of a turn; the turn goes on and nothing reads as idle.",
+  "derived_from": "Derived, not recorded: the claude recording of this scenario, each event it normalizes to fired as the lab agent's hook for it (packages/harness-lab/src/protocol.ts), at the same instants.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "lab-run-1"
+      }
+    },
+    {
+      "hook": "prompt",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "id": "toolu_01",
+        "kind": "other",
+        "tool": "Read",
+        "detail": "/repo/.worktrees/gh-12/src/a.ts"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "id": "toolu_01",
+        "ok": true
+      }
+    },
+    {
+      "hook": "compact",
+      "at": "2026-11-17T10:00:12.000Z",
+      "payload": {}
+    },
+    {
+      "hook": "tool",
+      "at": "2026-11-17T10:01:10.000Z",
+      "payload": {
+        "id": "toolu_02",
+        "kind": "write",
+        "tool": "Edit",
+        "detail": "/repo/.worktrees/gh-12/src/a.ts"
+      }
+    },
+    {
+      "hook": "tool-done",
+      "at": "2026-11-17T10:01:11.000Z",
+      "payload": {
+        "id": "toolu_02",
+        "ok": true
+      }
+    },
+    {
+      "hook": "stop",
+      "at": "2026-11-17T10:01:20.000Z",
+      "payload": {
+        "last_message": "Done editing."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 5,
+      "now": "2026-11-17T10:00:13.000Z",
+      "expect": {
+        "activity": "working",
+        "silent": false,
+        "compactions": 1
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:01:10.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "compactions": 1
+      }
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T10:01:12.000Z",
+      "expect": {
+        "activity": "working",
+        "compactions": 1
+      }
+    },
+    {
+      "after": 8,
+      "now": "2026-11-17T10:01:21.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "compactions": 1
+      }
+    }
+  ]
+}
