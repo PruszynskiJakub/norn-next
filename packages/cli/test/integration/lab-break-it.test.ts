@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { sh } from "./world.ts";
-import { alive, calledBeyondVersion, holdCommits, inLab, KEY, machine, norn, SLOW, served, snapshot, statusUntil, story } from "./lab-world.ts";
+import { alive, calledBeyondVersion, holdCommits, inLab, KEY, machine, norn, SLOW, served, snapshot, statusUntil, story, tickBeside } from "./lab-world.ts";
 
 describe("norn lab's break-it switches", () => {
   test(
@@ -38,7 +38,8 @@ describe("norn lab's break-it switches", () => {
           const rewritten = stories.find((s) => s.key === KEY)?.claim;
           expect(rewritten?.holder).not.toBe(ours);
           expect(Date.parse(rewritten?.expires_at ?? "")).toBeLessThan(Date.now());
-          const tick = await norn(a, "tick", "--json");
+          const tick = await tickBeside(a);
+          expect(tick.code).toBe(0);
           const waits = (tick.body.decisions ?? []) as { rule: string; reason?: string }[];
           expect(waits.find((d) => d.rule === "claim.held_elsewhere")?.reason).toContain("expired");
           const took = await norn(a, "story", "take", KEY, "--force", "--json");

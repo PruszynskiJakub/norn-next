@@ -142,6 +142,17 @@ export async function story(l: Lab): Promise<StorySeen | undefined> {
   return (r.body.stories as StorySeen[]).find((s) => s.key === KEY);
 }
 
+/**
+ * One `norn tick --json` beside the dashboard's own ticks: the served lab ticks on its own, so a tick
+ * that meets its lock (exit 5, `tick_locked`) is tried again rather than read as the tick's report.
+ */
+export async function tickBeside(l: Lab, maxMs = 60_000): Promise<Out> {
+  for (const until = performance.now() + maxMs; ; await Bun.sleep(200)) {
+    const t = await norn(l, "tick", "--json");
+    if (!(t.code === 5 && t.body.code === "tick_locked") || performance.now() >= until) return t;
+  }
+}
+
 /** What the play saw: every tick's rules, and the unit after each tick. */
 export interface Play {
   rules: string[];
