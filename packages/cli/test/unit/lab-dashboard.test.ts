@@ -18,7 +18,7 @@ import { labPaths } from "../../src/lab/paths.ts";
 import { labMerge, labScript } from "../../src/lab/script.ts";
 import { STANDING } from "../../src/tick-report.ts";
 import type { StoryView, UnitView } from "../../src/views.ts";
-import { nodeId } from "../../src/workflows-page.ts";
+import { nodeId, workflowMermaid } from "../../src/workflows-page.ts";
 
 const script = labScript();
 const KEY = "lt-1";
@@ -85,13 +85,14 @@ describe("the dashboard's state", () => {
     expect(s.graph.workflow).toBe("quick");
     expect(s.graph.live).toBe("implement");
     expect(s.graph.steps).toEqual(Object.keys(workflow.graph.steps));
-    expect(s.graph.mermaid).toContain("flowchart TD");
+    // the graph opens only the shared part holding the live step
+    expect(s.graph.mermaid).toBe(workflowMermaid(workflow, { expand: "build", live: "implement" }));
     expect(s.graph.mermaid).toContain(`class ${nodeId("implement")} live`);
     expect(s.lab).toMatchObject({ story: KEY, beat: { n: 2, of: 8 } });
 
     const ended = await stateOf(sources({ story: storyView([unitView({ step: "merge", ended: "done" })]) }));
     expect(ended.graph.live).toBeNull();
-    expect(ended.graph.mermaid).not.toContain(" live\n");
+    expect(ended.graph.mermaid).toBe(workflowMermaid(workflow));
   });
 
   test("AC4: each decision a tick made carries its plain-word caption, in tick order, and ticks of only waiting are left out", async () => {

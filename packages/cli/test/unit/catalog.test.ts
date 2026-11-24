@@ -104,9 +104,8 @@ describe("norn workflow show", () => {
     const m = repo();
     const run = await runCli(["workflow", "show", "tidy", "--mermaid"], m.io);
     expect(run.exit).toBe(ExitCode.ok);
-    expect(run.stdout.trim()).toStartWith("flowchart TD");
+    expect(run.stdout.split("\n")[1]).toBe("flowchart LR");
     expect(run.stdout).toContain("s_work");
-    expect(run.stdout).toContain("house-style");
     expect((await runCli(["workflow", "show", "tidy", "--mermaid", "--json"], m.io)).exit).toBe(ExitCode.usage);
   });
 

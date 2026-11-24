@@ -12,7 +12,7 @@ import { ruleCaption } from "../captions.ts";
 import { ExitCode, toFailure } from "../output.ts";
 import { STANDING } from "../tick-report.ts";
 import type { StoryView } from "../views.ts";
-import { nodeId, workflowMermaid } from "../workflows-page.ts";
+import { partOf, workflowMermaid } from "../workflows-page.ts";
 import { BREAK_NAMES, type BreakName, BREAKS, isBreak } from "./break-it.ts";
 import type { LabView } from "./lab.ts";
 
@@ -167,11 +167,11 @@ function needs(story: StoryView | null): LabNeed[] {
   return out;
 }
 
-/** The workflow's graph with the live step lit. */
+/** The workflow's main graph, only the shared part holding the live step opened, and that step lit. */
 function graph(w: LabSources["workflow"], live: string | null): LabState["graph"] {
-  const lines = [workflowMermaid(w.loaded)];
-  if (live !== null && w.loaded.graph.steps[live] !== undefined) lines.push("  classDef live fill:#86efac,stroke:#15803d,stroke-width:4px,color:#052e16", `  class ${nodeId(live)} live`);
-  return { workflow: w.name, mermaid: lines.join("\n"), live, steps: Object.keys(w.loaded.graph.steps) };
+  const known = live !== null && w.loaded.graph.steps[live] !== undefined ? live : null;
+  const mermaid = workflowMermaid(w.loaded, { expand: known === null ? null : partOf(w.loaded, known), live: known });
+  return { workflow: w.name, mermaid, live, steps: Object.keys(w.loaded.graph.steps) };
 }
 
 export const LAB_PERSON_ACTIONS = ["approve", "reject", "answer", "rerun", "merge", "round", "reset"] as const;

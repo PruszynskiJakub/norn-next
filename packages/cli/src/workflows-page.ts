@@ -1,7 +1,8 @@
 /**
- * Workflows as Mermaid graphs: `workflowMermaid` draws one loaded workflow, and `renderWorkflowsPage`
- * the generated block of docs/workflows.md from every shipped one. Pure: the caller loads the
- * workflows through the real loader, so the page shows what a unit runs, not what a file says.
+ * Workflows as Mermaid graphs: `workflowMermaid` draws one loaded workflow's main path, each shared
+ * part it uses one node; `groupMermaid` draws one shared part on its own; `renderWorkflowsPage` the
+ * generated block of docs/workflows.md from every shipped one. Pure: the caller loads the workflows
+ * through the real loader, so the page shows what a unit runs, not what a file says.
  */
 import type { CompiledStep, LoadedWorkflow } from "@norn/kernel";
 import type { MarkerPair } from "./reference.ts";
@@ -13,53 +14,325 @@ export const WORKFLOWS_MARKERS: MarkerPair = {
 };
 
 // prefixed, so a step named after a Mermaid keyword (`end`, `graph`) never breaks the graph
-export const nodeId = (step: string): string => (step === "$done" ? "DONE" : step === "$stuck" ? "STUCK" : `s_${step.replace(/[^A-Za-z0-9_]/g, "_")}`);
+export const nodeId = (step: string): string => (step === "$done" ? "DONE" : `s_${step.replace(/[^A-Za-z0-9_]/g, "_")}`);
 const groupId = (shared: string): string => `u_${shared.replace(/[^A-Za-z0-9_]/g, "_")}`;
 const text = (s: string): string => s.replace(/"/g, "#quot;");
 
-function node(step: CompiledStep): string {
-  const agent = step.agent;
-  const kind = agent ? (agent.role ? `agent · ${agent.role}` : "agent") : step.kind;
-  const skills = agent?.skills.length ? `<br/><small>${agent.skills.join(", ")}</small>` : "";
-  const label = text(`${step.name}<br/><i>${kind}</i>${skills}`);
+const SPACING = `%%{init: {"flowchart": {"rankSpacing": 28, "nodeSpacing": 16, "padding": 6}}}%%`;
+const STYLES = [
+  "  classDef gate fill:#fde68a,stroke:#b45309,color:#1c1917",
+  "  classDef part fill:#e0e7ff,stroke:#4338ca,color:#1e1b4b",
+];
+
+/** One node of a drawing: a step, a collapsed shared part, or done. */
+interface Node {
+  id: string;
+  /** what a loop-back's stub names it by */
+  name: string;
+  decl: string;
+  cls: "gate" | "part" | null;
+}
+
+/** A step's box: its name, its kind or role, and a badge per counted outcome and per way to stuck. */
+function stepNode(step: CompiledStep, counters: LoadedWorkflow["graph"]["counters"]): Node {
+  const kind = step.agent ? (step.agent.role ? `agent · ${step.agent.role}` : "agent") : step.kind;
+  const badges = Object.entries(step.routes).flatMap(([outcome, route]) => {
+    if (route.to === "$stuck") return [outcome === "stuck" ? "→ stuck" : `${outcome} → stuck`];
+    const max = route.counter === undefined ? undefined : counters[route.counter]?.max;
+    return max === undefined ? [] : [`⟳ ${outcome} ≤${max}`];
+  });
+  // a plugin kind named like its step (`open-pr`) says nothing twice
+  const label = text([step.name, ...(kind === step.name ? [] : [`<small>${kind}</small>`]), ...badges.map((b) => `<small>${b}</small>`)].join("<br/>"));
   const id = nodeId(step.name);
-  if (step.kind === "gate") return `${id}{"${label}"}`;
-  if (step.kind === "check") return `${id}[/"${label}"/]`;
-  if (step.runner.type === "plugin") return `${id}[["${label}"]]`;
-  return `${id}["${label}"]`;
+  const name = step.name;
+  if (step.kind === "gate") return { id, name, decl: `${id}{{"${label}"}}`, cls: "gate" };
+  if (step.kind === "check") return { id, name, decl: `${id}[/"${label}"/]`, cls: null };
+  if (step.runner.type === "plugin") return { id, name, decl: `${id}[["${label}"]]`, cls: null };
+  return { id, name, decl: `${id}["${label}"]`, cls: null };
+}
+
+const partNode = (shared: string): Node => ({ id: groupId(shared), name: shared, decl: `${groupId(shared)}(["${text(shared)}"])`, cls: "part" });
+const DONE: Node = { id: "DONE", name: "done", decl: `DONE(("done"))`, cls: null };
+
+interface Edge {
+  from: string;
+  to: string;
+  outcomes: string[];
+}
+
+/** What a drawing holds: its nodes and edges, where its main path starts and may end, any shared part drawn open, the live step. */
+interface Scene {
+  nodes: Node[];
+  edges: Edge[];
+  start: string;
+  goals: ReadonlySet<string>;
+  groups: ReadonlyMap<string, Node[]>;
+  live: string | null;
+  /** places outside the drawing that lie behind it on the workflow's main path: an edge to one loops back */
+  behind?: ReadonlySet<string>;
+  /** what a stub names a place outside the drawing by */
+  names?: ReadonlyMap<string, string>;
+}
+
+interface Layout {
+  /** the main path, start to goal */
+  path: string[];
+  /** each node's place left to right: its index on the main path, or a fraction between */
+  rank: Map<string, number>;
+  out: Map<string, Edge[]>;
 }
 
 /**
- * One workflow as a Mermaid flowchart: each shared file it uses a subgraph, a gate a highlighted
- * diamond, a check a parallelogram, a plugin step kind a double box; a counted edge reads
- * `⟳counter≤max`, and every counter an edge bumps has a dashed edge to stuck for when it runs out.
+ * The main path is the first way from `start` to a goal, following outcomes in the order a step lists
+ * them. Off it, a chain of nodes ranks just before the main-path node its first outcomes lead back to,
+ * so rework (a failed check sent to build) reads as a loop back and the chain reads forward.
  */
-export function workflowMermaid(workflow: LoadedWorkflow): string {
-  const { graph } = workflow;
-  const included = workflow.included ?? {};
-  const steps = Object.values(graph.steps);
-  const out = ["flowchart TD", `  START(( )) --> ${nodeId(graph.start)}`];
-  const groups = new Map<string, CompiledStep[]>();
-  for (const step of steps) {
-    const shared = included[step.name];
-    if (shared === undefined) out.push(`  ${node(step)}`);
-    else groups.set(shared, [...(groups.get(shared) ?? []), step]);
-  }
-  for (const [shared, inside] of groups) out.push(`  subgraph ${groupId(shared)}["${text(shared)}"]`, ...inside.map((s) => `    ${node(s)}`), "  end");
-  for (const step of steps) {
-    const counters = new Set<string>();
-    for (const [outcome, route] of Object.entries(step.routes)) {
-      const max = route.counter === undefined ? undefined : graph.counters[route.counter]?.max;
-      if (route.counter !== undefined) counters.add(route.counter);
-      const label = route.counter === undefined ? outcome : `${outcome} ⟳${route.counter}≤${max ?? "?"}`;
-      out.push(`  ${nodeId(step.name)} -->|"${text(label)}"| ${nodeId(route.to)}`);
+function layout(s: Scene): Layout {
+  const out = new Map<string, Edge[]>();
+  for (const e of s.edges) out.set(e.from, [...(out.get(e.from) ?? []), e]);
+  const path: string[] = [];
+  const seen = new Set<string>();
+  const walk = (at: string): boolean => {
+    if (seen.has(at)) return false;
+    seen.add(at);
+    path.push(at);
+    if (s.goals.has(at)) return true;
+    for (const e of out.get(at) ?? []) if (walk(e.to)) return true;
+    path.pop();
+    return false;
+  };
+  walk(s.start);
+  const rank = new Map(path.map((n, i) => [n, i]));
+  for (const n of s.nodes) {
+    if (rank.has(n.id)) continue;
+    const chain: string[] = [];
+    let at: string | undefined = n.id;
+    while (at !== undefined && !rank.has(at) && !chain.includes(at)) {
+      chain.push(at);
+      at = out.get(at)?.[0]?.to;
     }
-    for (const counter of counters) out.push(`  ${nodeId(step.name)} -.->|"${text(`⟳${counter} exhausted`)}"| STUCK`);
+    if (at === undefined || !rank.has(at)) continue;
+    const back = rank.get(at) as number;
+    chain.forEach((c, i) => rank.has(c) || rank.set(c, back - 1 + (i + 1) / (chain.length + 1)));
   }
-  out.push("  DONE((done))", "  STUCK((stuck))");
-  const gates = steps.filter((s) => s.kind === "gate").map((s) => nodeId(s.name));
-  if (gates.length) out.push("  classDef gate fill:#fde68a,stroke:#b45309,color:#1c1917", `  class ${gates.join(",")} gate`);
-  return out.join("\n");
+  // what no chain leads back from ranks just after the first node that leads to it
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const e of s.edges)
+      if (rank.has(e.from) && !rank.has(e.to)) {
+        rank.set(e.to, (rank.get(e.from) as number) + 0.5);
+        grew = true;
+      }
+  }
+  return { path, rank, out };
+}
+
+/**
+ * Draws a scene left to right, or the part of it in `shown`. An edge into a node at or before its
+ * source on the main path is a loop-back: one to the node just before is a dotted line labelled
+ * `← outcome`; a longer one is a short dotted edge to a `↩ name` stub beside its source, so no loop
+ * arcs across the graph and the main path stays one straight row. An edge to a node not shown ends
+ * at a stub too (`→ name` ahead), and one that leaves `end`, the row's last node, is the next row's.
+ */
+function render(s: Scene, lay: Layout, shown: ReadonlySet<string> | null = null, end: string | null = null): string {
+  const { rank, out } = lay;
+  const drawn = new Set(s.nodes.map((n) => n.id));
+  const visible = (id: string) => drawn.has(id) && (shown === null || shown.has(id));
+  const nodes = s.nodes.filter((n) => visible(n.id));
+  // tighter than Mermaid's defaults, so a workflow's main path fits a docs page's width unscaled
+  const lines = [SPACING, "flowchart LR"];
+  const inGroup = new Set([...s.groups.values()].flat().map((n) => n.id));
+  for (const n of nodes) if (!inGroup.has(n.id)) lines.push(`  ${n.decl}`);
+  for (const [shared, inside] of s.groups) {
+    const here = inside.filter((n) => visible(n.id));
+    if (here.length) lines.push(`  subgraph ${groupId(shared)}["${text(shared)}"]`, ...here.map((n) => `    ${n.decl}`), "  end");
+  }
+  // a goal (done, or a place a shared part leads out to) is always ahead
+  const gapOf = (e: Edge) => (s.goals.has(e.to) ? -1 : (rank.get(e.from) ?? -Infinity) - (rank.get(e.to) ?? Infinity));
+  // only a step that branches forward names the outcome on each way ahead: a label costs width
+  const branches = (from: string) => !from.startsWith("u_") && (out.get(from) ?? []).filter((e) => gapOf(e) < 0).length > 1;
+  const stubs: string[] = [];
+  const stub = (e: Edge, mark: "↩" | "→") => {
+    const id = `${mark === "↩" ? "b" : "f"}_${e.from}_${e.to}`;
+    stubs.push(id);
+    // a part's own outcomes say nothing about where it goes on: only a loop back names them
+    const label = mark === "→" && e.from.startsWith("u_") ? "" : `|"${text(e.outcomes.join("<br/>"))}"|`;
+    lines.push(`  ${id}(["${text(`${mark} ${s.nodes.find((n) => n.id === e.to)?.name ?? s.names?.get(e.to) ?? e.to}`)}"])`, `  ${e.from} -.->${label} ${id}`);
+  };
+  for (const e of s.edges) {
+    if (!visible(e.from) || e.from === end) continue;
+    const gap = gapOf(e);
+    const label = e.outcomes.join("<br/>");
+    if (!visible(e.to)) stub(e, gap >= 0 || s.behind?.has(e.to) ? "↩" : "→");
+    // written from its target, arrowless, so the layout keeps the main path one row; the label points back
+    else if (gap >= 0 && gap <= 1) lines.push(`  ${e.to} -.-|"${text(`← ${label}`)}"| ${e.from}`);
+    else if (gap > 1) stub(e, "↩");
+    else if (branches(e.from)) lines.push(`  ${e.from} -->|"${text(label)}"| ${e.to}`);
+    else lines.push(`  ${e.from} --> ${e.to}`);
+  }
+  lines.push(...STYLES);
+  const of = (cls: Node["cls"]) => nodes.filter((n) => n.cls === cls).map((n) => n.id);
+  if (of("gate").length) lines.push(`  class ${of("gate").join(",")} gate`);
+  if (of("part").length) lines.push(`  class ${of("part").join(",")} part`);
+  if (stubs.length) lines.push("  classDef back fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:3 3,color:#475569", `  class ${stubs.join(",")} back`);
+  if (s.live !== null && visible(nodeId(s.live))) lines.push("  classDef live fill:#86efac,stroke:#15803d,stroke-width:4px,color:#052e16", `  class ${nodeId(s.live)} live`);
+  return lines.join("\n");
+}
+
+/** The most main-path nodes one row of a docs page holds before the path wraps to the next row. */
+export const ROW_NODES = 7;
+
+/**
+ * A scene cut into rows, each a graph of its own that starts where the one before ends: as few rows as
+ * hold at most `ROW_NODES` main-path nodes each, cut where the rows come out most even, counting the
+ * nodes off the main path and the loop-back stubs each row draws as well. A node off the main path goes
+ * in the row its rank falls in.
+ */
+function rows(s: Scene): string[] {
+  const lay = layout(s);
+  const n = lay.path.length;
+  if (n <= ROW_NODES) return [render(s, lay)];
+  const count = Math.ceil((n - 1) / (ROW_NODES - 1));
+  const inRow = (r: number, from: number, to: number, first: boolean, last: boolean) => (Number.isInteger(r) ? r >= from && r <= to : (r > from || first) && (r < to || last));
+  const shownIn = (from: number, to: number, first: boolean, last: boolean) =>
+    new Set(s.nodes.filter((node) => inRow(lay.rank.get(node.id) ?? Number.NaN, from, to, first, last)).map((node) => node.id));
+  const weight = (from: number, to: number, first: boolean, last: boolean) => {
+    const shown = shownIn(from, to, first, last);
+    const stubs = s.edges.filter((e) => shown.has(e.from) && (!shown.has(e.to) || (lay.rank.get(e.from) ?? 0) - (lay.rank.get(e.to) ?? 0) > 1)).length;
+    return shown.size + stubs / 2;
+  };
+  // every way to place the inner cuts, each row holding at most ROW_NODES main-path nodes
+  let best: { cuts: number[]; cost: number } | null = null;
+  const place = (cuts: number[]) => {
+    const at = cuts.at(-1) as number;
+    if (cuts.length === count) {
+      if (n - 1 - at > ROW_NODES - 1) return;
+      const all = [...cuts, n - 1];
+      const cost = Math.max(...all.slice(0, -1).map((from, i) => weight(from, all[i + 1] as number, i === 0, i === count - 1)));
+      if (best === null || cost < best.cost) best = { cuts: all, cost };
+      return;
+    }
+    for (let next = at + 1; next <= Math.min(n - 2, at + ROW_NODES - 1); next++) place([...cuts, next]);
+  };
+  place([0]);
+  const cuts = (best as { cuts: number[] } | null)?.cuts ?? [0, n - 1];
+  return cuts.slice(0, -1).map((from, i) => {
+    const to = cuts[i + 1] as number;
+    const last = i === cuts.length - 2;
+    return render(s, lay, shownIn(from, to, i === 0, last), last ? null : (lay.path[to] as string));
+  });
+}
+
+/** The edges between units, one per pair, each listing the outcomes it carries; a way to stuck is a badge, never an edge. */
+function unitEdges(steps: readonly CompiledStep[], unitOf: (step: string) => string | null): Edge[] {
+  const byPair = new Map<string, Edge>();
+  for (const step of steps) {
+    const from = unitOf(step.name);
+    if (from === null) continue;
+    for (const [outcome, route] of Object.entries(step.routes)) {
+      const to = route.to === "$stuck" ? null : route.to === "$done" ? "DONE" : unitOf(route.to);
+      if (to === null || (to === from && from.startsWith("u_"))) continue;
+      const key = `${from}>${to}`;
+      const e = byPair.get(key) ?? { from, to, outcomes: [] };
+      if (!e.outcomes.includes(outcome)) e.outcomes.push(outcome);
+      byPair.set(key, e);
+    }
+  }
+  return [...byPair.values()];
+}
+
+/** The shared parts a workflow uses, in the order its steps come. */
+export function sharedParts(workflow: LoadedWorkflow): string[] {
+  const included = workflow.included ?? {};
+  return [...new Set(Object.keys(workflow.graph.steps).flatMap((s) => included[s] ?? []))];
+}
+
+/** The shared part a step came from, or null for a step the workflow names itself. */
+export function partOf(workflow: LoadedWorkflow, step: string): string | null {
+  return (workflow.included ?? {})[step] ?? null;
+}
+
+export interface MermaidOptions {
+  /** the shared part drawn open, its steps inside the main graph */
+  expand?: string | null;
+  /** the step lit as the one running now */
+  live?: string | null;
+}
+
+/** One workflow's main scene: each step it names itself, each shared part one node unless it is `expand`, done. */
+function mainScene(workflow: LoadedWorkflow, opts: MermaidOptions): Scene {
+  const { graph } = workflow;
+  const steps = Object.values(graph.steps);
+  const expand = opts.expand ?? null;
+  const unitOf = (step: string): string => {
+    const shared = partOf(workflow, step);
+    return shared === null || shared === expand ? nodeId(step) : groupId(shared);
+  };
+  const nodes: Node[] = [];
+  const groups = new Map<string, Node[]>();
+  for (const step of steps) {
+    const shared = partOf(workflow, step.name);
+    if (shared !== null && shared !== expand) {
+      if (!nodes.some((n) => n.id === groupId(shared))) nodes.push(partNode(shared));
+      continue;
+    }
+    const n = stepNode(step, graph.counters);
+    nodes.push(n);
+    if (shared !== null) groups.set(shared, [...(groups.get(shared) ?? []), n]);
+  }
+  nodes.push(DONE);
+  const live = opts.live != null && graph.steps[opts.live] !== undefined && unitOf(opts.live) === nodeId(opts.live) ? opts.live : null;
+  return { nodes, edges: unitEdges(steps, unitOf), start: unitOf(graph.start), goals: new Set(["DONE"]), groups, live };
+}
+
+/**
+ * One workflow's main graph, left to right: each step the workflow names itself a node, each shared
+ * part it uses one node (or, with `expand`, that part's steps in a box), done at the end. A gate is a
+ * highlighted hexagon, a check a parallelogram, a plugin step kind a double box; each counted outcome
+ * is a badge on its step with the counter's maximum, and stuck is never drawn.
+ */
+export function workflowMermaid(workflow: LoadedWorkflow, opts: MermaidOptions = {}): string {
+  const scene = mainScene(workflow, opts);
+  return render(scene, layout(scene));
+}
+
+/** The main graph as a docs page draws it: one row, or rows of at most `ROW_NODES` main-path nodes for a long path. */
+export function workflowRows(workflow: LoadedWorkflow): string[] {
+  return rows(mainScene(workflow, {}));
+}
+
+/**
+ * One shared part on its own, left to right: its steps, then each place outside it the part leads on
+ * to; a place behind it on the workflow's main path (rework sent back to build) is a `↩` stub instead.
+ */
+export function groupMermaid(workflow: LoadedWorkflow, shared: string): string {
+  const { graph } = workflow;
+  const steps = Object.values(graph.steps);
+  const inside = steps.filter((s) => partOf(workflow, s.name) === shared);
+  const unitOf = (step: string): string => {
+    const part = partOf(workflow, step);
+    return part === null || part === shared ? nodeId(step) : groupId(part);
+  };
+  const edges = unitEdges(inside, unitOf);
+  const nodes = inside.map((s) => stepNode(s, graph.counters));
+  const main = mainScene(workflow, {});
+  const mainRank = layout(main).rank;
+  const here = mainRank.get(groupId(shared)) ?? -Infinity;
+  const names = new Map(main.nodes.map((n) => [n.id, n.name]));
+  const behind = new Set<string>();
+  const exits = new Set<string>();
+  for (const e of edges) {
+    if (nodes.some((n) => n.id === e.to) || exits.has(e.to) || behind.has(e.to)) continue;
+    if ((mainRank.get(e.to) ?? Infinity) < here) {
+      behind.add(e.to);
+      continue;
+    }
+    exits.add(e.to);
+    const part = main.nodes.find((n) => n.id === e.to && n.cls === "part");
+    nodes.push(e.to === "DONE" ? DONE : (part ?? { id: e.to, name: names.get(e.to) ?? e.to, decl: `${e.to}(["${text(names.get(e.to) ?? e.to)}"])`, cls: null }));
+  }
+  const scene: Scene = { nodes, edges, start: nodeId(inside[0]?.name ?? ""), goals: exits, groups: new Map(), live: null, behind, names };
+  return render(scene, layout(scene));
 }
 
 export interface WorkflowsPageInput {
@@ -69,19 +342,22 @@ export interface WorkflowsPageInput {
   workflows: Readonly<Record<string, LoadedWorkflow>>;
 }
 
+const mermaid = (graph: string): string[] => ["```mermaid", graph, "```", ""];
+
 /** The generated block of docs/workflows.md, markers included. */
 export function renderWorkflowsPage(input: WorkflowsPageInput): string {
   const out = [
     WORKFLOWS_MARKERS.start,
     "",
-    `The \`${input.pack}\` pack's workflows, drawn from the workflow loader. A box is an agent step (its role and skill), a parallelogram a check, a double box a plugin step kind and a highlighted diamond a person's gate. A labelled box around steps is a shared file the workflow uses. An edge is an outcome; \`⟳counter≤max\` says it counts toward a limit, and the dashed edge from the same step goes to stuck when that limit runs out.`,
+    `The \`${input.pack}\` pack's workflows, drawn from the workflow loader. Each reads left to right along its main path, from its first step to done; a long path wraps into rows, each starting where the one before ends, and \`→ name\` marks where an edge goes on in another row. A box is an agent step (its role), a parallelogram a check, a double box a plugin step kind and a highlighted hexagon a person's gate. A rounded blue node is a shared part the workflow uses; its own graph follows the workflow's. A dotted line loops back to the left, labelled \`← outcome\` with the outcome that takes it; \`⟳ outcome ≤max\` on a step says that outcome counts toward a limit, and the story goes stuck when the limit runs out.`,
     "",
   ];
   for (const name of Object.keys(input.workflows).sort()) {
     const w = input.workflows[name];
     if (!w) continue;
     const description = typeof w.pinned.doc.description === "string" ? w.pinned.doc.description.trim().replace(/\s+/g, " ") : "";
-    out.push(`## \`${name}\``, "", ...(description ? [description, ""] : []), "```mermaid", workflowMermaid(w), "```", "");
+    out.push(`## \`${name}\``, "", ...(description ? [description, ""] : []), ...workflowRows(w).flatMap(mermaid));
+    for (const shared of sharedParts(w)) out.push(`### \`${name}\` › \`${shared}\``, "", ...mermaid(groupMermaid(w, shared)));
   }
   out.push(WORKFLOWS_MARKERS.end);
   return out.join("\n");

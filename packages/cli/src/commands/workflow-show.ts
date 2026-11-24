@@ -16,7 +16,7 @@ export const workflowShowCommand = defineCommand({
   summary: "Show a workflow as norn runs it: steps, outcomes, counters, gates and skills, or its graph",
   usage: "norn workflow show <name> [--mermaid]",
   options: { mermaid: { type: "boolean" } },
-  optionHelp: { "--mermaid": "print the workflow's Mermaid graph, as docs/workflows.md draws it, instead (no --json)" },
+  optionHelp: { "--mermaid": "print the workflow's main Mermaid graph, its shared parts collapsed, as docs/workflows.md draws it, instead (no --json)" },
   positionals: { min: 1, max: 1 },
   async run(ctx, args) {
     const name = args.positionals[0] as string;

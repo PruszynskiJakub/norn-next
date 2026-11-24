@@ -663,7 +663,7 @@ Show a workflow as norn runs it: steps, outcomes, counters, gates and skills, or
 norn workflow show <name> [--mermaid]
 ```
 
-- `--mermaid`: print the workflow's Mermaid graph, as docs/workflows.md draws it, instead (no --json)
+- `--mermaid`: print the workflow's main Mermaid graph, its shared parts collapsed, as docs/workflows.md draws it, instead (no --json)
 
 ##### `norn workflow confirm`
 
