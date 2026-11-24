@@ -63,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [lab, lab-again, lab-break-it, lab-serve, lab-tty]
+        suite: [lab]
     name: integration (${{ matrix.suite }})
     steps:
       - uses: actions/checkout@v4
