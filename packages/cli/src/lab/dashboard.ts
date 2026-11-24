@@ -122,8 +122,12 @@ const BEFORE: Readonly<Record<string, string>> = {
 function receiptLine(r: LabReceipt): LabReceiptLine {
   const d = (r.data ?? {}) as Record<string, unknown>;
   const kind = typeof d.kind === "string" ? d.kind : "unknown";
-  const said = ["step", "outcome", "verb", "run_kind", "executor", "reason"].flatMap((k) => (typeof d[k] === "string" ? [`${k} ${d[k]}`] : []));
-  return { seq: r.seq, at: r.at, kind, what: said.join(", "), before: BEFORE[kind] ?? null };
+  const step = typeof d.step === "string" ? [`step ${d.step}${typeof d.attempt === "number" ? ` #${d.attempt}` : ""}`] : [];
+  // a run is recorded started before its launch, then again once the launch names its session:
+  // the second is the same start, written after the effect, so it is the record of nothing to come
+  if (kind === "run.started" && typeof d.session === "string") return { seq: r.seq, at: r.at, kind, what: [...step, `the same run, its session named ${d.session}`].join(", "), before: null };
+  const said = ["outcome", "verb", "run_kind", "executor", "reason"].flatMap((k) => (typeof d[k] === "string" ? [`${k} ${d[k]}`] : []));
+  return { seq: r.seq, at: r.at, kind, what: [...step, ...said].join(", "), before: BEFORE[kind] ?? null };
 }
 
 /** The receipts in the order written, then the state committed after them all, the record's commit point. */

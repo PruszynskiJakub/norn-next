@@ -131,6 +131,17 @@ describe("the dashboard's state", () => {
     expect(s.receipts.entries.at(-1)?.what).toBe("version 4, step check, receipts 1–3 applied");
   });
 
+  test("one run's two run.started receipts read as one start: the launch, then the session it got", async () => {
+    const receipts = [
+      { seq: 1, at: "2026-01-01T00:00:01.000Z", data: { kind: "run.started", step: "implement", run_id: "r1", run_kind: "agent", executor: "lab", attempt: 2 } },
+      { seq: 2, at: "2026-01-01T00:00:01.100Z", data: { kind: "run.started", step: "implement", run_id: "r1", run_kind: "agent", executor: "lab", attempt: 2, session: "lab|s1" } },
+    ];
+    const s = await stateOf(sources({ record: { receipts, state: { version: 2, data: { step: "implement", applied_through: 2 } } } }));
+    const [launch, session] = s.receipts.entries;
+    expect(launch).toMatchObject({ what: "step implement #2, run_kind agent, executor lab", before: "the run is launched" });
+    expect(session).toMatchObject({ what: "step implement #2, the same run, its session named lab|s1", before: null });
+  });
+
   test("AC6: needs-you lists a question and a gate waiting, as status does, with the command that answers each", async () => {
     const asked = unitView({ waiting: { for: "answer", text: "Keep the comma?", next: `norn story answer ${KEY} "<answer>"` } });
     const gate = unitView({ id: `${KEY}/01`, step: "ready", kind: "gate", waiting: { for: "gate", text: "ready waits for a person" } });
