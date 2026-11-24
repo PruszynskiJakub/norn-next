@@ -1,7 +1,7 @@
 /**
  * A person's machine for the `norn lab` integration tests: an own norn home, a repo of theirs and a
  * TMPDIR the lab goes under, with every norn call a subprocess of the binary from source. Each lab
- * suite is a file of its own, so the runner plays their labs side by side rather than one after another.
+ * suite is a file of its own, so CI runs each alone on a runner (ci.yml's lab job).
  */
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

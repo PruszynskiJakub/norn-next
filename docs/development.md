@@ -81,7 +81,7 @@ The unit tier (`bun run test`) and the type check must pass before you hand work
 
 The docs lint fails on a rules file coming back, a link or anchor that does not resolve, a `norn` command or flag the CLI does not have, a version named outside the README badge and the changelog, and a handoff tracked in the repo outside a spec folder's `handoffs/`. A test also fails if the emitted JSON schemas or the generated blocks of `docs/reference.md` (`packages/cli/test/unit/reference.test.ts`) and `docs/workflows.md` (`packages/cli/test/unit/workflows-page.test.ts`) are stale.
 
-CI (`.github/workflows/ci.yml`) runs the unit tier and the type check on every PR. Once they pass, it runs the integration tier in four shards, and builds the npm package and a binary and checks both with `scripts/smoke.sh`. The release run tests only the unit tier and the type check, since the release PR's CI ran every tier.
+CI (`.github/workflows/ci.yml`) runs the unit tier and the type check on every PR. Once they pass, it runs the integration tier in four shards, except the lab suites (the `lab*.test.ts` files in `packages/cli/test/integration/`), which each run alone on a runner, as the check `integration (<suite>)`: each plays a whole lab of real processes, and a lab next to other suites on one runner pushes every suite there past its timeout. It also builds the npm package and a binary and checks both with `scripts/smoke.sh`. The release run tests only the unit tier and the type check, since the release PR's CI ran every tier.
 
 ## Writing a test
 
