@@ -1,7 +1,6 @@
+# Runs on each slice a story workflow cuts; the story's qa checks the slice's criteria, once.
 name: slice
-description: Build one slice test-first, check and review it, and integrate it into the story branch.
-when: >-
-  Runs on each slice a story workflow cuts; the story's qa checks the slice's criteria, once.
+description: "Runs on each slice a story workflow cuts, never started by hand: build the slice test-first, check and review it, and integrate it into the story branch."
 start: build
 steps:
   build:

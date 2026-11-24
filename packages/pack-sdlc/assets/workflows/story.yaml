@@ -1,8 +1,7 @@
+# For a story a refinement round planned; start it with `norn story round <story> --workflow story`.
+# A merged PR ends the story.
 name: story
-description: Slice a planned story against the current base, run the slices, verify the story, open the draft PR, wait for CI.
-when: >-
-  For a story a refinement round planned; start it with `norn story round <story> --workflow story`.
-  A merged PR ends the story.
+description: "For a story a refinement round planned: slice it against the current base, run the slices, verify the story, open the draft PR, wait for CI."
 start: catch-up
 steps:
   catch-up:

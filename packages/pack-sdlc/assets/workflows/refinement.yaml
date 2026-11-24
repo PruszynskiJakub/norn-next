@@ -1,8 +1,7 @@
+# For a story that needs a spec and a plan before code. No gate: starting the next round (`norn story
+# round <story> --workflow story|quick`) approves the plan; `--workflow refinement --at plan` reworks it.
 name: refinement
-description: Agree a story's spec and plan with a person, against the current base; no code.
-when: >-
-  For a story that needs a spec and a plan before code. No gate: starting the next round (`norn story
-  round <story> --workflow story|quick`) approves the plan; `--workflow refinement --at plan` reworks it.
+description: "For a story that needs a spec and a plan before code: agree them with a person against the current base; no code. The next round is story or quick."
 start: catch-up
 steps:
   # the spec and plan are written against the current base

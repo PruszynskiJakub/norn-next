@@ -383,17 +383,12 @@ describe("a step written with by: in the workflow-source and workflow-shared sch
   });
 });
 
-describe("when: in the workflow-source schema", () => {
+describe("the workflow-source schema", () => {
   const wf = { name: "quick", start: "review", steps: { review: { gate: "Approve?", outcomes: { approve: "$done" } } } };
-  test("a workflow file may say when to pick it, as a string, and need not", () => {
-    expect(validate("workflow-source", { ...wf, when: "Pick it for a small change." }).ok).toBe(true);
-    expect(validate("workflow-source", wf).ok).toBe(true);
-    expect(validate("workflow-source", { ...wf, when: 3 }).ok).toBe(false);
-  });
-  test("the emitted schema lists when as an optional string", () => {
-    const json = toJsonSchema("workflow-source") as { properties: Record<string, { type?: string }>; required: string[] };
-    expect(json.properties.when?.type).toBe("string");
-    expect(json.required).not.toContain("when");
+  test("has no when: key; a workflow says when to pick it in its description", () => {
+    expect(validate("workflow-source", { ...wf, when: "Pick it for a small change." }).ok).toBe(false);
+    const json = toJsonSchema("workflow-source") as { properties: Record<string, unknown> };
+    expect(json.properties.when).toBeUndefined();
   });
 });
 

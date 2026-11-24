@@ -28,7 +28,6 @@
         "type": "object",
         "required": [
           "name",
-          "when",
           "description",
           "source",
           "state",
@@ -38,17 +37,6 @@
           "name": {
             "minLength": 1,
             "type": "string"
-          },
-          "when": {
-            "anyOf": [
-              {
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "description": {
             "anyOf": [

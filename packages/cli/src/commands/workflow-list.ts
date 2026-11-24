@@ -22,8 +22,8 @@ export const workflowListCommand = defineCommand({
   async run(ctx) {
     const c = await readCatalog(ctx);
     const value: WorkflowList = { repo: c.repo, workflows: workflowEntries(c) };
-    const rows = value.workflows.map((w) => `| \`${w.name}\` | ${SOURCE[w.source]}${w.file ? ` (${w.file})` : ""} | ${tableCell(state(w))} | ${tableCell(w.when ?? w.description ?? "")} |`);
-    const md = ["| Workflow | Source | State | When |", "| --- | --- | --- | --- |", ...rows, "", c.repo === null ? PACK_ALONE : "Read one with norn workflow show <name>."];
+    const rows = value.workflows.map((w) => `| \`${w.name}\` | ${SOURCE[w.source]}${w.file ? ` (${w.file})` : ""} | ${tableCell(state(w))} | ${tableCell(w.description ?? "")} |`);
+    const md = ["| Workflow | Source | State | Description |", "| --- | --- | --- | --- |", ...rows, "", c.repo === null ? PACK_ALONE : "Read one with norn workflow show <name>."];
     return rendered(value, md.join("\n"));
   },
 });

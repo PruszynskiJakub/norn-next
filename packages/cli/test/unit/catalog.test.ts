@@ -21,9 +21,9 @@ const tools = (argv: string[]) => (argv[1] === "--version" && ["git", "norn", "c
 
 /** the pack's quick, said differently and with a wider publish limit: a repo copy no person need confirm */
 const QUICK = (SDLC_PACK.workflows["quick.yaml"] as string)
-  .replace(/when: >-\n(  .*\n)+/, "when: When the repo says so.\n")
+  .replace(/^description: .*$/m, "description: When the repo says so.")
   .replace("failed: { to: build, max: 3 }", "failed: { to: build, max: 5 }");
-const TIDY = ["name: tidy", "when: For tidying up.", "start: work", "steps:", "  work:", "    agent: Do the work.", "    skills: [house-style, deploy-notes, nowhere-skill]", "    outcomes: { done: $done }", ""].join("\n");
+const TIDY = ["name: tidy", "description: For tidying up.", "start: work", "steps:", "  work:", "    agent: Do the work.", "    skills: [house-style, deploy-notes, nowhere-skill]", "    outcomes: { done: $done }", ""].join("\n");
 /** a repo's own workflow with a person's step: held until the person confirms it */
 const OWN = ["name: own", "start: work", "steps:", "  work:", "    by: builder", "    do: Do the work.", "    outcomes: { done: ready }", "  ready:", "    by: person", "    do: Approve it.", "    outcomes: { approve: $done, reject: { to: work, max: 2 } }", ""].join("\n");
 const HOUSE = "---\nname: house-style\ndescription: The house rules for code here. Use when writing or reviewing code in this repo.\n---\nRules.\n";
@@ -44,16 +44,16 @@ function repo() {
 }
 const outside = () => machine({ common: null, cwd: "/work/elsewhere" });
 
-const packWhen = (file: string): string => ((parse(SDLC_PACK.workflows[file] as string) as { when: string }).when as string).trim();
+const packDescription = (file: string): string => ((parse(SDLC_PACK.workflows[file] as string) as { description: string }).description as string).trim();
 const valid = (schema: "workflow-list" | "workflow-show" | "skill-list", value: unknown) => {
   const r = validate(schema, value);
   return r.ok ? true : r.errors;
 };
 
-type Entry = { name: string; when: string | null; source: string; state: string; changes?: string[]; confirm?: string; file: string | null };
+type Entry = { name: string; description: string | null; source: string; state: string; changes?: string[]; confirm?: string; file: string | null };
 
 describe("norn workflow list", () => {
-  test("every startable workflow with its when, marked pack, repo or replaces pack, the held one with what it needs", async () => {
+  test("every startable workflow with its description, marked pack, repo or replaces pack, the held one with what it needs", async () => {
     const m = repo();
     const run = await runCli(["workflow", "list", "--json"], m.io);
     expect(run.exit).toBe(ExitCode.ok);
@@ -62,9 +62,9 @@ describe("norn workflow list", () => {
     expect(body.repo).toBe(ROOT);
     const byName = Object.fromEntries((body.workflows as Entry[]).map((w) => [w.name, w]));
     for (const file of Object.keys(SDLC_PACK.workflows)) expect(byName[file.replace(".yaml", "")]).toBeDefined();
-    expect(byName.story).toMatchObject({ source: "pack", state: "ok", when: packWhen("story.yaml"), file: null });
-    expect(byName.quick).toMatchObject({ source: "replaces-pack", state: "ok", when: "When the repo says so.", file: ".agents/workflows/quick.yaml" });
-    expect(byName.tidy).toMatchObject({ source: "repo", state: "ok", when: "For tidying up.", file: ".agents/workflows/tidy.yaml" });
+    expect(byName.story).toMatchObject({ source: "pack", state: "ok", description: packDescription("story.yaml"), file: null });
+    expect(byName.quick).toMatchObject({ source: "replaces-pack", state: "ok", description: "When the repo says so.", file: ".agents/workflows/quick.yaml" });
+    expect(byName.tidy).toMatchObject({ source: "repo", state: "ok", description: "For tidying up.", file: ".agents/workflows/tidy.yaml" });
     expect(byName.own).toMatchObject({ source: "repo", state: "held", confirm: "norn workflow confirm own" });
     expect(byName.own?.changes?.length).toBeGreaterThan(0);
 
@@ -83,7 +83,8 @@ describe("norn workflow show", () => {
     expect(run.exit).toBe(ExitCode.ok);
     const body = json(run.stdout) as { steps: Array<{ name: string; kind: string; skills: string[]; outcomes: Array<{ outcome: string; to: string; counter: string | null }> }>; counters: Array<{ name: string; max: number }>; gates: string[] } & Record<string, unknown>;
     expect(valid("workflow-show", body)).toBe(true);
-    expect(body).toMatchObject({ name: "quick", source: "replaces-pack", state: "ok", when: "When the repo says so." });
+    expect(body).toMatchObject({ name: "quick", source: "replaces-pack", state: "ok", description: "When the repo says so." });
+    expect(body).not.toHaveProperty("when");
     expect(body.steps.map((s) => s.name)).toContain(body.start as string);
     // the shared files' steps are resolved in, not left as `use:`
     expect(body.steps.map((s) => s.name)).not.toContain("build");

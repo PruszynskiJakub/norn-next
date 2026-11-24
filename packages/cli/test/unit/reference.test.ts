@@ -95,7 +95,7 @@ describe("reference render", () => {
 });
 
 const oneLine = (s: unknown): string => String(s ?? "").trim().replace(/\s+/g, " ");
-const PACK_DOCS = Object.values(SDLC_PACK.workflows).map((text) => parse(text) as { name: string; when: string; description: string; start: string });
+const PACK_DOCS = Object.values(SDLC_PACK.workflows).map((text) => parse(text) as { name: string; description: string; start: string });
 const LOADED = (() => {
   const signals = collectSignals(BUNDLED_PLUGINS);
   const kinds = collectStepKinds(BUNDLED_PLUGINS);
@@ -121,23 +121,18 @@ describe("the workflow and skill catalog", () => {
   const catalog = catalogSection(fresh, "### Workflow catalog") + catalogSection(fresh, "### Skills");
   const workflows = (name: string) => catalogSection(fresh, `#### \`${name}\``);
 
-  test("every pack workflow has its name, when text, description, start step and norn:wf label", () => {
+  test("every pack workflow has its name, description, start step and norn:wf label", () => {
     expect(PACK_DOCS.length).toBeGreaterThan(0);
     expect(catalog).not.toBe("");
     for (const doc of PACK_DOCS) {
       const section = workflows(doc.name);
-      expect(section, doc.name).toContain(`**When:** ${oneLine(doc.when)}`);
+      expect(section, doc.name).not.toContain("**When:**");
       expect(section, doc.name).toContain(oneLine(doc.description));
       const load = LOADED[doc.name];
       expect(section, doc.name).toContain(`starts at \`${load?.ok ? load.workflow.graph.start : "?"}\``);
       if (doc.name === DEFAULT_KERNEL_CONFIG.sliceWorkflow) expect(section).toContain("No label: a story's `slices` step runs it on each slice");
       else expect(section, doc.name).toContain(`Label \`${DEFAULT_KERNEL_CONFIG.intakeWorkflowLabelPrefix}${doc.name}\``);
     }
-  });
-
-  test("the when text names each workflow's next rounds, so the catalog says what follows it", () => {
-    expect(workflows("triage")).toContain("--workflow refinement|quick|reproduce|fix");
-    expect(workflows("refinement")).toContain("--workflow story|quick");
   });
 
   test("every pack skill is listed with its Use when clause, and only the person-only ones are marked", () => {
@@ -173,7 +168,7 @@ describe("the workflow and skill catalog", () => {
     const pack = CONFIG_DEFAULTS.packs?.[0] ?? "sdlc";
     const render = (p: typeof SDLC_PACK) => renderReference({ commands: COMMANDS, nouns: NOUNS, pack, catalog: packCatalog(p, BUNDLED_PLUGINS) });
     expect(render(SDLC_PACK)).toBe(fresh);
-    const quick = (SDLC_PACK.workflows["quick.yaml"] as string).replace(/^when: >-\n/m, "when: >-\n  A changed line.\n");
+    const quick = (SDLC_PACK.workflows["quick.yaml"] as string).replace(/^description: .*$/m, "description: A changed line.");
     expect(render({ ...SDLC_PACK, workflows: { ...SDLC_PACK.workflows, "quick.yaml": quick } })).not.toBe(fresh);
     const tdd = SDLC_PACK.skills["norn-tdd"] as Record<string, string>;
     const skill = { ...tdd, "SKILL.md": (tdd["SKILL.md"] as string).replace("Use for TDD", "Use for test-driven work") };
@@ -185,18 +180,18 @@ describe("CONTRIBUTING.md's workflow table", () => {
   const block = freshContributing();
   const repo = repoWorkflowTexts();
 
-  test("is this repo's workflows, the pack overlaid with .agents/workflows, as Label, Workflow, When rows; a file with no when: shows its description", () => {
+  test("is this repo's workflows, the pack overlaid with .agents/workflows, as Label, Workflow, Description rows", () => {
     expect(block.startsWith(CONTRIBUTING_MARKERS.start) && block.endsWith(CONTRIBUTING_MARKERS.end)).toBe(true);
-    expect(block).toContain("| Label | Workflow | When |");
+    expect(block).toContain("| Label | Workflow | Description |");
     const names = new Set([...Object.keys(SDLC_PACK.workflows), ...Object.keys(repo.workflows)].map((f) => f.replace(/\.ya?ml$/, "")));
     expect(names.has("release")).toBe(true);
     for (const name of names) {
       const text = repo.workflows[`${name}.yaml`] ?? SDLC_PACK.workflows[`${name}.yaml`];
-      const doc = parse(text as string) as { when?: string; description: string };
-      const when = tableCell(oneLine(doc.when ?? doc.description));
-      expect(when, name).not.toBe("");
+      const doc = parse(text as string) as { description: string };
+      const description = tableCell(oneLine(doc.description));
+      expect(description, name).not.toBe("");
       const label = name === DEFAULT_KERNEL_CONFIG.sliceWorkflow ? "—" : `\`${DEFAULT_KERNEL_CONFIG.intakeWorkflowLabelPrefix}${name}\``;
-      expect(block, name).toContain(`| ${label} | ${name} | ${when} |`);
+      expect(block, name).toContain(`| ${label} | ${name} | ${description} |`);
     }
   });
 

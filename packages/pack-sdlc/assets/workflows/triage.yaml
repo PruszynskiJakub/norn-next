@@ -1,8 +1,7 @@
+# The first round of a new issue. Next round: the one its outcome names (`norn story round <story>
+# --workflow refinement|quick|reproduce|fix`); after close, a person closes the issue.
 name: triage
-description: Check an issue still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it.
-when: >-
-  The first round of a new issue. Next round: the one its outcome names (`norn story round <story>
-  --workflow refinement|quick|reproduce|fix`); after close, a person closes the issue.
+description: "The first round of a new issue: check it still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it."
 start: explore
 steps:
   explore:
@@ -13,7 +12,7 @@ steps:
       `norn:priority:low|medium|high|extreme`; a label missing on the remote is named in the comment
       for a person to create. That comment and those labels are the only remote writes this step allows,
       an exception to the brief's rule on remote writes; never remove a label, the intake label `norn` included. Change no file, spec.md included,
-      but the handoff. Recommend from the workflow catalog (each workflow's `when:`), not a list of your own. Report the outcome the comment recommends, with its reason as the note:
+      but the handoff. Recommend from the workflow catalog (each workflow's description), not a list of your own. Report the outcome the comment recommends, with its reason as the note:
       `norn done <recommendation> --note "<reason>"`.
     with: { skills: [norn-triage] }
     reads: [spec, handoff]

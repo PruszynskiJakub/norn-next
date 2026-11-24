@@ -16,8 +16,7 @@ export const WorkflowState = Type.Union([Type.Literal("ok"), Type.Literal("held"
 
 const WorkflowEntryFields = {
   name: NonEmpty,
-  /** when to pick it, from the file's `when:` */
-  when: Text,
+  /** what it does and when to pick it, from the file's `description:` */
   description: Text,
   source: WorkflowOrigin,
   state: WorkflowState,

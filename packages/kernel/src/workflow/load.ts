@@ -249,7 +249,7 @@ function pin(
   const docCounters: Record<string, CounterDoc> = {};
   for (const [name, c] of Object.entries(counters))
     docCounters[name] = { max: c.max, ...(c.reset_on.length === 1 ? { reset_on: c.reset_on[0] } : c.reset_on.length > 1 ? { reset_on: c.reset_on } : {}) };
-  const { $schema: _schema, when: _when, counters: _counters, steps: _steps, start: _start, base: _base, ...rest } = written;
+  const { $schema: _schema, counters: _counters, steps: _steps, start: _start, base: _base, ...rest } = written;
   const doc: WorkflowDocument = {
     ...rest,
     start: flat.start,

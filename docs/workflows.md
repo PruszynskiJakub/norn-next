@@ -8,7 +8,7 @@ The `sdlc` pack's workflows, drawn from the workflow loader. A box is an agent s
 
 ## `fix`
 
-Reproduce a bug and confirm its cause, fix it test-first, review it, open the draft PR, wait for CI.
+For a bug whose fix looks small and settled: reproduce it and confirm its cause, fix it test-first, review it, open the draft PR, wait for CI.
 
 ```mermaid
 flowchart TD
@@ -103,7 +103,7 @@ flowchart TD
 
 ## `quick`
 
-Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
+For a refactor, docs, a chore or another small change, or the fix of a bug a reproduce round confirmed: make it, check and review it, open the draft PR, wait for CI.
 
 ```mermaid
 flowchart TD
@@ -193,7 +193,7 @@ flowchart TD
 
 ## `refinement`
 
-Agree a story's spec and plan with a person, against the current base; no code.
+For a story that needs a spec and a plan before code: agree them with a person against the current base; no code. The next round is story or quick.
 
 ```mermaid
 flowchart TD
@@ -221,7 +221,7 @@ flowchart TD
 
 ## `reproduce`
 
-Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.
+For a bug whose cause a person wants before anyone fixes it: reproduce it through the real interface, confirm its cause and the seam for a regression test; change no code. The next round is fix, quick or refinement.
 
 ```mermaid
 flowchart TD
@@ -237,7 +237,7 @@ flowchart TD
 
 ## `slice`
 
-Build one slice test-first, check and review it, and integrate it into the story branch.
+Runs on each slice a story workflow cuts, never started by hand: build the slice test-first, check and review it, and integrate it into the story branch.
 
 ```mermaid
 flowchart TD
@@ -266,7 +266,7 @@ flowchart TD
 
 ## `story`
 
-Slice a planned story against the current base, run the slices, verify the story, open the draft PR, wait for CI.
+For a story a refinement round planned: slice it against the current base, run the slices, verify the story, open the draft PR, wait for CI.
 
 ```mermaid
 flowchart TD
@@ -378,7 +378,7 @@ flowchart TD
 
 ## `triage`
 
-Check an issue still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it.
+The first round of a new issue: check it still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it.
 
 ```mermaid
 flowchart TD

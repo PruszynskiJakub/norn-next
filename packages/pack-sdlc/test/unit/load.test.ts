@@ -246,9 +246,10 @@ describe("how the pack's workflows bring in their shared files", () => {
     expect(stale("quick.yaml").land).toEqual({ max: DEFAULT_KERNEL_CONFIG.counterDefaults.stale, reset_on: [] });
   });
 
-  test.each(files)("%s says when to pick it and what comes next in its when:, the text a catalog shows", (file) => {
-    const when = (parse(SDLC_PACK.workflows[file] as string) as { when?: unknown }).when;
-    expect({ file, when: typeof when === "string" && when.trim().length > 0 }).toEqual({ file, when: true });
+  // the catalog prints the description, so it is where a person reads when to pick the workflow
+  test.each(files)("%s's description says when to pick it, then what it does", (file) => {
+    const doc = parse(SDLC_PACK.workflows[file] as string) as { description?: unknown; when?: unknown };
+    expect({ file, when: doc.when, description: String(doc.description) }).toEqual({ file, when: undefined, description: expect.stringMatching(/^(For |Runs on |The first round )[^:]+: \S/) });
   });
 
   test("a file's header comment, where it has one, is a few lines, without restating the pack it ships in", () => {

@@ -79,11 +79,6 @@ describe("this repo's workflow files, as written", () => {
     expect(written.filter(({ doc }) => "base" in doc).map(({ file }) => file)).toEqual([]);
   });
 
-  // the released binary runs this checkout's rounds and refuses a top-level key it does not know;
-  // a key new in this tree moves into the repo's own files only once a release reads it
-  test("no top-level key the released norn refuses: the round guidance stays a comment until a release reads when:", () => {
-    expect(written.filter(({ doc }) => "when" in doc).map(({ file }) => file)).toEqual([]);
-  });
 });
 
 /** A workflow as written, its shared files flattened in: the doc the loader pins. */

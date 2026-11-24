@@ -30,7 +30,6 @@ export const workflowShowCommand = defineCommand({
     const md = [`# Workflow \`${name}\``, "", `From ${SOURCE[entry.source]}${entry.file ? ` (${entry.file})` : ""}.`];
     if (entry.state === "held") md.push(`Held for the person's confirmation (${(entry.changes ?? []).join("; ")}): shown as it runs once confirmed with ${entry.confirm}.`);
     md.push("");
-    if (value.when) md.push(`When: ${value.when}`, "");
     if (value.description) md.push(value.description, "");
     md.push(`Starts at \`${value.start}\`.`, "", "## Steps", "");
     for (const s of value.steps) {

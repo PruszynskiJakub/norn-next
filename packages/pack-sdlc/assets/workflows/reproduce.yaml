@@ -1,9 +1,8 @@
+# For a bug whose cause a person wants before anyone fixes it; label it norn:wf:reproduce, or start it
+# after triage. Next round: `fix` or `quick` (implement turns the red loop into a failing test first),
+# or `refinement`.
 name: reproduce
-description: Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.
-when: >-
-  For a bug whose cause a person wants before anyone fixes it; label it norn:wf:reproduce, or start it
-  after triage. Next round: `fix` or `quick` (implement turns the red loop into a failing test first),
-  or `refinement`.
+description: "For a bug whose cause a person wants before anyone fixes it: reproduce it through the real interface, confirm its cause and the seam for a regression test; change no code. The next round is fix, quick or refinement."
 start: diagnose
 steps:
   diagnose:

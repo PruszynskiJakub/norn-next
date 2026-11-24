@@ -553,31 +553,9 @@ describe("loading: copies, limits and hashes", () => {
   });
 });
 
-describe("when", () => {
-  test("a workflow with a top-level when: loads, as one without it does", () => {
-    expect(loadWorkflow(wf({ build: agent({ done: "$done" }) }, { when: "Pick it for a small change." }), opts()).ok).toBe(true);
-    expect(loadWorkflow(wf({ build: agent({ done: "$done" }) }), opts()).ok).toBe(true);
-  });
-
-  test("when: is a string", () => {
-    expect(errorsOf(loadWorkflow(wf({ build: agent({ done: "$done" }) }, { when: 3 }), opts())).map((e) => e.path)).toEqual(["/when"]);
-  });
-
-  test("when: stays out of the pinned document, so the hash and graph are those of the workflow without it", () => {
-    const without = loaded(loadWorkflow(wf({ build: agent({ done: "$done" }) }), opts()));
-    const withIt = loaded(loadWorkflow(wf({ build: agent({ done: "$done" }) }, { when: "Pick it for a small change." }), opts()));
-    expect(withIt.pinned).toEqual(without.pinned);
-    expect(withIt.graph).toEqual(without.graph);
-  });
-
-  test("a shipped workflow with its when: removed pins the same hash", () => {
-    const { workflows, shared } = shipped();
-    for (const [file, doc] of Object.entries(workflows)) {
-      const { when: _when, ...rest } = doc as Record<string, unknown>;
-      const a = loaded(loadWorkflow(doc, opts({ sharedFiles: shared })));
-      const b = loaded(loadWorkflow(rest, opts({ sharedFiles: shared })));
-      expect([file, a.pinned.hash]).toEqual([file, b.pinned.hash]);
-    }
+describe("a top-level when:", () => {
+  test("is refused as an unknown key: a workflow says when to pick it in its description", () => {
+    expect(errorsOf(loadWorkflow(wf({ build: agent({ done: "$done" }) }, { when: "Pick it for a small change." }), opts())).length).toBeGreaterThan(0);
   });
 });
 

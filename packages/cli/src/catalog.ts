@@ -30,7 +30,7 @@ export interface CatalogStep {
 
 export interface CatalogWorkflow {
   name: string;
-  when: string;
+  /** when to pick it and what it does */
   description: string;
   start: string;
   /** the intake label that starts it; null for the workflow a story's `slices` step runs on each slice */
@@ -81,7 +81,6 @@ export function packCatalog(pack: Pack, plugins: readonly NornPlugin[]): Catalog
       : [];
     return {
       name,
-      when: oneLine(doc.when),
       description: oneLine(doc.description),
       // a `start:` naming a shared group is entered at the group's first step, which the steps list
       start: load?.ok ? load.workflow.graph.start : typeof doc.start === "string" ? doc.start : "",
@@ -134,8 +133,8 @@ export async function readCatalog(ctx: CliContext): Promise<RepoCatalog> {
   }
 }
 
-/** The `when:` and `description:` a workflow file says, read off its text: the loader keeps `when:` out of the pinned document. */
-function said(text: string | undefined): { when: string | null; description: string | null } {
+/** The `description:` a workflow file says, read off its text, so a held or invalid file still shows one. */
+function said(text: string | undefined): { description: string | null } {
   let doc: unknown;
   try {
     doc = text === undefined ? null : parse(text);
@@ -146,7 +145,7 @@ function said(text: string | undefined): { when: string | null; description: str
     const v = (doc as Record<string, unknown> | null)?.[k];
     return typeof v === "string" && v.trim() ? v.trim().replace(/\s+/g, " ") : null;
   };
-  return { when: field("when"), description: field("description") };
+  return { description: field("description") };
 }
 
 const fileText = (files: Readonly<Record<string, string>>, name: string): string | undefined => Object.entries(files).find(([f]) => workflowNameOf(f) === name)?.[1];

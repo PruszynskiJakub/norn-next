@@ -257,10 +257,8 @@ export const SourceDoc = Type.Object(
 export type SourceDoc = Static<typeof SourceDoc>;
 export const SourcesDoc = Type.Record(Type.String({ pattern: OUTCOME_NAME_PATTERN }), SourceDoc, closed);
 
-/** What only a workflow file holds: `signals:` and `entries:`, lowered into the pinned document's `base:`, and `when:`, dropped from it. */
+/** What only a workflow file holds: `signals:` and `entries:`, lowered into the pinned document's `base:`. */
 const FILE_KEYS = {
-  /** when to pick the workflow: a catalog's text, never pinned, so writing it moves no hash */
-  when: Type.Optional(Type.String({ minLength: 1 })),
   signals: Type.Optional(Type.Record(SignalSurfaceName, SignalSettingsDoc, closed)),
   /** a way back into the workflow by name (`update-branch`) → the step it enters */
   entries: Type.Optional(Type.Record(Type.String({ pattern: "^[a-z][a-z0-9_-]*$" }), StepName, closed)),

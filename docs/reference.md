@@ -137,10 +137,10 @@ signals: { vcs.stale: { when: conflict, verify: test } }   # when: conflict (def
 entries: { update-branch: update }
 ```
 
-A workflow may say when to pick it, and what round comes next, in a top-level `when:`. It is optional, the catalog's text, and kept out of the pinned workflow, so writing or changing it moves no hash and disturbs no running unit:
+A workflow's `description:` says when to pick it, then what it does; `norn workflow list`, `norn workflow show` and the catalog print it:
 
 ```yaml
-when: For refactors, docs, chores and other small changes. A merged PR ends the story.
+description: "For a refactor, docs, a chore or another small change: make it, check and review it, open the draft PR, wait for CI."
 ```
 
 ### Workflow floor and confirmation
@@ -871,15 +871,13 @@ Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner`, `ru
 
 ### Workflow catalog
 
-The `sdlc` pack's workflows, each drawn as a graph in [Workflows](workflows.md). An issue's `norn:wf:<name>` label picks the workflow its first round runs; a person starts each later round with `norn story round`, and each workflow's When names the rounds that follow it. A repo's own `.agents/workflows/` file replaces the pack's of the same name. Each step lists the skills its agent loads.
+The `sdlc` pack's workflows, each drawn as a graph in [Workflows](workflows.md). An issue's `norn:wf:<name>` label picks the workflow its first round runs; a person starts each later round with `norn story round`, and each workflow's description says when to pick it. A repo's own `.agents/workflows/` file replaces the pack's of the same name. Each step lists the skills its agent loads.
 
 #### `fix`
 
 Label `norn:wf:fix` · starts at `sync`
 
-Reproduce a bug and confirm its cause, fix it test-first, review it, open the draft PR, wait for CI.
-
-**When:** For a bug whose fix looks small and settled: one round reproduces it, then fixes it behind a regression test. A merged PR ends the story; a bug that would not reproduce ends the round.
+For a bug whose fix looks small and settled: reproduce it and confirm its cause, fix it test-first, review it, open the draft PR, wait for CI.
 
 | Step | Kind | Skills |
 |---|---|---|
@@ -905,9 +903,7 @@ Reproduce a bug and confirm its cause, fix it test-first, review it, open the dr
 
 Label `norn:wf:quick` · starts at `sync`
 
-Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
-
-**When:** For refactors, docs, chores and other small changes, and the fix of a bug a reproduce round confirmed. A merged PR ends the story.
+For a refactor, docs, a chore or another small change, or the fix of a bug a reproduce round confirmed: make it, check and review it, open the draft PR, wait for CI.
 
 | Step | Kind | Skills |
 |---|---|---|
@@ -932,9 +928,7 @@ Make a small change (refactor, docs, chore, a reproduced bug's fix), check and r
 
 Label `norn:wf:refinement` · starts at `sync`
 
-Agree a story's spec and plan with a person, against the current base; no code.
-
-**When:** For a story that needs a spec and a plan before code. No gate: starting the next round (`norn story round <story> --workflow story|quick`) approves the plan; `--workflow refinement --at plan` reworks it.
+For a story that needs a spec and a plan before code: agree them with a person against the current base; no code. The next round is story or quick.
 
 | Step | Kind | Skills |
 |---|---|---|
@@ -948,9 +942,7 @@ Agree a story's spec and plan with a person, against the current base; no code.
 
 Label `norn:wf:reproduce` · starts at `reproduce`
 
-Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.
-
-**When:** For a bug whose cause a person wants before anyone fixes it; label it norn:wf:reproduce, or start it after triage. Next round: `fix` or `quick` (implement turns the red loop into a failing test first), or `refinement`.
+For a bug whose cause a person wants before anyone fixes it: reproduce it through the real interface, confirm its cause and the seam for a regression test; change no code. The next round is fix, quick or refinement.
 
 | Step | Kind | Skills |
 |---|---|---|
@@ -960,9 +952,7 @@ Reproduce a bug through the real interface, confirm its cause and the seam for a
 
 No label: a story's `slices` step runs it on each slice · starts at `implement`
 
-Build one slice test-first, check and review it, and integrate it into the story branch.
-
-**When:** Runs on each slice a story workflow cuts; the story's qa checks the slice's criteria, once.
+Runs on each slice a story workflow cuts, never started by hand: build the slice test-first, check and review it, and integrate it into the story branch.
 
 | Step | Kind | Skills |
 |---|---|---|
@@ -976,9 +966,7 @@ Build one slice test-first, check and review it, and integrate it into the story
 
 Label `norn:wf:story` · starts at `sync`
 
-Slice a planned story against the current base, run the slices, verify the story, open the draft PR, wait for CI.
-
-**When:** For a story a refinement round planned; start it with `norn story round <story> --workflow story`. A merged PR ends the story.
+For a story a refinement round planned: slice it against the current base, run the slices, verify the story, open the draft PR, wait for CI.
 
 | Step | Kind | Skills |
 |---|---|---|
@@ -1008,9 +996,7 @@ Slice a planned story against the current base, run the slices, verify the story
 
 Label `norn:wf:triage` · starts at `explore`
 
-Check an issue still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it.
-
-**When:** The first round of a new issue. Next round: the one its outcome names (`norn story round <story> --workflow refinement|quick|reproduce|fix`); after close, a person closes the issue.
+The first round of a new issue: check it still holds, add its context, and end with the next round it recommends (refinement, quick, reproduce, fix) or closing it.
 
 | Step | Kind | Skills |
 |---|---|---|

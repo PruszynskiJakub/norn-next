@@ -203,14 +203,14 @@ function renderConfig(): string[] {
 function renderWorkflow(w: CatalogWorkflow): string[] {
   const label = w.label === null ? "No label: a story's `slices` step runs it on each slice" : `Label \`${w.label}\``;
   const steps = w.steps.map((st) => `| \`${st.name}\` | ${tableCell(st.kind)} | ${st.skills.length ? st.skills.map((k) => `\`${k}\``).join(", ") : "—"} |`);
-  return [`#### \`${w.name}\``, "", `${label} · starts at \`${w.start}\``, "", w.description, "", `**When:** ${w.when}`, "", ...(steps.length ? ["| Step | Kind | Skills |", "|---|---|---|", ...steps, ""] : [])];
+  return [`#### \`${w.name}\``, "", `${label} · starts at \`${w.start}\``, "", w.description, "", ...(steps.length ? ["| Step | Kind | Skills |", "|---|---|---|", ...steps, ""] : [])];
 }
 
 function renderCatalog(pack: string, catalog: Catalog): string[] {
   return [
     "### Workflow catalog",
     "",
-    `The \`${pack}\` pack's workflows, each drawn as a graph in [Workflows](workflows.md). An issue's \`norn:wf:<name>\` label picks the workflow its first round runs; a person starts each later round with \`norn story round\`, and each workflow's When names the rounds that follow it. A repo's own \`.agents/workflows/\` file replaces the pack's of the same name. Each step lists the skills its agent loads.`,
+    `The \`${pack}\` pack's workflows, each drawn as a graph in [Workflows](workflows.md). An issue's \`norn:wf:<name>\` label picks the workflow its first round runs; a person starts each later round with \`norn story round\`, and each workflow's description says when to pick it. A repo's own \`.agents/workflows/\` file replaces the pack's of the same name. Each step lists the skills its agent loads.`,
     "",
     ...catalog.workflows.flatMap(renderWorkflow),
     "### Skills",
@@ -276,14 +276,14 @@ export const CONTRIBUTING_MARKERS: MarkerPair = {
   end: "<!-- norn:workflows:end -->",
 };
 
-/** CONTRIBUTING.md's workflow table, markers included: one row per workflow a repo can start, by label; a workflow with no `when:` shows its description, so no row is blank. */
+/** CONTRIBUTING.md's workflow table, markers included: one row per workflow a repo can start, by label, with its description. */
 export function renderWorkflowTable(workflows: readonly CatalogWorkflow[]): string {
   return [
     CONTRIBUTING_MARKERS.start,
     "",
-    "| Label | Workflow | When |",
+    "| Label | Workflow | Description |",
     "|---|---|---|",
-    ...workflows.map((w) => `| ${w.label === null ? "—" : `\`${w.label}\``} | ${w.name} | ${tableCell(w.when || w.description)} |`),
+    ...workflows.map((w) => `| ${w.label === null ? "—" : `\`${w.label}\``} | ${w.name} | ${tableCell(w.description)} |`),
     "",
     CONTRIBUTING_MARKERS.end,
   ].join("\n");
