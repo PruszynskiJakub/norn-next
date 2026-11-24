@@ -167,7 +167,7 @@ function linkProblem(from: string, target: string, readText: (path: string) => s
 
 /** Every markdown file but dependencies, story specs and CHANGELOG. */
 function linkedDocs(): string[] {
-  return textFiles(ROOT, [".md"]).filter((f) => !rel(f).startsWith(".agents/specs/") && rel(f) !== "CHANGELOG.md");
+  return textFiles(ROOT, [".md"]).filter((f) => !rel(f).startsWith(".agents/specs/") && rel(f) !== "CHANGELOG.md" && !ignoredByFolder(rel(f)));
 }
 
 describe("links resolve (B36, B37)", () => {
